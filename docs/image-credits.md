@@ -28,4 +28,47 @@
 
 ## スポット（spots、#30・#58）
 
-#30・#58 で足す。
+写真はまだない。北アルプス山麓の5地域のスポット（#30）は `supabase/seed.sql` の `image_path` が全件 `null` で、表示側はプレースホルダーを出す。写真は #65 で用意し、置いたら `image_path` に下の表の予定のパスを入れる（パスの番号は `spots.id` の末尾2桁と同じ）。スポットの事実の出典は docs/spot-sources.md。全国のほかの地域のスポット（#58）は写真がなくてよい。
+
+| スポット                   | 地域     | 予定の `image_path`              | 出典（URL・撮影者） | ライセンス | 状態   |
+| -------------------------- | -------- | -------------------------------- | ------------------- | ---------- | ------ |
+| 白馬塩の道温泉 倉下の湯    | 白馬村   | `/images/spots/hakuba-01.jpg`    |                     |            | 未用意 |
+| 青鬼集落                   | 白馬村   | `/images/spots/hakuba-02.jpg`    |                     |            | 未用意 |
+| 大出公園                   | 白馬村   | `/images/spots/hakuba-03.jpg`    |                     |            | 未用意 |
+| 姫川源流自然探勝園         | 白馬村   | `/images/spots/hakuba-04.jpg`    |                     |            | 未用意 |
+| 白馬ガラス工房GAKU         | 白馬村   | `/images/spots/hakuba-05.jpg`    |                     |            | 未用意 |
+| 貞麟寺                     | 白馬村   | `/images/spots/hakuba-06.jpg`    |                     |            | 未用意 |
+| おやきの山愛               | 白馬村   | `/images/spots/hakuba-07.jpg`    |                     |            | 未用意 |
+| Kitchen＆Marché 農かふぇ   | 白馬村   | `/images/spots/hakuba-08.jpg`    |                     |            | 未用意 |
+| 塩の道ちょうじや           | 大町市   | `/images/spots/omachi-01.jpg`    |                     |            | 未用意 |
+| 若一王子神社               | 大町市   | `/images/spots/omachi-02.jpg`    |                     |            | 未用意 |
+| ぽかぽかランド美麻         | 大町市   | `/images/spots/omachi-03.jpg`    |                     |            | 未用意 |
+| ゆいせきや                 | 大町市   | `/images/spots/omachi-04.jpg`    |                     |            | 未用意 |
+| 創舎 わちがい              | 大町市   | `/images/spots/omachi-05.jpg`    |                     |            | 未用意 |
+| 居谷里湿原                 | 大町市   | `/images/spots/omachi-06.jpg`    |                     |            | 未用意 |
+| 中綱湖                     | 大町市   | `/images/spots/omachi-07.jpg`    |                     |            | 未用意 |
+| 鷹狩山                     | 大町市   | `/images/spots/omachi-08.jpg`    |                     |            | 未用意 |
+| 池田八幡神社               | 池田町   | `/images/spots/ikeda-01.jpg`     |                     |            | 未用意 |
+| あづみ野池田クラフトパーク | 池田町   | `/images/spots/ikeda-02.jpg`     |                     |            | 未用意 |
+| 北アルプス展望美術館       | 池田町   | `/images/spots/ikeda-03.jpg`     |                     |            | 未用意 |
+| 夢農場                     | 池田町   | `/images/spots/ikeda-04.jpg`     |                     |            | 未用意 |
+| 花紋大雪渓                 | 池田町   | `/images/spots/ikeda-05.jpg`     |                     |            | 未用意 |
+| カフェ風のいろ             | 池田町   | `/images/spots/ikeda-06.jpg`     |                     |            | 未用意 |
+| HOP FROG CAFE              | 池田町   | `/images/spots/ikeda-07.jpg`     |                     |            | 未用意 |
+| 発酵と暮らし おはこ        | 池田町   | `/images/spots/ikeda-08.jpg`     |                     |            | 未用意 |
+| 豊科温泉 湯多里山の神      | 安曇野市 | `/images/spots/azumino-01.jpg`   |                     |            | 未用意 |
+| ほりでーゆ〜四季の郷       | 安曇野市 | `/images/spots/azumino-02.jpg`   |                     |            | 未用意 |
+| 安曇野市天蚕センター       | 安曇野市 | `/images/spots/azumino-03.jpg`   |                     |            | 未用意 |
+| 貞享義民記念館             | 安曇野市 | `/images/spots/azumino-04.jpg`   |                     |            | 未用意 |
+| 長峰山                     | 安曇野市 | `/images/spots/azumino-05.jpg`   |                     |            | 未用意 |
+| 御宝田遊水池               | 安曇野市 | `/images/spots/azumino-06.jpg`   |                     |            | 未用意 |
+| 烏川渓谷緑地               | 安曇野市 | `/images/spots/azumino-07.jpg`   |                     |            | 未用意 |
+| 三郷サラダ市               | 安曇野市 | `/images/spots/azumino-08.jpg`   |                     |            | 未用意 |
+| 松本市はかり資料館         | 松本市   | `/images/spots/matsumoto-01.jpg` |                     |            | 未用意 |
+| ホットプラザ浅間           | 松本市   | `/images/spots/matsumoto-02.jpg` |                     |            | 未用意 |
+| 手仕事商會 すぐり          | 松本市   | `/images/spots/matsumoto-03.jpg` |                     |            | 未用意 |
+| ファーマーズガーデンうちだ | 松本市   | `/images/spots/matsumoto-04.jpg` |                     |            | 未用意 |
+| 源智の井戸                 | 松本市   | `/images/spots/matsumoto-05.jpg` |                     |            | 未用意 |
+| 馬場家住宅                 | 松本市   | `/images/spots/matsumoto-06.jpg` |                     |            | 未用意 |
+| 弘法山古墳                 | 松本市   | `/images/spots/matsumoto-07.jpg` |                     |            | 未用意 |
+| 城山公園                   | 松本市   | `/images/spots/matsumoto-08.jpg` |                     |            | 未用意 |
