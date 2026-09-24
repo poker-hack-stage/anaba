@@ -41,6 +41,7 @@ npm run dev             # http://localhost:3000
 | `npm run lint` / `lint:fix`       | ESLint                                                       |
 | `npm run format` / `format:check` | Prettier                                                     |
 | `npm run typecheck`               | 型チェック                                                   |
+| `npm test` / `test:watch`         | テスト（Vitest）を1回実行 / 変更を監視して再実行             |
 | `npm run db:start` / `db:stop`    | ローカル Supabase 起動 / 停止                                |
 | `npm run db:new <名前>`           | マイグレーションファイル作成                                 |
 | `npm run db:reset`                | ローカル DB を作り直し（全マイグレーション + seed を再適用） |
@@ -64,7 +65,7 @@ components/           共通コンポーネント
 lib/
   auth.ts             ログイン中ユーザーの取得
   data/               DB 読み取り関数（ページからはここを呼ぶ）
-  spots/categories.ts スポットのカテゴリ定義（色・絵文字）
+  spots/categories.ts スポットのカテゴリ定義（色・絵文字）。テストは隣の categories.test.ts
   planner/            旅プランの型と候補の生成（generate.ts が仮実装）
 lib/supabase/         Supabase クライアント
   server.ts           Server Component / Server Action / Route Handler 用
@@ -75,6 +76,8 @@ supabase/
   migrations/         DB スキーマ変更（SQL）
   seed.sql            ローカル用初期データ
 proxy.ts              Next.js Proxy（旧 middleware）
+test/                 テストの共通設定（setup.ts）とモック（mocks/）
+vitest.config.mts     Vitest の設定
 ```
 
 ## 開発フロー
@@ -82,7 +85,7 @@ proxy.ts              Next.js Proxy（旧 middleware）
 1. Issue を立てる（またはアサインされる）
 2. `main` からブランチを切る: `feat/xxx`, `fix/xxx`, `chore/xxx`
 3. 実装してコミット（例: `feat: プロフィール編集画面を追加`）
-4. PR を作成 → CI（lint / format / typecheck / build）が通ること、1 人以上のレビューで `main` にマージ
+4. PR を作成 → CI（lint / format / typecheck / test / build）が通ること、1 人以上のレビューで `main` にマージ
 5. PR ごとに Vercel の Preview URL が発行され、`main` へのマージで本番デプロイされる
 
 `main` への直 push は禁止（GitHub の Branch protection で設定推奨）。
@@ -107,6 +110,19 @@ npx supabase login
 npx supabase link --project-ref <project-ref>
 npx supabase db push
 ```
+
+### テストを書くとき
+
+Vitest + React Testing Library（`jsdom`）。設定は `vitest.config.mts`、見本は `lib/spots/categories.test.ts`。
+
+- **置き場所と命名**: 対象ファイルの隣に `<ファイル名>.test.ts`（コンポーネントなら `.test.tsx`）を置く。例: `lib/spots/categories.ts` → `lib/spots/categories.test.ts`
+- **書く対象**
+  - `lib/` の関数: Vitest で書く
+  - クライアントコンポーネント（`"use client"`）: Testing Library で描画して確かめる
+  - async の Server Component: Vitest では描画できないので、中のロジックを `lib/` の関数に切り出してその関数をテストする
+- **外部サービスは呼ばない**: Supabase と Claude API はテストから呼ばない。フィクスチャ（`supabase/seed.sql` 相当のデータを TS で書いたもの）や `vi.mock()` で差し替える
+- `import "server-only"` を含むファイルもテストで読み込める（`vitest.config.mts` で空のモジュールに差し替えている）
+- `describe` / `expect` / `test` などはグローバルにせず、各ファイルで `import { describe, expect, test } from "vitest"` する
 
 ## デプロイ（Vercel）
 
