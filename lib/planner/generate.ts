@@ -1,5 +1,6 @@
 import type { AreaWithSpots } from "@/lib/data/areas";
 import type { SpotCategory } from "@/lib/spots/categories";
+import { compareByRating } from "@/lib/spots/score";
 import type { PlanCandidate, PlanConditions } from "./types";
 
 const INTEREST_TO_CATEGORY: Record<string, SpotCategory> = {
@@ -38,7 +39,7 @@ export function generateCandidates(
         (a, b) =>
           Number(wanted.has(b.category as SpotCategory)) -
             Number(wanted.has(a.category as SpotCategory)) ||
-          (b.rating ?? 0) - (a.rating ?? 0),
+          compareByRating(a, b),
       );
       const route = sorted.slice(0, MAX_ROUTE_LENGTH);
       const routeIds = new Set(route.map((s) => s.id));

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/lib/supabase/database.types";
+import { compareByRating } from "@/lib/spots/score";
 import type { Spot } from "./spots";
 
 export type Area = Tables<"areas">;
@@ -42,7 +43,5 @@ export async function getAreasWithSpots(): Promise<AreaWithSpots[]> {
  * TODO(#14): 今は評価の高い順に3件。選び方を決めたらここを差し替える
  */
 function pickRecommended(spots: Spot[], count = 3): Spot[] {
-  return [...spots]
-    .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
-    .slice(0, count);
+  return [...spots].sort(compareByRating).slice(0, count);
 }

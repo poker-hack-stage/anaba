@@ -1,6 +1,7 @@
 import { Clock, Star } from "lucide-react";
 import type { Spot } from "@/lib/data/spots";
 import { getCategory } from "@/lib/spots/categories";
+import { formatRating, getRating } from "@/lib/spots/score";
 import { SpotImage } from "./spot-image";
 
 /**
@@ -14,6 +15,7 @@ export function SpotCard({
   onSelect?: (spot: Spot) => void;
 }) {
   const meta = getCategory(spot.category);
+  const rating = getRating(spot);
 
   return (
     <button
@@ -32,10 +34,10 @@ export function SpotCard({
           >
             {meta.emoji} {meta.label}
           </span>
-          {spot.rating !== null && (
+          {rating !== null && (
             <span className="ml-auto flex items-center gap-0.5 text-xs font-bold text-amber-600">
               <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
-              {spot.rating}
+              {formatRating(rating)}
             </span>
           )}
         </div>

@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { Clock, Lightbulb, Star, Timer, X } from "lucide-react";
 import type { Spot } from "@/lib/data/spots";
 import { getCategory } from "@/lib/spots/categories";
+import { formatRating, getRating } from "@/lib/spots/score";
 import { SpotImage } from "./spot-image";
 
 /** スポット詳細。「穴場を探す」と「AI旅プラン」の両方で使う（#24） */
@@ -23,6 +24,7 @@ export function SpotDetailDialog({
 
   if (!spot) return null;
   const meta = getCategory(spot.category);
+  const rating = getRating(spot);
 
   return (
     <div
@@ -62,10 +64,10 @@ export function SpotDetailDialog({
               <h2 className="text-xl font-extrabold text-stone-900">
                 {spot.name}
               </h2>
-              {spot.rating !== null && (
+              {rating !== null && (
                 <span className="flex shrink-0 items-center gap-1 font-bold text-amber-600">
                   <Star className="h-4 w-4 fill-amber-500 text-amber-500" />
-                  {spot.rating}
+                  {formatRating(rating)}
                 </span>
               )}
             </div>
