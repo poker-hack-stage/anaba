@@ -1,7 +1,7 @@
 "use client";
 
 import "leaflet/dist/leaflet.css";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import type { GeoJsonObject } from "geojson";
 import { Map } from "lucide-react";
@@ -85,6 +85,14 @@ export function SpotMap({
     () => (boundary ? toBoundaryLayer(boundary) : null),
     [boundary],
   );
+  // cacheComponents で前のページが <Activity> に隠れると、effect の後始末で react-leaflet が map.remove() する。
+  // 隠れている間は MapContainer を外し、表示に戻ったら作り直す（外さないと壊れた地図を再利用して落ちる）
+  const [active, setActive] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 表示・非表示（Activity）に合わせて地図を作り直すため
+    setActive(true);
+    return () => setActive(false);
+  }, []);
 
   return (
     // isolate: Leaflet 内部の z-index（最大 1000）がヘッダーやダイアログより前に出ないようにする
@@ -94,74 +102,76 @@ export function SpotMap({
         className,
       )}
     >
-      <MapContainer
-        center={JAPAN_CENTER}
-        zoom={JAPAN_ZOOM}
-        minZoom={MIN_ZOOM}
-        maxZoom={MAX_ZOOM}
-        // 1ページに地図が複数並ぶので、ホイールでページのスクロールを奪わない
-        scrollWheelZoom={false}
-        // タッチ端末では1本指のドラッグで地図を動かさず、ページをスクロールさせる（ピンチと＋−ボタンで操作できる）
-        dragging={!L.Browser.mobile}
-        zoomControl={false}
-        className="h-full w-full bg-emerald-50/60"
-      >
-        <TileLayer
-          url={TILE_URL}
-          attribution={TILE_ATTRIBUTION}
+      {active && (
+        <MapContainer
+          center={JAPAN_CENTER}
+          zoom={JAPAN_ZOOM}
           minZoom={MIN_ZOOM}
           maxZoom={MAX_ZOOM}
-        />
-        {/* 地域名のバッジと重ならないよう右上に置く */}
-        <ZoomControl position="topright" />
-        <FitBounds points={points} boundaryLayer={boundaryLayer} />
-        {boundaryLayer && <BoundaryLayer layer={boundaryLayer} />}
+          // 1ページに地図が複数並ぶので、ホイールでページのスクロールを奪わない
+          scrollWheelZoom={false}
+          // タッチ端末では1本指のドラッグで地図を動かさず、ページをスクロールさせる（ピンチと＋−ボタンで操作できる）
+          dragging={!L.Browser.mobile}
+          zoomControl={false}
+          className="h-full w-full bg-emerald-50/60"
+        >
+          <TileLayer
+            url={TILE_URL}
+            attribution={TILE_ATTRIBUTION}
+            minZoom={MIN_ZOOM}
+            maxZoom={MAX_ZOOM}
+          />
+          {/* 地域名のバッジと重ならないよう右上に置く */}
+          <ZoomControl position="topright" />
+          <FitBounds points={points} boundaryLayer={boundaryLayer} />
+          {boundaryLayer && <BoundaryLayer layer={boundaryLayer} />}
 
-        {routeLine.length > 1 && (
-          <Polyline
-            positions={routeLine}
-            pathOptions={{
-              color: ROUTE_COLOR,
-              weight: 3,
-              dashArray: "8 6",
-              lineCap: "round",
-            }}
-          />
-        )}
+          {routeLine.length > 1 && (
+            <Polyline
+              positions={routeLine}
+              pathOptions={{
+                color: ROUTE_COLOR,
+                weight: 3,
+                dashArray: "8 6",
+                lineCap: "round",
+              }}
+            />
+          )}
 
-        {others.map((spot) => (
-          <SpotMarker
-            key={`other-${spot.id}`}
-            spot={spot}
-            icon={pinIcon(spot, "sm")}
-            title={spot.name}
-            onSpotClick={onSpotClick}
-            onSpotHover={onSpotHover}
-          />
-        ))}
-        {highlighted.map((spot) => (
-          <SpotMarker
-            key={`highlighted-${spot.id}`}
-            spot={spot}
-            icon={pinIcon(spot, "lg")}
-            title={spot.name}
-            zIndexOffset={500}
-            onSpotClick={onSpotClick}
-            onSpotHover={onSpotHover}
-          />
-        ))}
-        {route.map((spot, i) => (
-          <SpotMarker
-            key={`route-${spot.id}`}
-            spot={spot}
-            icon={pinIcon(spot, "md", String(i + 1))}
-            title={`${i + 1}. ${spot.name}`}
-            zIndexOffset={1000}
-            onSpotClick={onSpotClick}
-            onSpotHover={onSpotHover}
-          />
-        ))}
-      </MapContainer>
+          {others.map((spot) => (
+            <SpotMarker
+              key={`other-${spot.id}`}
+              spot={spot}
+              icon={pinIcon(spot, "sm")}
+              title={spot.name}
+              onSpotClick={onSpotClick}
+              onSpotHover={onSpotHover}
+            />
+          ))}
+          {highlighted.map((spot) => (
+            <SpotMarker
+              key={`highlighted-${spot.id}`}
+              spot={spot}
+              icon={pinIcon(spot, "lg")}
+              title={spot.name}
+              zIndexOffset={500}
+              onSpotClick={onSpotClick}
+              onSpotHover={onSpotHover}
+            />
+          ))}
+          {route.map((spot, i) => (
+            <SpotMarker
+              key={`route-${spot.id}`}
+              spot={spot}
+              icon={pinIcon(spot, "md", String(i + 1))}
+              title={`${i + 1}. ${spot.name}`}
+              zIndexOffset={1000}
+              onSpotClick={onSpotClick}
+              onSpotHover={onSpotHover}
+            />
+          ))}
+        </MapContainer>
+      )}
 
       {all.length === 0 && !boundaryLayer && (
         <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center">
