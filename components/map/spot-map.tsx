@@ -194,14 +194,13 @@ function FitBounds({
 
   useEffect(() => {
     const bounds = L.latLngBounds(points);
-    if (boundary) {
-      const boundaryBounds = L.geoJSON(boundary).getBounds();
-      if (boundaryBounds.isValid()) bounds.extend(boundaryBounds);
-    }
+    const boundaryLayer = boundary ? toBoundaryLayer(boundary) : null;
+    const boundaryBounds = boundaryLayer?.getBounds();
+    if (boundaryBounds?.isValid()) bounds.extend(boundaryBounds);
 
     if (!bounds.isValid()) {
       map.setView(JAPAN_CENTER, JAPAN_ZOOM);
-    } else if (points.length === 1 && !boundary) {
+    } else if (points.length === 1 && !boundaryBounds?.isValid()) {
       map.setView(points[0], SINGLE_SPOT_ZOOM);
     } else {
       map.fitBounds(bounds, { padding: [36, 36], maxZoom: 16 });
@@ -218,7 +217,19 @@ function BoundaryLayer({ data }: { data: GeoJsonObject }) {
   const map = useMap();
 
   useEffect(() => {
-    const layer = L.geoJSON(data, {
+    const layer = toBoundaryLayer(data)?.addTo(map);
+    return () => {
+      layer?.remove();
+    };
+  }, [map, data]);
+
+  return null;
+}
+
+/** 境界の GeoJSON をレイヤーにする。DB の値が GeoJSON として読めなければ null（地図ごと落とさない） */
+function toBoundaryLayer(data: GeoJsonObject) {
+  try {
+    return L.geoJSON(data, {
       style: {
         color: "#24463d", // ink
         weight: 2,
@@ -226,13 +237,11 @@ function BoundaryLayer({ data }: { data: GeoJsonObject }) {
         fillOpacity: 0.08,
       },
       interactive: false,
-    }).addTo(map);
-    return () => {
-      layer.remove();
-    };
-  }, [map, data]);
-
-  return null;
+    });
+  } catch (error) {
+    console.error("地域の境界（GeoJSON）を読めませんでした", error);
+    return null;
+  }
 }
 
 /**
