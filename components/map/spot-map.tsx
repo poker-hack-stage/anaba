@@ -1,7 +1,7 @@
 "use client";
 
 import "leaflet/dist/leaflet.css";
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import L from "leaflet";
 import type { GeoJsonObject } from "geojson";
 import { Map } from "lucide-react";
@@ -80,12 +80,11 @@ export function SpotMap({
   const all = [...highlighted, ...route, ...others];
   const points = all.map((s): L.LatLngTuple => [s.lat, s.lng]);
   const routeLine = route.map((s): L.LatLngTuple => [s.lat, s.lng]);
-
-  const eventHandlers = (spot: Spot): L.LeafletEventHandlerFnMap => ({
-    click: () => onSpotClick?.(spot),
-    mouseover: () => onSpotHover?.(spot),
-    mouseout: () => onSpotHover?.(null),
-  });
+  // 表示範囲と描画の両方で使うので、変換は1回だけにする
+  const boundaryLayer = useMemo(
+    () => (boundary ? toBoundaryLayer(boundary) : null),
+    [boundary],
+  );
 
   return (
     // isolate: Leaflet 内部の z-index（最大 1000）がヘッダーやダイアログより前に出ないようにする
@@ -102,6 +101,8 @@ export function SpotMap({
         maxZoom={MAX_ZOOM}
         // 1ページに地図が複数並ぶので、ホイールでページのスクロールを奪わない
         scrollWheelZoom={false}
+        // タッチ端末では1本指のドラッグで地図を動かさず、ページをスクロールさせる（ピンチと＋−ボタンで操作できる）
+        dragging={!L.Browser.mobile}
         zoomControl={false}
         className="h-full w-full bg-emerald-50/60"
       >
@@ -113,8 +114,8 @@ export function SpotMap({
         />
         {/* 地域名のバッジと重ならないよう右上に置く */}
         <ZoomControl position="topright" />
-        <FitBounds points={points} boundary={boundary} />
-        {boundary && <BoundaryLayer data={boundary} />}
+        <FitBounds points={points} boundaryLayer={boundaryLayer} />
+        {boundaryLayer && <BoundaryLayer layer={boundaryLayer} />}
 
         {routeLine.length > 1 && (
           <Polyline
@@ -129,40 +130,40 @@ export function SpotMap({
         )}
 
         {others.map((spot) => (
-          <Marker
+          <SpotMarker
             key={`other-${spot.id}`}
-            position={[spot.lat, spot.lng]}
+            spot={spot}
             icon={pinIcon(spot, "sm")}
             title={spot.name}
-            alt={spot.name}
-            eventHandlers={eventHandlers(spot)}
+            onSpotClick={onSpotClick}
+            onSpotHover={onSpotHover}
           />
         ))}
         {highlighted.map((spot) => (
-          <Marker
+          <SpotMarker
             key={`highlighted-${spot.id}`}
-            position={[spot.lat, spot.lng]}
+            spot={spot}
             icon={pinIcon(spot, "lg")}
             title={spot.name}
-            alt={spot.name}
             zIndexOffset={500}
-            eventHandlers={eventHandlers(spot)}
+            onSpotClick={onSpotClick}
+            onSpotHover={onSpotHover}
           />
         ))}
         {route.map((spot, i) => (
-          <Marker
+          <SpotMarker
             key={`route-${spot.id}`}
-            position={[spot.lat, spot.lng]}
+            spot={spot}
             icon={pinIcon(spot, "md", String(i + 1))}
             title={`${i + 1}. ${spot.name}`}
-            alt={`${i + 1}. ${spot.name}`}
             zIndexOffset={1000}
-            eventHandlers={eventHandlers(spot)}
+            onSpotClick={onSpotClick}
+            onSpotHover={onSpotHover}
           />
         ))}
       </MapContainer>
 
-      {all.length === 0 && (
+      {all.length === 0 && !boundaryLayer && (
         <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center">
           <div className="flex flex-col items-center gap-2 rounded-2xl bg-white/80 px-5 py-4 text-stone-500 shadow-sm backdrop-blur-sm">
             <Map className="h-6 w-6" />
@@ -180,13 +181,77 @@ export function SpotMap({
   );
 }
 
+/**
+ * スポットのピン。Leaflet のマーカーは Tab で選べるが、Enter では click が出ないので、
+ * キーボードでも詳細を開けるよう keydown を受ける。フォーカスはマウスオーバーと同じ扱いにする
+ */
+function SpotMarker({
+  spot,
+  icon,
+  title,
+  zIndexOffset,
+  onSpotClick,
+  onSpotHover,
+}: {
+  spot: Spot;
+  icon: L.DivIcon;
+  title: string;
+  zIndexOffset?: number;
+  onSpotClick?: (spot: Spot) => void;
+  onSpotHover?: (spot: Spot | null) => void;
+}) {
+  const markerRef = useRef<L.Marker>(null);
+  // focus / blur は付け直さずに最新の props を呼ぶ
+  const latest = useRef({ spot, onSpotHover });
+  useEffect(() => {
+    latest.current = { spot, onSpotHover };
+  });
+
+  // Leaflet はマーカーの focus / blur をイベントとして出さないので、要素に直接付ける。
+  // アイコンが変わると要素が作り直されるため icon ごとに付け直す
+  useEffect(() => {
+    const el = markerRef.current?.getElement();
+    if (!el) return;
+    const onFocus = () => latest.current.onSpotHover?.(latest.current.spot);
+    const onBlur = () => latest.current.onSpotHover?.(null);
+    el.addEventListener("focus", onFocus);
+    el.addEventListener("blur", onBlur);
+    return () => {
+      el.removeEventListener("focus", onFocus);
+      el.removeEventListener("blur", onBlur);
+    };
+  }, [icon]);
+
+  return (
+    <Marker
+      ref={markerRef}
+      position={[spot.lat, spot.lng]}
+      icon={icon}
+      title={title}
+      zIndexOffset={zIndexOffset}
+      eventHandlers={{
+        click: () => onSpotClick?.(spot),
+        keydown: (e) => {
+          const { key } = e.originalEvent;
+          if (key === "Enter" || key === " ") {
+            e.originalEvent.preventDefault();
+            onSpotClick?.(spot);
+          }
+        },
+        mouseover: () => onSpotHover?.(spot),
+        mouseout: () => onSpotHover?.(null),
+      }}
+    />
+  );
+}
+
 /** 渡されたスポット（と境界）が全部入るように表示範囲を合わせる */
 function FitBounds({
   points,
-  boundary,
+  boundaryLayer,
 }: {
   points: L.LatLngTuple[];
-  boundary?: GeoJsonObject | null;
+  boundaryLayer: L.GeoJSON | null;
 }) {
   const map = useMap();
   // 配列は毎回作り直されるので、中身が変わったときだけ合わせ直す
@@ -194,7 +259,6 @@ function FitBounds({
 
   useEffect(() => {
     const bounds = L.latLngBounds(points);
-    const boundaryLayer = boundary ? toBoundaryLayer(boundary) : null;
     const boundaryBounds = boundaryLayer?.getBounds();
     if (boundaryBounds?.isValid()) bounds.extend(boundaryBounds);
 
@@ -207,21 +271,21 @@ function FitBounds({
     }
     // points は pointsKey で比較する
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, pointsKey, boundary]);
+  }, [map, pointsKey, boundaryLayer]);
 
   return null;
 }
 
-/** 地域の境界を塗りつぶす。data が変わったら描き直す */
-function BoundaryLayer({ data }: { data: GeoJsonObject }) {
+/** 地域の境界を塗りつぶす。layer が変わったら描き直す */
+function BoundaryLayer({ layer }: { layer: L.GeoJSON }) {
   const map = useMap();
 
   useEffect(() => {
-    const layer = toBoundaryLayer(data)?.addTo(map);
+    layer.addTo(map);
     return () => {
-      layer?.remove();
+      layer.remove();
     };
-  }, [map, data]);
+  }, [map, layer]);
 
   return null;
 }
