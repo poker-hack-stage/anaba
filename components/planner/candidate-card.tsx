@@ -1,7 +1,18 @@
+"use client";
+
+import dynamic from "next/dynamic";
 import { MapPin } from "lucide-react";
-import { SpotMap } from "@/components/map/spot-map";
+import { SpotMapSkeleton } from "@/components/map/spot-map-skeleton";
 import type { Spot } from "@/lib/data/spots";
 import type { PlanCandidate } from "@/lib/planner/types";
+
+const MAP_CLASS_NAME = "h-56 rounded-none border-0 border-b";
+
+// Leaflet は window を使うので、サーバーでは描画しない
+const SpotMap = dynamic(
+  () => import("@/components/map/spot-map").then((m) => m.SpotMap),
+  { ssr: false, loading: () => <SpotMapSkeleton className={MAP_CLASS_NAME} /> },
+);
 
 /** 旅プランの候補カード。地図に経路と、経路以外のスポットを表示する */
 export function CandidateCard({
@@ -19,7 +30,7 @@ export function CandidateCard({
         route={candidate.route}
         others={candidate.otherSpots}
         onSpotClick={onSpotClick}
-        className="h-56 rounded-none border-0 border-b"
+        className={MAP_CLASS_NAME}
       />
       <div className="flex flex-col gap-3 p-4">
         <div>

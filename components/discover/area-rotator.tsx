@@ -1,14 +1,26 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { ChevronLeft, ChevronRight, MapPinned } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
-import { SpotMap } from "@/components/map/spot-map";
+import { SpotMapSkeleton } from "@/components/map/spot-map-skeleton";
 import { SpotCard } from "@/components/spots/spot-card";
 import { SpotDetailDialog } from "@/components/spots/spot-detail-dialog";
 import type { AreaWithSpots } from "@/lib/data/areas";
 import type { Spot } from "@/lib/data/spots";
 import { cn } from "@/lib/utils";
+
+// Leaflet は window を使うので、サーバーでは描画しない
+const SpotMap = dynamic(
+  () => import("@/components/map/spot-map").then((m) => m.SpotMap),
+  {
+    ssr: false,
+    loading: () => (
+      <SpotMapSkeleton className="h-72 sm:h-96 lg:h-auto lg:min-h-[520px]" />
+    ),
+  },
+);
 
 /** 次の地域へ切り替わるまでの時間 */
 const ROTATE_INTERVAL_MS = 6000;
