@@ -8,13 +8,21 @@
 // ダウンロードしたファイルは OS の一時ディレクトリ（N03_CACHE_DIR で変更可）に置き、リポジトリには入れない。
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const N03_VERSION = "N03-2025";
 const N03_DATE = "20250101";
+// seed.sql の出典コメントに書く日付（例: 2025年1月1日時点）
+const N03_DATE_LABEL = `${Number(N03_DATE.slice(0, 4))}年${Number(N03_DATE.slice(4, 6))}月${Number(N03_DATE.slice(6, 8))}日時点`;
 const MAPSHAPER = "mapshaper@0.6.121";
 
 // seed.sql の areas と同じ固定 id。code は N03_007（全国地方公共団体コードの5桁）。
@@ -131,7 +139,10 @@ async function download(prefCode) {
   console.log(`download ${url}`);
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${url}: ${res.status}`);
-  writeFileSync(path, Buffer.from(await res.arrayBuffer()));
+  // 途中で止まっても壊れた zip がキャッシュに残らないよう、書き終えてから名前を変える
+  const part = `${path}.part`;
+  writeFileSync(part, Buffer.from(await res.arrayBuffer()));
+  renameSync(part, path);
   return path;
 }
 
@@ -249,14 +260,23 @@ async function main() {
 
   if (checkOnly) return;
 
+  const seed = readFileSync(seedPath, "utf8");
+  // id の打ち間違いは update が0行になるだけで気づけないので、insert 文にあるかを先に確かめる
+  for (const area of AREAS) {
+    if (!seed.includes(`'${area.id}', '${area.name}'`)) {
+      throw new Error(
+        `${area.name}（${area.id}）が seed.sql の areas の insert に見つからない`,
+      );
+    }
+  }
+
   const block = [
     BEGIN,
-    `-- 出典: 「国土数値情報（行政区域データ）」（国土交通省）${N03_VERSION}（令和7年1月1日時点）を加工して作成。CC BY 4.0。`,
+    `-- 出典: 「国土数値情報（行政区域データ）」（国土交通省）${N03_VERSION}（${N03_DATE_LABEL}）を加工して作成。CC BY 4.0。`,
     "-- 加工: 市町村ごとにまとめ、mapshaper で頂点を間引いた。形は GeoJSON の geometry（Polygon / MultiPolygon）、座標は [経度, 緯度]。",
     ...lines,
     END,
   ].join("\n");
-  const seed = readFileSync(seedPath, "utf8");
   const start = seed.indexOf(BEGIN);
   const end = seed.indexOf(END);
   const next =
