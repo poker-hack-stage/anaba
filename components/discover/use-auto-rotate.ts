@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
   useSyncExternalStore,
   type FocusEvent,
@@ -51,19 +52,35 @@ export function useAutoRotate(count: number, { paused }: { paused: boolean }) {
     () => false,
   );
 
-  // 詳細を閉じたら「乗せている」を解除する。ダイアログの上でポインタを外へ動かして閉じると
-  // pointerleave が来ないため。ポインタがまだ上にあれば、次の pointermove で戻る
-  const [prevPaused, setPrevPaused] = useState(paused);
-  if (paused !== prevPaused) {
-    setPrevPaused(paused);
-    if (!paused) setHovered(false);
-  }
+  // 最後にマウスがあった位置と、hoverHandlers を付けた要素
+  const lastPointer = useRef<{ x: number; y: number } | null>(null);
+  const hoverTarget = useRef<Element | null>(null);
+
+  // 詳細を閉じたら、その時点のポインタ位置で「乗せている」を判定し直す。ダイアログが消えても
+  // pointerleave / pointerenter は来ないため（マウスを動かさないと状態が変わらない）
+  useEffect(() => {
+    if (paused) return;
+    // ダイアログが DOM から消えたあとに判定する
+    const id = requestAnimationFrame(() => {
+      const p = lastPointer.current;
+      const el = p && document.elementFromPoint(p.x, p.y);
+      setHovered(!!el && !!hoverTarget.current?.contains(el));
+    });
+    return () => cancelAnimationFrame(id);
+  }, [paused]);
 
   const isPaused = userPaused ?? reducedMotion;
   const togglePaused = () => setUserPaused(!isPaused);
 
   const next = useCallback(() => setIndex((i) => (i + 1) % count), [count]);
   const prev = () => setIndex((i) => (i - 1 + count) % count);
+
+  const trackPointer = (e: PointerEvent) => {
+    if (e.pointerType !== "mouse") return;
+    lastPointer.current = { x: e.clientX, y: e.clientY };
+    hoverTarget.current = e.currentTarget;
+    setHovered(true);
+  };
 
   const stopped =
     hovered || focused || paused || isPaused || hidden || count < 2;
@@ -82,13 +99,12 @@ export function useAutoRotate(count: number, { paused }: { paused: boolean }) {
     togglePaused,
     // タッチのタップは「乗せた」に数えない（外をタップするまで止まり続けてしまうため）
     hoverHandlers: {
-      onPointerEnter: (e: PointerEvent) => {
-        if (e.pointerType === "mouse") setHovered(true);
+      onPointerEnter: trackPointer,
+      onPointerMove: trackPointer,
+      onPointerLeave: () => {
+        lastPointer.current = null;
+        setHovered(false);
       },
-      onPointerMove: (e: PointerEvent) => {
-        if (e.pointerType === "mouse") setHovered(true);
-      },
-      onPointerLeave: () => setHovered(false),
     },
     // 地域が切り替わるとフォーカス中のカードが作り直されてフォーカスが消えるので、キーボード操作中は止める。
     // マウスのクリックやタップでは :focus-visible にならないので、止まり続けることはない
