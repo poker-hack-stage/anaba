@@ -76,6 +76,21 @@ export type Database = {
         }
         Relationships: []
       }
+      ng_words: {
+        Row: {
+          created_at: string
+          word: string
+        }
+        Insert: {
+          created_at?: string
+          word: string
+        }
+        Update: {
+          created_at?: string
+          word?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -100,6 +115,115 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limits: {
+        Row: {
+          count: number
+          key: string
+          window_start: string
+        }
+        Insert: {
+          count?: number
+          key: string
+          window_start: string
+        }
+        Update: {
+          count?: number
+          key?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
+      reviews: {
+        Row: {
+          body: string
+          client_hash: string | null
+          created_at: string
+          id: string
+          nickname: string
+          rating: number
+          spot_id: string
+          status: string
+        }
+        Insert: {
+          body: string
+          client_hash?: string | null
+          created_at?: string
+          id?: string
+          nickname: string
+          rating: number
+          spot_id: string
+          status?: string
+        }
+        Update: {
+          body?: string
+          client_hash?: string | null
+          created_at?: string
+          id?: string
+          nickname?: string
+          rating?: number
+          spot_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_spot_id_fkey"
+            columns: ["spot_id"]
+            isOneToOne: false
+            referencedRelation: "spots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      spot_submissions: {
+        Row: {
+          area_id: string
+          category: string
+          client_hash: string | null
+          created_at: string
+          description: string
+          id: string
+          lat: number
+          lng: number
+          name: string
+          nickname: string
+          status: string
+        }
+        Insert: {
+          area_id: string
+          category: string
+          client_hash?: string | null
+          created_at?: string
+          description: string
+          id?: string
+          lat: number
+          lng: number
+          name: string
+          nickname: string
+          status?: string
+        }
+        Update: {
+          area_id?: string
+          category?: string
+          client_hash?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          lat?: number
+          lng?: number
+          name?: string
+          nickname?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spot_submissions_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "areas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       spots: {
         Row: {
           area_id: string
@@ -115,6 +239,7 @@ export type Database = {
           local_tip: string | null
           name: string
           rating: number | null
+          source: string
           stay_minutes: number | null
           tags: string[]
           updated_at: string
@@ -133,6 +258,7 @@ export type Database = {
           local_tip?: string | null
           name: string
           rating?: number | null
+          source?: string
           stay_minutes?: number | null
           tags?: string[]
           updated_at?: string
@@ -151,6 +277,7 @@ export type Database = {
           local_tip?: string | null
           name?: string
           rating?: number | null
+          source?: string
           stay_minutes?: number | null
           tags?: string[]
           updated_at?: string
@@ -167,10 +294,50 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      published_reviews: {
+        Row: {
+          body: string | null
+          created_at: string | null
+          id: string | null
+          nickname: string | null
+          rating: number | null
+          spot_id: string | null
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string | null
+          id?: string | null
+          nickname?: string | null
+          rating?: number | null
+          spot_id?: string | null
+        }
+        Update: {
+          body?: string | null
+          created_at?: string | null
+          id?: string | null
+          nickname?: string | null
+          rating?: number | null
+          spot_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_spot_id_fkey"
+            columns: ["spot_id"]
+            isOneToOne: false
+            referencedRelation: "spots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
-      [_ in never]: never
+      approve_spot_submission: { Args: { p_id: string }; Returns: string }
+      assert_postable_text: { Args: { p_text: string }; Returns: undefined }
+      check_rate_limit: {
+        Args: { p_key: string; p_max: number; p_window_seconds: number }
+        Returns: boolean
+      }
+      normalize_for_moderation: { Args: { p_text: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never
