@@ -15,6 +15,7 @@
 --   AN003 : 同じ本文の連投（429）
 --   AN004 : 全体の上限を超えた（429）
 --   ほかに check 制約違反は 23514（400）、指定できない列を指定したときは 42501
+--   トリガーも、見えない文字だけの入力・続く改行には 23514 を返す
 
 -- ---------------------------------------------------------------------------
 -- spots.source
@@ -71,7 +72,8 @@ create index spot_submissions_created_at_idx on public.spot_submissions (created
 create index spot_submissions_status_idx on public.spot_submissions (status);
 
 create table public.rate_limits (
-  -- IP のハッシュ＋種類（例: 'review:<client_hash>'）。作り方は呼ぶ側（#52・#25）が決める
+  -- '<種類>:<client_hash>'（種類は review・submission・plan。client_hash は SHA-256 の16進64文字）。
+  -- 作るのは呼ぶ側（#52・#25）。形は check_rate_limit() が確かめる
   key text not null,
   window_start timestamptz not null,
   count integer not null default 0,
@@ -125,30 +127,82 @@ create policy "spot_submissions: anon は承認待ちでだけ投稿可"
 -- ---------------------------------------------------------------------------
 -- 公開用のビュー
 -- anon は reviews を読めないので、所有者の権限で読むビュー（security_invoker にしない）にして、
--- 公開してよい行と列だけを出す
+-- 公開してよい行と列だけを出す。security_barrier で、呼ぶ側の条件より先に status の条件を評価させる
+-- 公開してよいデータなので、ログインしたままの人（authenticated）も読める
 -- ---------------------------------------------------------------------------
 
-create view public.published_reviews as
+create view public.published_reviews with (security_barrier = true) as
   select id, spot_id, nickname, rating, body, created_at
   from public.reviews
   where status = 'published';
 
 revoke all on table public.published_reviews from anon, authenticated;
-grant select on table public.published_reviews to anon;
+grant select on table public.published_reviews to anon, authenticated;
 
 -- ---------------------------------------------------------------------------
 -- 荒らし対策のトリガー
 -- anon は ng_words・reviews を読めないので security definer にする
 -- ---------------------------------------------------------------------------
 
--- 比べる前に NFKC で正規化して小文字にする（全角の「ｈｔｔｐ」やカタカナの半角ですり抜けさせない）
+-- 比べる前に正規化する。全角の「ｈｔｔｐ」や半角カタカナ、見えない文字（ゼロ幅スペースなど）で
+-- すり抜けさせず、空白や見えない文字だけの入力を空として扱うため
+--   1. NFKC で正規化して小文字にする（全角スペースなども半角スペースになる）
+--   2. 改行を \n にそろえる（\r\n・\r・U+0085・U+2028・U+2029・垂直タブ・改ページ）
+--   3. タブを空白にする
+--   4. 見えない文字を消す: 改行以外の制御文字、ソフトハイフン、ゼロ幅・書式の文字、
+--      空白に見える文字（ハングルの空白・点字の空白）、異体字セレクタ、タグ文字
+--   5. 空白を1つに畳み、改行の前後の空白と、全体の前後の空白・改行を削る
 create or replace function public.normalize_for_moderation(p_text text)
 returns text
 language sql
 immutable
 set search_path = ''
 as $$
-  select lower(normalize(coalesce(p_text, ''), NFKC));
+  select btrim(
+    regexp_replace(
+      regexp_replace(
+        regexp_replace(
+          regexp_replace(
+            regexp_replace(lower(normalize(coalesce(p_text, ''), NFKC)), '\r\n?|[\u0085\u2028\u2029\v\f]', E'\n', 'g'),
+            '\t', ' ', 'g'
+          ),
+          '[\x01-\x09\x0b-\x1f\x7f-\x9f\u00ad\u034f\u061c\u115f\u1160\u17b4\u17b5\u180b-\u180f\u200b-\u200f\u202a-\u202e\u2060-\u206f\u2800\u3164\ufe00-\ufe0f\ufeff\uffa0\U000e0000-\U000e007f]',
+          '', 'g'
+        ),
+        ' +', ' ', 'g'
+      ),
+      ' ?\n ?', E'\n', 'g'
+    ),
+    E' \n'
+  );
+$$;
+
+-- 空（正規化すると何も残らない）・続く改行を拒否する（check 制約と同じ 23514）
+--   p_allow_newline: 本文・説明は改行を2つ続くまで許す。ニックネーム・スポット名は改行を許さない
+create or replace function public.assert_visible_text(p_text text, p_allow_newline boolean)
+returns void
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v_text text := public.normalize_for_moderation(p_text);
+  -- 改行は、前後を削る前の形で数える（先頭・末尾に続く改行も拒否するため）。
+  -- 両端に印を付けて正規化し、前後が削られないようにする
+  v_untrimmed text := public.normalize_for_moderation('|' || coalesce(p_text, '') || '|');
+begin
+  if v_text = '' then
+    raise exception using errcode = 'check_violation', message = '空白や見えない文字だけの入力はできません';
+  end if;
+
+  if p_allow_newline then
+    if strpos(v_untrimmed, E'\n\n\n') > 0 then
+      raise exception using errcode = 'check_violation', message = '改行は2つまでしか続けられません';
+    end if;
+  elsif strpos(v_untrimmed, E'\n') > 0 then
+    raise exception using errcode = 'check_violation', message = '改行は入れられません';
+  end if;
+end;
 $$;
 
 -- NG ワード・URL を含んでいたら例外を出す
@@ -164,7 +218,9 @@ begin
   if exists (
     select 1
     from public.ng_words w
-    where strpos(v_text, public.normalize_for_moderation(w.word)) > 0
+    -- 正規化して空になる語は、すべての書き込みに当たってしまうので無視する
+    where public.normalize_for_moderation(w.word) <> ''
+      and strpos(v_text, public.normalize_for_moderation(w.word)) > 0
   ) then
     raise exception using errcode = 'AN001', message = '使えない言葉が含まれています';
   end if;
@@ -182,16 +238,19 @@ security definer
 set search_path = ''
 as $$
 begin
+  perform public.assert_visible_text(new.nickname, false);
+  perform public.assert_visible_text(new.body, true);
   perform public.assert_postable_text(new.nickname || ' ' || new.body);
 
   -- 数えている間にほかの insert が入って上限を超えないよう、口コミの insert を直列にする
   perform pg_advisory_xact_lock(hashtext('public.reviews_before_insert'));
 
+  -- 空白や見えない文字の違いですり抜けさせないよう、正規化してから比べる
   if exists (
     select 1
     from public.reviews r
     where r.spot_id = new.spot_id
-      and r.body = new.body
+      and public.normalize_for_moderation(r.body) = public.normalize_for_moderation(new.body)
       and r.created_at > now() - interval '10 minutes'
   ) then
     raise exception using errcode = 'AN003', message = '同じ口コミがすでに投稿されています';
@@ -227,6 +286,9 @@ security definer
 set search_path = ''
 as $$
 begin
+  perform public.assert_visible_text(new.nickname, false);
+  perform public.assert_visible_text(new.name, false);
+  perform public.assert_visible_text(new.description, true);
   perform public.assert_postable_text(new.nickname || ' ' || new.name || ' ' || new.description);
 
   perform pg_advisory_xact_lock(hashtext('public.spot_submissions_before_insert'));
@@ -266,8 +328,9 @@ declare
   v_window_start timestamptz;
   v_count integer;
 begin
-  if p_key is null or char_length(p_key) not between 1 and 200 then
-    raise exception using errcode = '22023', message = 'p_key は1〜200文字にしてください';
+  -- anon が公開キーで直接呼べるので、でたらめなキーで大きな行を増やせないよう、形を限る
+  if p_key is null or p_key !~ '^(review|submission|plan):[0-9a-f]{64}$' then
+    raise exception using errcode = '22023', message = 'p_key は <review|submission|plan>:<16進64文字> にしてください';
   end if;
   if p_window_seconds is null or p_window_seconds not between 1 and 86400 then
     raise exception using errcode = '22023', message = 'p_window_seconds は1〜86400にしてください';
@@ -344,6 +407,7 @@ $$;
 -- ---------------------------------------------------------------------------
 
 revoke execute on function public.normalize_for_moderation(text) from public, anon, authenticated;
+revoke execute on function public.assert_visible_text(text, boolean) from public, anon, authenticated;
 revoke execute on function public.assert_postable_text(text) from public, anon, authenticated;
 revoke execute on function public.reviews_before_insert() from public, anon, authenticated;
 revoke execute on function public.spot_submissions_before_insert() from public, anon, authenticated;

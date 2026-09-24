@@ -333,6 +333,10 @@ export type Database = {
     Functions: {
       approve_spot_submission: { Args: { p_id: string }; Returns: string }
       assert_postable_text: { Args: { p_text: string }; Returns: undefined }
+      assert_visible_text: {
+        Args: { p_allow_newline: boolean; p_text: string }
+        Returns: undefined
+      }
       check_rate_limit: {
         Args: { p_key: string; p_max: number; p_window_seconds: number }
         Returns: boolean
