@@ -54,6 +54,7 @@ app/                  ルーティング（ページ・Route Handler）
   planner/            AI旅プラン
   api/plan/           旅プランの候補を返す API（今は仮実装。Claude API に差し替える）
   auth/               ログイン・サインアップ等（スターター由来）
+  dev/ui/             UI 部品の見本（開発者向け。Vercel の Production では 404）
 components/           共通コンポーネント
   layout/             ヘッダー・タブ・下部ナビ・フッター（タブは nav-items.ts で管理）
   discover/           穴場を探す：地域の自動切り替え（地図＋情報パネル）

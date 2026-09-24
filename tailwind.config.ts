@@ -23,7 +23,7 @@ export default {
         },
         shu: {
           DEFAULT: "#c0432b", // 朱色（御朱印のイメージ。アクセント）
-          light: "#fbece7",
+          light: "#fcf0ec", // shu の文字を載せて 4.5:1 以上になる明るさ
           border: "#f0cabf",
         },
         washi: "#f6f1e7", // 和紙っぽい生成り色

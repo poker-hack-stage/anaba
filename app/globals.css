@@ -19,10 +19,10 @@
     --secondary: 60 5% 96%; /* stone-100 */
     --secondary-foreground: 24 10% 10%;
     --muted: 60 5% 96%;
-    --muted-foreground: 25 5% 45%; /* stone-500 */
+    --muted-foreground: 25 5% 42%; /* stone-500 より少し濃い（stone-100 の上でも 4.5:1 以上） */
     --accent: 150 20% 92%; /* ink-light */
     --accent-foreground: 164 32% 21%;
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 72.2% 50.6%; /* red-600（白文字で 4.5:1 以上） */
     --destructive-foreground: 0 0% 98%;
     --border: 20 6% 90%; /* stone-200 */
     --input: 20 6% 90%;

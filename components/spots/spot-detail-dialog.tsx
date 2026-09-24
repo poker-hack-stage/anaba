@@ -63,7 +63,7 @@ export function SpotDetailDialog({
                 {spot.name}
               </h2>
               {spot.rating !== null && (
-                <span className="flex shrink-0 items-center gap-1 font-bold text-amber-600">
+                <span className="flex shrink-0 items-center gap-1 font-bold text-amber-700">
                   <Star className="h-4 w-4 fill-amber-500 text-amber-500" />
                   {spot.rating}
                 </span>
