@@ -22,7 +22,10 @@ export type FilterableArea<S extends FilterableSpot = FilterableSpot> = {
 export type AreaFilter = {
   /** 検索欄のキーワード。空白で区切った語はすべて含む（AND） */
   q?: string;
-  /** 選んだカテゴリ（spots.category のキー）。どれかに当たればよい（OR） */
+  /**
+   * 選んだカテゴリ（spots.category のキー）。どれかに当たればよい（OR）。
+   * 空文字は捨てる（`/?cat=` を `split(",")` すると `[""]` になるため）
+   */
   categories?: readonly string[];
 };
 
@@ -35,12 +38,14 @@ export type FilteredArea<A extends FilterableArea> = A & {
 
 /**
  * 比べる前に文字をそろえる。NFKC で全角英数・半角カナをそろえ、英字を小文字に、カタカナをひらがなにする。
+ * 「美ヶ原」と「美ケ原」のように地名で使う小さい「ヶ」「ヵ」は、「け」「か」にそろえる。
  */
 export function normalizeText(text: string): string {
   return text
     .normalize("NFKC")
     .toLowerCase()
-    .replace(/[ァ-ヶ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60));
+    .replace(/[ァ-ヶ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60))
+    .replace(/[ゕゖ]/g, (c) => (c === "ゖ" ? "け" : "か"));
 }
 
 /** キーワードを上限で切り、正規化して、空白で語に分ける */
@@ -55,10 +60,16 @@ export function parseKeywords(q: string | undefined): string[] {
     .filter((word) => word !== "");
 }
 
-/** 条件が入っているか（キーワードが空白だけ・カテゴリなしなら false） */
+/** カテゴリから空文字を捨てる */
+function parseCategories(categories: AreaFilter["categories"]): Set<string> {
+  return new Set((categories ?? []).filter((category) => category !== ""));
+}
+
+/** 条件が入っているか（キーワードが空白だけ・カテゴリなし（空文字だけ）なら false） */
 export function hasActiveFilter(filter: AreaFilter): boolean {
   return (
-    parseKeywords(filter.q).length > 0 || (filter.categories?.length ?? 0) > 0
+    parseKeywords(filter.q).length > 0 ||
+    parseCategories(filter.categories).size > 0
   );
 }
 
@@ -75,10 +86,7 @@ export function filterAreas<A extends FilterableArea>(
   filter: AreaFilter,
 ): FilteredArea<A>[] {
   type S = A["spots"][number];
-  const keywords = parseKeywords(filter.q);
-  const categories = new Set(filter.categories ?? []);
-
-  if (keywords.length === 0 && categories.size === 0) {
+  if (!hasActiveFilter(filter)) {
     return areas.map((area) => ({
       ...area,
       matchedSpots: [...area.spots],
@@ -86,6 +94,8 @@ export function filterAreas<A extends FilterableArea>(
     }));
   }
 
+  const keywords = parseKeywords(filter.q);
+  const categories = parseCategories(filter.categories);
   const result: FilteredArea<A>[] = [];
   for (const area of areas) {
     const areaText = [area.name, area.prefecture ?? ""];

@@ -92,6 +92,11 @@ describe("normalizeText", () => {
     expect(normalizeText("ｶﾞﾚｯﾄ")).toBe("がれっと");
     expect(normalizeText("ヴィラ")).toBe("ゔぃら");
   });
+
+  test("小さい「ヶ」「ヵ」を「け」「か」にそろえる", () => {
+    expect(normalizeText("美ヶ原")).toBe(normalizeText("美ケ原"));
+    expect(normalizeText("三ヵ月")).toBe(normalizeText("三カ月"));
+  });
 });
 
 describe("parseKeywords", () => {
@@ -122,11 +127,20 @@ describe("hasActiveFilter", () => {
     expect(hasActiveFilter({ q: "城" })).toBe(true);
     expect(hasActiveFilter({ categories: ["onsen"] })).toBe(true);
   });
+
+  test("カテゴリの空文字は条件に数えない", () => {
+    expect(hasActiveFilter({ categories: [""] })).toBe(false);
+    expect(hasActiveFilter({ categories: ["", "onsen"] })).toBe(true);
+  });
 });
 
 describe("filterAreas", () => {
   test("条件が空なら全地域を今のおすすめのまま返す", () => {
-    for (const filter of [{}, { q: "  　", categories: [] }]) {
+    for (const filter of [
+      {},
+      { q: "  　", categories: [] },
+      { categories: [""] },
+    ]) {
       const result = filterAreas(AREAS, filter);
 
       expect(areaNames(result)).toEqual(areaNames(AREAS));
@@ -161,10 +175,11 @@ describe("filterAreas", () => {
   });
 
   test("キーワードが地域名に当たると、その地域のスポットがすべて一致する", () => {
-    const result = filterAreas(AREAS, { q: "尾道" });
+    // 大町のスポット名・タグには「大町」を含まない
+    const result = filterAreas(AREAS, { q: "大町" });
 
-    expect(areaNames(result)).toEqual(["尾道"]);
-    expect(spotNames(result[0].matchedSpots)).toEqual(["千光寺"]);
+    expect(areaNames(result)).toEqual(["大町"]);
+    expect(spotNames(result[0].matchedSpots)).toEqual(["木崎湖", "葛温泉"]);
   });
 
   test("キーワードが都道府県に当たる", () => {
@@ -202,6 +217,13 @@ describe("filterAreas", () => {
     );
   });
 
+  test("「ヶ」と「ケ」の違いを吸収する", () => {
+    // データは「美ヶ原温泉」
+    expect(
+      spotNames(filterAreas(AREAS, { q: "美ケ原" })[0].matchedSpots),
+    ).toEqual(["美ヶ原温泉"]);
+  });
+
   test("空白で区切った語はすべて含むスポットだけに当たる（AND）", () => {
     // 「松本」は地域名、「温泉」はスポット名・タグ。項目がまたがってもよい
     const result = filterAreas(AREAS, { q: "松本　温泉" });
@@ -229,6 +251,13 @@ describe("filterAreas", () => {
       ["葛温泉"],
     ]);
     expect(filterAreas(AREAS, { q: "城", categories: ["onsen"] })).toEqual([]);
+  });
+
+  test("カテゴリの空文字は捨て、残りのカテゴリで絞る", () => {
+    const result = filterAreas(AREAS, { categories: ["", "view"] });
+
+    expect(areaNames(result)).toEqual(["大町"]);
+    expect(spotNames(result[0].matchedSpots)).toEqual(["木崎湖"]);
   });
 
   test("一致が0件なら空配列", () => {
