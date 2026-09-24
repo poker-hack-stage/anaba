@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Loader2, Route, Search, SearchX } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { SpotDetailDialog } from "@/components/spots/spot-detail-dialog";
@@ -12,31 +13,99 @@ import type {
   PlanResponse,
 } from "@/lib/planner/types";
 import { CandidateCard } from "./candidate-card";
+import { type PlannerStatus, usePlannerState } from "./planner-state";
 
 const DURATIONS = ["日帰り", "1泊2日", "2泊3日"];
 const INTERESTS = ["食", "自然", "絶景", "温泉", "体験", "歴史"];
 const COMPANIONS = ["ひとり", "友人", "カップル", "家族（子連れ）"];
 const TRANSPORTS = ["車", "電車・バス", "自転車"];
 
-type Status = "idle" | "loading" | "done" | "error";
+const DEFAULT_CONDITIONS: PlanConditions = {
+  area: "おまかせ",
+  duration: DURATIONS[0],
+  interests: [],
+  companion: COMPANIONS[0],
+  transport: TRANSPORTS[0],
+};
 
-// TODO(#19): 選んだ条件を URL のクエリに入れ、リロード・共有しても同じ条件で表示されるようにする
-export function PlannerForm({ areaNames }: { areaNames: string[] }) {
-  const [conditions, setConditions] = useState<PlanConditions>({
-    area: "おまかせ",
-    duration: DURATIONS[0],
-    interests: [],
-    companion: COMPANIONS[0],
-    transport: TRANSPORTS[0],
+/**
+ * 条件を URL のクエリにする（例: ?area=…&duration=…&interests=食&interests=温泉&…）。
+ * 「クエリがない = まだ選んでいない」と見分けるため、既定値も含めて書く
+ */
+function toQuery(conditions: PlanConditions) {
+  const params = new URLSearchParams({
+    area: conditions.area,
+    duration: conditions.duration,
+    companion: conditions.companion,
+    transport: conditions.transport,
   });
-  const [status, setStatus] = useState<Status>("idle");
-  const [candidates, setCandidates] = useState<PlanCandidate[]>([]);
+  for (const interest of conditions.interests) {
+    params.append("interests", interest);
+  }
+  return params.toString();
+}
+
+/** URL のクエリから条件を読む。クエリがなければ null。知らない値は既定値にする */
+function fromQuery(
+  params: URLSearchParams,
+  areaOptions: string[],
+): PlanConditions | null {
+  const keys = ["area", "duration", "interests", "companion", "transport"];
+  if (!keys.some((key) => params.has(key))) return null;
+
+  const pick = (key: string, options: string[], fallback: string) => {
+    const value = params.get(key);
+    return value && options.includes(value) ? value : fallback;
+  };
+  return {
+    area: pick("area", areaOptions, DEFAULT_CONDITIONS.area),
+    duration: pick("duration", DURATIONS, DEFAULT_CONDITIONS.duration),
+    interests: INTERESTS.filter((i) => params.getAll("interests").includes(i)),
+    companion: pick("companion", COMPANIONS, DEFAULT_CONDITIONS.companion),
+    transport: pick("transport", TRANSPORTS, DEFAULT_CONDITIONS.transport),
+  };
+}
+
+/** 画面を再読み込みせずに URL のクエリだけ書き換える（useSearchParams にも反映される） */
+function replaceQuery(query: string) {
+  window.history.replaceState(null, "", `?${query}`);
+}
+
+// 条件は URL のクエリに持つ（再読み込み・共有しても同じ条件になる）。
+// 結果と最後の条件は app/layout.tsx の PlannerStateProvider に持ち、タブを切り替えても残す
+export function PlannerForm({ areaNames }: { areaNames: string[] }) {
+  const searchParams = useSearchParams();
+  const { savedConditions, saveConditions, result, setResult } =
+    usePlannerState();
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
+
+  const areaOptions = useMemo(() => ["おまかせ", ...areaNames], [areaNames]);
+  const queryConditions = useMemo(
+    () => fromQuery(searchParams, areaOptions),
+    [searchParams, areaOptions],
+  );
+  const conditions = queryConditions ?? savedConditions ?? DEFAULT_CONDITIONS;
+  const { status, candidates } = result;
+
+  useEffect(() => {
+    if (queryConditions) {
+      // URL の条件を覚えておく（タブで戻ってきたときに使う）
+      if (
+        !savedConditions ||
+        toQuery(savedConditions) !== toQuery(queryConditions)
+      ) {
+        saveConditions(queryConditions);
+      }
+    } else if (savedConditions) {
+      // タブで戻ってきて URL にクエリがないときは、覚えている条件を URL に戻す
+      replaceQuery(toQuery(savedConditions));
+    }
+  }, [queryConditions, savedConditions, saveConditions]);
 
   const set = <K extends keyof PlanConditions>(
     key: K,
     value: PlanConditions[K],
-  ) => setConditions((prev) => ({ ...prev, [key]: value }));
+  ) => replaceQuery(toQuery({ ...conditions, [key]: value }));
 
   const toggleInterest = (interest: string) =>
     set(
@@ -47,7 +116,8 @@ export function PlannerForm({ areaNames }: { areaNames: string[] }) {
     );
 
   const submit = async () => {
-    setStatus("loading");
+    // 結果は Context に入れるので、読み込み中に別のタブへ移動しても戻ると表示される
+    setResult({ status: "loading", candidates });
     try {
       const res = await fetch("/api/plan", {
         method: "POST",
@@ -56,10 +126,9 @@ export function PlannerForm({ areaNames }: { areaNames: string[] }) {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as PlanResponse;
-      setCandidates(data.candidates);
-      setStatus("done");
+      setResult({ status: "done", candidates: data.candidates });
     } catch {
-      setStatus("error");
+      setResult({ status: "error", candidates: [] });
     }
   };
 
@@ -132,7 +201,7 @@ function Result({
   candidates,
   onSpotClick,
 }: {
-  status: Status;
+  status: PlannerStatus;
   candidates: PlanCandidate[];
   onSpotClick: (spot: Spot) => void;
 }) {
