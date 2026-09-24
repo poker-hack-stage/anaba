@@ -1,0 +1,46 @@
+# yaml-language-server: $schema=https://docs.coderabbit.ai/schema.json
+language: "ja-JP"
+tone_instructions: "ハッカソン中の開発。バグ・セキュリティ・データ破損につながる問題を優先し、好みの問題や細かいスタイルの指摘は控えめに。簡潔な日本語で。"
+
+reviews:
+  profile: "chill" # quiet にするとさらに少なくなる
+  request_changes_workflow: false # Request changes を出さない（マージを止めない）
+  high_level_summary: true
+  high_level_summary_in_walkthrough: true # 要約を PR 本文ではなくコメントに出す（PR テンプレートの本文を崩さない）
+  poem: false
+  review_status: true
+  review_details: false
+  collapse_walkthrough: true
+  sequence_diagrams: false
+  estimate_code_review_effort: false
+  related_prs: false
+  suggested_labels: false
+  suggested_reviewers: false
+  in_progress_fortune: false
+  pre_merge_checks:
+    docstrings:
+      mode: "off" # docstring の網羅率チェック（既定は警告）を止める
+    title:
+      mode: "off"
+    description:
+      mode: "off"
+  auto_review:
+    enabled: true # スター 10 未満の間は実際には手動起動が必要
+    drafts: false # 下書き PR は対象外
+    ignore_title_keywords:
+      - "WIP"
+      - "[skip review]"
+    auto_incremental_review: false # push ごとのレビューをしない（回数上限を守るため）
+  path_filters:
+    # package-lock.json などの lock ファイルは既定で除外済み
+    - "!lib/supabase/database.types.ts" # npm run db:types で生成
+    - "!supabase/seed.sql"
+    # - "!supabase/migrations/**"        # 除外したい場合だけ有効にする（下の注意を参照）
+  path_instructions:
+    - path: "supabase/migrations/**"
+      instructions: "RLS ポリシーの抜け（anon / authenticated が他人の行を読み書きできないか）と、既存データを壊す変更だけを見る。"
+    - path: "app/api/**"
+      instructions: "認証チェックの抜けと、サーバー側の秘密情報がクライアントへ出ていないかを優先して見る。"
+
+chat:
+  auto_reply: true
