@@ -3,6 +3,7 @@ import {
   useEffect,
   useState,
   useSyncExternalStore,
+  type FocusEvent,
   type PointerEvent,
 } from "react";
 
@@ -24,13 +25,17 @@ function subscribeVisibility(onChange: () => void) {
 
 /**
  * 地域の自動切り替え。`count` 件を数秒ごとに順に巡回し、最後まで行くと最初に戻る。
- * 次のときは止まる: マウスを乗せている間（`hoverHandlers` を付けた要素）・`paused` が true の間・
- * 一時停止ボタン（`togglePaused`）で止めた間・タブを離れている間・件数が1件以下のとき。
+ * 次のときは止まる: マウスを乗せている間（`hoverHandlers` を付けた要素）・
+ * キーボードでフォーカスしている間（`focusHandlers` を付けた要素の中が `:focus-visible` のとき）・
+ * `paused` が true の間・一時停止ボタン（`togglePaused`）で止めた間・タブを離れている間・件数が1件以下のとき。
  * OS の「視差効果を減らす」（`prefers-reduced-motion`）が有効なら、最初から一時停止にしておく。
+ * 一時停止ボタンが `hoverHandlers` の要素の中にあるときは、マウスで「再開」を押しても
+ * ポインタを外すまでは動かない（乗せている間は止まる、の仕様どおり）。
  */
 export function useAutoRotate(count: number, { paused }: { paused: boolean }) {
   const [index, setIndex] = useState(0);
   const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
   // 一時停止ボタンでの選択。null はまだ押していない（OS の設定に従う）
   const [userPaused, setUserPaused] = useState<boolean | null>(null);
 
@@ -46,13 +51,22 @@ export function useAutoRotate(count: number, { paused }: { paused: boolean }) {
     () => false,
   );
 
+  // 詳細を閉じたら「乗せている」を解除する。ダイアログの上でポインタを外へ動かして閉じると
+  // pointerleave が来ないため。ポインタがまだ上にあれば、次の pointermove で戻る
+  const [prevPaused, setPrevPaused] = useState(paused);
+  if (paused !== prevPaused) {
+    setPrevPaused(paused);
+    if (!paused) setHovered(false);
+  }
+
   const isPaused = userPaused ?? reducedMotion;
   const togglePaused = () => setUserPaused(!isPaused);
 
   const next = useCallback(() => setIndex((i) => (i + 1) % count), [count]);
   const prev = () => setIndex((i) => (i - 1 + count) % count);
 
-  const stopped = hovered || paused || isPaused || hidden || count < 2;
+  const stopped =
+    hovered || focused || paused || isPaused || hidden || count < 2;
   useEffect(() => {
     if (stopped) return;
     const id = setTimeout(next, ROTATE_INTERVAL_MS);
@@ -71,7 +85,19 @@ export function useAutoRotate(count: number, { paused }: { paused: boolean }) {
       onPointerEnter: (e: PointerEvent) => {
         if (e.pointerType === "mouse") setHovered(true);
       },
+      onPointerMove: (e: PointerEvent) => {
+        if (e.pointerType === "mouse") setHovered(true);
+      },
       onPointerLeave: () => setHovered(false),
+    },
+    // 地域が切り替わるとフォーカス中のカードが作り直されてフォーカスが消えるので、キーボード操作中は止める。
+    // マウスのクリックやタップでは :focus-visible にならないので、止まり続けることはない
+    focusHandlers: {
+      onFocus: (e: FocusEvent) =>
+        setFocused(e.target.matches(":focus-visible")),
+      onBlur: (e: FocusEvent) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) setFocused(false);
+      },
     },
   };
 }
