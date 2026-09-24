@@ -19,11 +19,11 @@
     --secondary: 60 5% 96%; /* stone-100 */
     --secondary-foreground: 24 10% 10%;
     --muted: 60 5% 96%;
-    --muted-foreground: 25 5% 42%; /* stone-500 より少し濃い（stone-100 の上でも 4.5:1 以上） */
+    --muted-foreground: 25 5% 42%; /* stone-500 より少し濃い（stone-100 の上でも 4.5:1 以上）。変えたら app/dev/ui/contrast.ts も直す */
     --accent: 150 20% 92%; /* ink-light */
     --accent-foreground: 164 32% 21%;
-    --destructive: 0 72.2% 50.6%; /* red-600（白文字で 4.5:1 以上） */
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 72.2% 50.6%; /* red-600（白文字で 4.5:1 以上）。変えたら app/dev/ui/contrast.ts も直す */
+    --destructive-foreground: 0 0% 98%; /* 変えたら app/dev/ui/contrast.ts も直す */
     --border: 20 6% 90%; /* stone-200 */
     --input: 20 6% 90%;
     --ring: 164 32% 21%;

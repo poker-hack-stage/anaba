@@ -61,7 +61,8 @@ components/           共通コンポーネント
   map/                地図（spot-map.tsx。今は簡易表示で、Leaflet に差し替える）
   spots/              スポットカード・スポット詳細（両タブ共通）
   planner/            旅プランの条件フォーム・候補カード
-  ui/                 shadcn/ui（`npx shadcn@latest add <name>` で追加）
+  ui/                 shadcn/ui（`npx shadcn@latest add <name>` で追加。生成された `import { cn } from "cn"` は
+                      `@/lib/utils` に直し、package.json に入った `cn` は消す）
 lib/
   auth.ts             ログイン中ユーザーの取得
   data/               DB 読み取り関数（ページからはここを呼ぶ）

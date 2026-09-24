@@ -18,20 +18,21 @@ import { Rating } from "@/components/ui/rating";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CATEGORIES } from "@/lib/spots/categories";
 import { ChipDemo } from "./chip-demo";
-import { TEXT_PAIRS, contrastRatio } from "./contrast";
+import { TEXT_PAIRS, brand, contrastRatio } from "./contrast";
 
 export const metadata: Metadata = {
   title: "UI 部品の見本",
   robots: { index: false, follow: false },
 };
 
+// 色の値は tailwind.config.ts から読む
 const BRAND_COLORS = [
-  { name: "ink", hex: "#24463d", note: "深緑（メイン）" },
-  { name: "ink-light", hex: "#e7efeb", note: "ink の薄い背景" },
-  { name: "shu", hex: "#c0432b", note: "朱色（アクセント）" },
-  { name: "shu-light", hex: "#fcf0ec", note: "shu の薄い背景" },
-  { name: "shu-border", hex: "#f0cabf", note: "shu の枠線" },
-  { name: "washi", hex: "#f6f1e7", note: "生成り（ヒーローの背景）" },
+  { name: "ink", hex: brand.ink.DEFAULT, note: "深緑（メイン）" },
+  { name: "ink-light", hex: brand.ink.light, note: "ink の薄い背景" },
+  { name: "shu", hex: brand.shu.DEFAULT, note: "朱色（アクセント）" },
+  { name: "shu-light", hex: brand.shu.light, note: "shu の薄い背景" },
+  { name: "shu-border", hex: brand.shu.border, note: "shu の枠線" },
+  { name: "washi", hex: brand.washi, note: "生成り（ヒーローの背景）" },
 ];
 
 /**
@@ -101,7 +102,10 @@ export default function UiCatalogPage() {
       >
         <div className="flex flex-col gap-3">
           {[5, 4.3, 3.5, 2.8, 1, 0].map((v) => (
-            <div key={v} className="flex items-center gap-6">
+            <div
+              key={v}
+              className="flex flex-wrap items-center gap-x-6 gap-y-1"
+            >
               <Rating value={v} />
               <Rating value={v} size="md" />
               <Rating value={v} showValue={false} />
@@ -233,6 +237,8 @@ export default function UiCatalogPage() {
             <tbody>
               {TEXT_PAIRS.map((p) => {
                 const ratio = contrastRatio(p.fg, p.bg);
+                // 色が読めず NaN になったときも ✕ にする
+                const ok = ratio >= 4.5;
                 return (
                   <tr key={p.usage} className="border-t border-stone-200">
                     <td className="py-2 pr-3">
@@ -248,10 +254,10 @@ export default function UiCatalogPage() {
                       {p.fgName} / {p.bgName}
                     </td>
                     <td
-                      className={`py-2 font-bold ${ratio >= 4.5 ? "text-stone-900" : "text-destructive"}`}
+                      className={`py-2 font-bold ${ok ? "text-stone-900" : "text-destructive"}`}
                     >
                       {ratio.toFixed(2)}
-                      {ratio < 4.5 && " ✕"}
+                      {!ok && " ✕"}
                     </td>
                   </tr>
                 );

@@ -20,7 +20,10 @@ export function Rating({
   value: number | null;
   max?: number;
   size?: keyof typeof SIZES;
-  /** false にすると星だけを出す（数値は読み上げ用のラベルにだけ入る） */
+  /**
+   * false にすると星だけを出す（数値は読み上げ用のラベルにだけ入る）。
+   * 星の塗り（amber-500）は白地で 3:1 未満なので、数値を別に出している場所でだけ使う
+   */
   showValue?: boolean;
   className?: string;
 }) {
