@@ -20,6 +20,9 @@ const INTERESTS = ["食", "自然", "絶景", "温泉", "体験", "歴史"];
 const COMPANIONS = ["ひとり", "友人", "カップル", "家族（子連れ）"];
 const TRANSPORTS = ["車", "電車・バス", "自転車"];
 
+/** /api/plan の応答を待つ上限 */
+const PLAN_TIMEOUT_MS = 30_000;
+
 const DEFAULT_CONDITIONS: PlanConditions = {
   area: "おまかせ",
   duration: DURATIONS[0],
@@ -30,7 +33,7 @@ const DEFAULT_CONDITIONS: PlanConditions = {
 
 /**
  * 条件を URL のクエリにする（例: ?area=…&duration=…&interests=食&interests=温泉&…）。
- * 「クエリがない = まだ選んでいない」と見分けるため、既定値も含めて書く
+ * 「クエリがない = タブやリンクから来た」と見分けるため、既定値も含めて書く
  */
 function toQuery(conditions: PlanConditions) {
   const params = new URLSearchParams({
@@ -45,13 +48,24 @@ function toQuery(conditions: PlanConditions) {
   return params.toString();
 }
 
+/** 条件のクエリのキー（toQuery と同じ並び） */
+const QUERY_KEYS = ["area", "duration", "companion", "transport", "interests"];
+
+/** URL のクエリのうち、条件のキーだけを toQuery と同じ並びで取り出す */
+function pickConditionQuery(params: URLSearchParams) {
+  const picked = new URLSearchParams();
+  for (const key of QUERY_KEYS) {
+    for (const value of params.getAll(key)) picked.append(key, value);
+  }
+  return picked.toString();
+}
+
 /** URL のクエリから条件を読む。クエリがなければ null。知らない値は既定値にする */
 function fromQuery(
   params: URLSearchParams,
   areaOptions: string[],
 ): PlanConditions | null {
-  const keys = ["area", "duration", "interests", "companion", "transport"];
-  if (!keys.some((key) => params.has(key))) return null;
+  if (!QUERY_KEYS.some((key) => params.has(key))) return null;
 
   const pick = (key: string, options: string[], fallback: string) => {
     const value = params.get(key);
@@ -66,9 +80,17 @@ function fromQuery(
   };
 }
 
-/** 画面を再読み込みせずに URL のクエリだけ書き換える（useSearchParams にも反映される） */
-function replaceQuery(query: string) {
-  window.history.replaceState(null, "", `?${query}`);
+/**
+ * 画面を再読み込みせずに URL のクエリの条件のキーだけ書き換える（useSearchParams にも反映される）。
+ * ほかのキー（utm_source など）はそのまま残す
+ */
+function replaceQuery(conditions: PlanConditions) {
+  const params = new URLSearchParams(window.location.search);
+  for (const key of QUERY_KEYS) params.delete(key);
+  for (const [key, value] of new URLSearchParams(toQuery(conditions))) {
+    params.append(key, value);
+  }
+  window.history.replaceState(null, "", `?${params.toString()}`);
 }
 
 // 条件は URL のクエリに持つ（再読み込み・共有しても同じ条件になる）。
@@ -79,16 +101,29 @@ export function PlannerForm({ areaNames }: { areaNames: string[] }) {
     usePlannerState();
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
 
-  const areaOptions = useMemo(() => ["おまかせ", ...areaNames], [areaNames]);
+  const areaOptions = useMemo(
+    () => [DEFAULT_CONDITIONS.area, ...areaNames],
+    [areaNames],
+  );
   const queryConditions = useMemo(
     () => fromQuery(searchParams, areaOptions),
     [searchParams, areaOptions],
   );
   const conditions = queryConditions ?? savedConditions ?? DEFAULT_CONDITIONS;
   const { status, candidates } = result;
+  // 表示中の候補が今の条件で出したものでないとき（読み込み中や結果が出たあとに条件を変えた、
+  // ブラウザの「戻る」で前の条件に戻ったなど）は、そのことを知らせる
+  const isStale =
+    status === "done" &&
+    result.conditions !== null &&
+    toQuery(result.conditions) !== toQuery(conditions);
 
   useEffect(() => {
     if (queryConditions) {
+      // 知らない値や並びの違うクエリは、画面に出している条件に合わせて書き直す
+      if (pickConditionQuery(searchParams) !== toQuery(queryConditions)) {
+        replaceQuery(queryConditions);
+      }
       // URL の条件を覚えておく（タブで戻ってきたときに使う）
       if (
         !savedConditions ||
@@ -98,14 +133,14 @@ export function PlannerForm({ areaNames }: { areaNames: string[] }) {
       }
     } else if (savedConditions) {
       // タブで戻ってきて URL にクエリがないときは、覚えている条件を URL に戻す
-      replaceQuery(toQuery(savedConditions));
+      replaceQuery(savedConditions);
     }
-  }, [queryConditions, savedConditions, saveConditions]);
+  }, [searchParams, queryConditions, savedConditions, saveConditions]);
 
   const set = <K extends keyof PlanConditions>(
     key: K,
     value: PlanConditions[K],
-  ) => replaceQuery(toQuery({ ...conditions, [key]: value }));
+  ) => replaceQuery({ ...conditions, [key]: value });
 
   const toggleInterest = (interest: string) =>
     set(
@@ -117,18 +152,26 @@ export function PlannerForm({ areaNames }: { areaNames: string[] }) {
 
   const submit = async () => {
     // 結果は Context に入れるので、読み込み中に別のタブへ移動しても戻ると表示される
-    setResult({ status: "loading", candidates });
+    // 結果には、送ったときの条件を付けておく（あとで条件が変わってもずれが分かるように）
+    const requested = conditions;
+    setResult({ status: "loading", candidates, conditions: requested });
     try {
       const res = await fetch("/api/plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(conditions),
+        body: JSON.stringify(requested),
+        // 応答が返ってこないと loading のまま抜けられないので、時間切れは error にする
+        signal: AbortSignal.timeout(PLAN_TIMEOUT_MS),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as PlanResponse;
-      setResult({ status: "done", candidates: data.candidates });
+      setResult({
+        status: "done",
+        candidates: data.candidates,
+        conditions: requested,
+      });
     } catch {
-      setResult({ status: "error", candidates: [] });
+      setResult({ status: "error", candidates: [], conditions: requested });
     }
   };
 
@@ -140,7 +183,7 @@ export function PlannerForm({ areaNames }: { areaNames: string[] }) {
         <h2 className="font-extrabold text-stone-900">旅の条件</h2>
         <Choice
           label="エリア"
-          options={["おまかせ", ...areaNames]}
+          options={areaOptions}
           selected={[conditions.area]}
           onSelect={(v) => set("area", v)}
         />
@@ -184,6 +227,14 @@ export function PlannerForm({ areaNames }: { areaNames: string[] }) {
       </section>
 
       <section className="flex flex-col gap-4">
+        {isStale && (
+          <p
+            role="status"
+            className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          >
+            条件が変わっています。「この条件で絞り直す」で更新できます。
+          </p>
+        )}
         <Result
           status={status}
           candidates={candidates}

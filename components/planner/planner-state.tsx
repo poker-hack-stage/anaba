@@ -8,6 +8,8 @@ export type PlannerStatus = "idle" | "loading" | "done" | "error";
 export type PlannerResult = {
   status: PlannerStatus;
   candidates: PlanCandidate[];
+  /** この結果を出したときの条件（idle のときは null）。今の条件とずれていないか比べるのに使う */
+  conditions: PlanConditions | null;
 };
 
 type PlannerState = {
@@ -32,6 +34,7 @@ export function PlannerStateProvider({
   const [result, setResult] = useState<PlannerResult>({
     status: "idle",
     candidates: [],
+    conditions: null,
   });
 
   const value = useMemo(
