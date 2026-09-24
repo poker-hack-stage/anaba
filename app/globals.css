@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  めぐりまちのテーマ色（shadcn/ui のトークン）。値は HSL。
+  ベースは stone、メインカラーは ink（深緑）。ダークモードは使わない。
+*/
+@layer base {
+  :root {
+    --background: 60 9% 98%; /* stone-50 */
+    --foreground: 24 10% 10%; /* stone-900 */
+    --card: 0 0% 100%;
+    --card-foreground: 24 10% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 24 10% 10%;
+    --primary: 164 32% 21%; /* ink（tailwind.config.ts のブランドカラー） */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 60 5% 96%; /* stone-100 */
+    --secondary-foreground: 24 10% 10%;
+    --muted: 60 5% 96%;
+    --muted-foreground: 25 5% 45%; /* stone-500 */
+    --accent: 150 20% 92%; /* ink-light */
+    --accent-foreground: 164 32% 21%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 20 6% 90%; /* stone-200 */
+    --input: 20 6% 90%;
+    --ring: 164 32% 21%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* 控えめなスクロールバー */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.5);
+  border-radius: 9999px;
+}
