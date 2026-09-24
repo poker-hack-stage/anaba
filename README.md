@@ -13,7 +13,7 @@ Next.js (App Router) + Supabase + Vercel
 
 ## セットアップ
 
-必要なもの: Node.js 22（`.nvmrc`）、Docker Desktop
+必要なもの: Node.js 22（22.13 以上、`.nvmrc`）、Docker Desktop
 
 ```bash
 npm install
@@ -41,7 +41,7 @@ npm run dev             # http://localhost:3000
 | `npm run lint` / `lint:fix`       | ESLint                                                       |
 | `npm run format` / `format:check` | Prettier                                                     |
 | `npm run typecheck`               | 型チェック                                                   |
-| `npm test` / `test:watch`         | テスト（Vitest）を1回実行 / 変更を監視して再実行             |
+| `npm test` / `npm run test:watch` | テスト（Vitest）を1回実行 / 変更を監視して再実行             |
 | `npm run db:start` / `db:stop`    | ローカル Supabase 起動 / 停止                                |
 | `npm run db:new <名前>`           | マイグレーションファイル作成                                 |
 | `npm run db:reset`                | ローカル DB を作り直し（全マイグレーション + seed を再適用） |
