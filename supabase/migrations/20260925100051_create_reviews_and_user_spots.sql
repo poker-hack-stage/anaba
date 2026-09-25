@@ -1,29 +1,39 @@
 -- 口コミ・スポットの投稿（ログインなしの匿名）の DB 側（docs/spec.md 画面-4、#51）
---   reviews           : スポットの口コミ。書いたらすぐ公開し、管理者があとから hidden にできる
---   spot_submissions  : 「穴場を教える」の投稿。管理者が承認すると spots に入る
---   published_reviews : 公開してよい口コミの、公開してよい列だけのビュー
---   rate_limits       : IP ごとのレート制限の回数（check_rate_limit() が使う。#52・#25）
---   ng_words          : NG ワード。管理者があとから足す（#55）
---   spots.source      : seed / user（投稿を承認して入れたもの）
+--   reviews            : スポットの口コミ。書いたらすぐ公開し、管理者があとから hidden にできる
+--   published_reviews  : 公開してよい口コミの、公開してよい列だけのビュー
+--   submit_spot()      : 「穴場を教える」の投稿。検査して spots に source = 'user' ですぐ公開で入れる。
+--                        管理者があとから spots.status を hidden にできる
+--   spot_client_hashes : 投稿したスポットの client_hash（公開しない）
+--   rate_limits        : IP ごとのレート制限の回数（check_rate_limit() が使う。#52・#25）
+--   ng_words           : NG ワード。管理者があとから足す（#55）
 --
 -- 書き込むのは anon ロール（ログインがないため）。公開キーはブラウザに出ているので、
--- API（#52）を通らない直接の insert でも荒らしを止められるよう、権限とトリガーで守る。
+-- API（#52）を通らない直接の insert・rpc でも荒らしを止められるよう、権限とトリガー・関数で守る。
 --
--- トリガーが返すエラー（#52 が HTTP のステータスに変える）
+-- トリガー・submit_spot() が返すエラー（#52 が HTTP のステータスに変える）
 --   AN001 : NG ワードを含む（400。どの語に当たったかは返さない）
 --   AN002 : URL を含む（400）
---   AN003 : 同じ本文の連投（429）
+--   AN003 : 連投（同じ本文の口コミ・同じ名前のスポット）（429）
 --   AN004 : 全体の上限を超えた（429）
---   ほかに check 制約違反は 23514（400）、指定できない列を指定したときは 42501
---   トリガーも、見えない文字だけの入力・続く改行には 23514 を返す
+--   ほかに check 制約違反・長さ・見えない文字だけの入力・続く改行は 23514（400）、
+--   存在しない（か非表示の）スポット・地域は 23503（400）、場所が地域の範囲の外・形の違う引数は 22023（400）、
+--   指定できない列を指定したときは 42501
 
 -- ---------------------------------------------------------------------------
--- spots.source
+-- spots に足す列
+--   source   : seed（seed / Studio / マイグレーションで入れたもの）/ user（submit_spot() で投稿されたもの）
+--   status   : published / hidden。hidden は公開の読み取り（RLS）に出ない。管理者があとから変える（#55）
+--   nickname : 投稿した人のニックネーム（公開する）。source = 'user' の行では必須
 -- ---------------------------------------------------------------------------
 
 alter table public.spots
-  add column source text not null default 'seed'
-  check (source in ('seed', 'user'));
+  add column source text not null default 'seed' check (source in ('seed', 'user')),
+  add column status text not null default 'published' check (status in ('published', 'hidden')),
+  add column nickname text check (char_length(nickname) <= 20),
+  add constraint spots_user_nickname_check check (source = 'seed' or nickname is not null);
+
+-- 投稿の連投・全体の上限の判定に使う
+create index spots_user_created_at_idx on public.spots (created_at) where source = 'user';
 
 -- ---------------------------------------------------------------------------
 -- テーブル
@@ -48,28 +58,15 @@ create index reviews_created_at_idx on public.reviews (created_at);
 -- 管理者が同じ client_hash をまとめて非表示にするとき（#55）に使う
 create index reviews_client_hash_idx on public.reviews (client_hash);
 
-create table public.spot_submissions (
-  id uuid primary key default gen_random_uuid(),
-  area_id uuid not null references public.areas (id) on delete cascade,
-  name text not null check (char_length(btrim(name)) >= 1 and char_length(name) <= 40),
-  -- spots.category と同じ6種（lib/spots/categories.ts の CATEGORIES のキー）
-  category text not null check (
-    category in ('gourmet', 'nature', 'view', 'onsen', 'craft', 'history')
-  ),
-  description text not null check (
-    char_length(btrim(description)) >= 1 and char_length(description) <= 300
-  ),
-  -- 日本のおおよその範囲（沖ノ鳥島〜択捉島、与那国島〜南鳥島）
-  lat double precision not null check (lat between 20 and 46),
-  lng double precision not null check (lng between 122 and 154),
-  nickname text not null check (char_length(btrim(nickname)) >= 1 and char_length(nickname) <= 20),
-  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
-  client_hash text check (char_length(client_hash) <= 128),
+-- 投稿したスポットの client_hash。spots の列にすると公開の読み取り（select *）に出てしまうので分ける
+create table public.spot_client_hashes (
+  spot_id uuid primary key references public.spots (id) on delete cascade,
+  client_hash text not null check (client_hash ~ '^[0-9a-f]{64}$'),
   created_at timestamptz not null default now()
 );
 
-create index spot_submissions_created_at_idx on public.spot_submissions (created_at);
-create index spot_submissions_status_idx on public.spot_submissions (status);
+-- 管理者が同じ client_hash のスポットをまとめて非表示にするとき（#55）に使う
+create index spot_client_hashes_client_hash_idx on public.spot_client_hashes (client_hash);
 
 create table public.rate_limits (
   -- '<種類>:<client_hash>'（種類は review・submission・plan。client_hash は SHA-256 の16進64文字）。
@@ -96,19 +93,17 @@ create table public.ng_words (
 -- ---------------------------------------------------------------------------
 
 alter table public.reviews enable row level security;
-alter table public.spot_submissions enable row level security;
+alter table public.spot_client_hashes enable row level security;
 alter table public.rate_limits enable row level security;
 alter table public.ng_words enable row level security;
 
 revoke all on table public.reviews from anon, authenticated;
-revoke all on table public.spot_submissions from anon, authenticated;
+revoke all on table public.spot_client_hashes from anon, authenticated;
 revoke all on table public.rate_limits from anon, authenticated;
 revoke all on table public.ng_words from anon, authenticated;
 
 -- anon は列を限った insert だけ。status・id・created_at は指定できない（既定値が入る）
 grant insert (spot_id, nickname, rating, body, client_hash) on table public.reviews to anon;
-grant insert (area_id, name, category, description, lat, lng, nickname, client_hash)
-  on table public.spot_submissions to anon;
 
 -- select・update・delete のポリシーは作らない（anon は読めない・変えられない）
 -- status の条件は列の権限と二重の守り
@@ -117,12 +112,19 @@ create policy "reviews: anon は公開の状態でだけ投稿可"
   to anon
   with check (status = 'published');
 
-create policy "spot_submissions: anon は承認待ちでだけ投稿可"
-  on public.spot_submissions for insert
-  to anon
-  with check (status = 'pending');
+-- spot_client_hashes・rate_limits・ng_words にはポリシーを作らない（anon・authenticated から見えない）
 
--- rate_limits・ng_words にはポリシーを作らない（anon・authenticated から見えない）
+-- spots: anon・authenticated は公開の状態の行を読むだけ。書き込みは submit_spot() を通す。
+-- アプリは areas.select("*, spots (*)") で読むので、非表示の行は RLS で落とす（読み出しのコードは変えない）
+revoke all on table public.spots from anon, authenticated;
+grant select on table public.spots to anon, authenticated;
+
+drop policy "spots: 誰でも閲覧可" on public.spots;
+
+create policy "spots: 公開の状態なら誰でも閲覧可"
+  on public.spots for select
+  to anon, authenticated
+  using (status = 'published');
 
 -- ---------------------------------------------------------------------------
 -- 公開用のビュー
@@ -238,6 +240,13 @@ security definer
 set search_path = ''
 as $$
 begin
+  -- 非表示のスポットには書けない（存在しないスポットと同じ 23503）
+  if not exists (
+    select 1 from public.spots s where s.id = new.spot_id and s.status = 'published'
+  ) then
+    raise exception using errcode = 'foreign_key_violation', message = 'スポットが見つかりません';
+  end if;
+
   perform public.assert_visible_text(new.nickname, false);
   perform public.assert_visible_text(new.body, true);
   perform public.assert_postable_text(new.nickname || ' ' || new.body);
@@ -279,35 +288,178 @@ create trigger reviews_before_insert
   before insert on public.reviews
   for each row execute function public.reviews_before_insert();
 
-create or replace function public.spot_submissions_before_insert()
-returns trigger
+-- ---------------------------------------------------------------------------
+-- スポットの投稿（#52 の POST /api/spot-submissions が rpc で呼ぶ。#54）
+-- 管理者の承認を待たずに、spots に source = 'user'・status = 'published' で入れる。
+-- 荒れたら管理者が spots.status を hidden にする・行を消す（#55）
+-- ---------------------------------------------------------------------------
+
+-- 点（緯度・経度）が GeoJSON（Geometry・Feature・FeatureCollection）の Polygon・MultiPolygon の内側か。
+-- 偶奇則で数えるので、穴（内側のリング）も扱える。
+-- Polygon・MultiPolygon を1つも含まない、または座標が読めないときは null（呼ぶ側が別の方法で判定する）
+create or replace function public.geojson_contains_point(
+  p_geojson jsonb,
+  p_lat double precision,
+  p_lng double precision
+)
+returns boolean
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v_ring jsonb;
+  v_found boolean := false;
+  v_inside boolean := false;
+  v_n integer;
+  v_x1 double precision;
+  v_y1 double precision;
+  v_x2 double precision;
+  v_y2 double precision;
+begin
+  if p_geojson is null then
+    return null;
+  end if;
+
+  -- strict にする（lax の .** は同じ値を2回返すことがある）
+  for v_ring in
+    select r from jsonb_path_query(p_geojson, 'strict $.** ? (@.type == "Polygon").coordinates[*]') r
+    union all
+    select r from jsonb_path_query(p_geojson, 'strict $.** ? (@.type == "MultiPolygon").coordinates[*][*]') r
+  loop
+    v_found := true;
+    v_n := jsonb_array_length(v_ring);
+    for i in 0 .. v_n - 1 loop
+      -- GeoJSON の座標は [経度, 緯度]
+      v_x1 := (v_ring -> i ->> 0)::double precision;
+      v_y1 := (v_ring -> i ->> 1)::double precision;
+      v_x2 := (v_ring -> ((i + 1) % v_n) ->> 0)::double precision;
+      v_y2 := (v_ring -> ((i + 1) % v_n) ->> 1)::double precision;
+      if (v_y1 > p_lat) <> (v_y2 > p_lat) then
+        -- 上の条件で v_y1 <> v_y2 なので、0 で割らない
+        if p_lng < (v_x2 - v_x1) * (p_lat - v_y1) / (v_y2 - v_y1) + v_x1 then
+          v_inside := not v_inside;
+        end if;
+      end if;
+    end loop;
+  end loop;
+
+  if not v_found then
+    return null;
+  end if;
+  return v_inside;
+exception
+  -- 座標が数でない・形が違うなど。境界がないときと同じ扱いにする
+  when others then
+    return null;
+end;
+$$;
+
+create or replace function public.submit_spot(
+  p_area_id uuid,
+  p_name text,
+  p_category text,
+  p_description text,
+  p_lat double precision,
+  p_lng double precision,
+  p_nickname text,
+  -- IP と RATE_LIMIT_SALT から作る SHA-256 の16進64文字（#52 が渡す）。spot_client_hashes に入れ、公開しない
+  p_client_hash text default null
+)
+returns uuid
 language plpgsql
 security definer
 set search_path = ''
 as $$
+declare
+  v_area public.areas%rowtype;
+  v_inside boolean;
+  v_spot_id uuid;
 begin
-  perform public.assert_visible_text(new.nickname, false);
-  perform public.assert_visible_text(new.name, false);
-  perform public.assert_visible_text(new.description, true);
-  perform public.assert_postable_text(new.nickname || ' ' || new.name || ' ' || new.description);
+  -- 長さ（口コミの check 制約と同じ 23514）
+  if p_nickname is null or char_length(p_nickname) > 20 then
+    raise exception using errcode = 'check_violation', message = 'ニックネームは1〜20文字にしてください';
+  end if;
+  if p_name is null or char_length(p_name) > 40 then
+    raise exception using errcode = 'check_violation', message = 'スポット名は1〜40文字にしてください';
+  end if;
+  if p_description is null or char_length(p_description) > 300 then
+    raise exception using errcode = 'check_violation', message = 'ひとことは1〜300文字にしてください';
+  end if;
+  -- spots.category の check と同じ6種（lib/spots/categories.ts の CATEGORIES のキー）
+  if p_category is null
+    or p_category not in ('gourmet', 'nature', 'view', 'onsen', 'craft', 'history') then
+    raise exception using errcode = 'check_violation', message = 'カテゴリが正しくありません';
+  end if;
 
-  perform pg_advisory_xact_lock(hashtext('public.spot_submissions_before_insert'));
+  perform public.assert_visible_text(p_nickname, false);
+  perform public.assert_visible_text(p_name, false);
+  perform public.assert_visible_text(p_description, true);
+  perform public.assert_postable_text(p_nickname || ' ' || p_name || ' ' || p_description);
+
+  if p_client_hash is not null and p_client_hash !~ '^[0-9a-f]{64}$' then
+    raise exception using errcode = '22023', message = 'p_client_hash は16進64文字にしてください';
+  end if;
+
+  -- 場所: 巡回や AI旅プランに地域の外の場所が出ないよう、地域の範囲の中だけを受け付ける
+  select * into v_area from public.areas a where a.id = p_area_id;
+  if not found then
+    raise exception using errcode = 'foreign_key_violation', message = '地域が見つかりません';
+  end if;
+  -- 日本のおおよその範囲（沖ノ鳥島〜択捉島、与那国島〜南鳥島）。NaN・Infinity もここで弾かれる
+  if p_lat is null or p_lng is null
+    or not (p_lat between 20 and 46 and p_lng between 122 and 154) then
+    raise exception using errcode = '22023', message = '場所が日本の範囲の外です';
+  end if;
+  -- 境界（areas.boundary）があればその内側。なければ地域の中心から 50 km 以内
+  -- （市町村の端までの距離のおおよその上限。北アルプス山麓の松本市でも中心から乗鞍まで約 40 km）
+  v_inside := public.geojson_contains_point(v_area.boundary, p_lat, p_lng);
+  if v_inside is null then
+    v_inside := 6371 * 2 * asin(sqrt(
+      power(sin(radians(p_lat - v_area.center_lat) / 2), 2)
+      + cos(radians(v_area.center_lat)) * cos(radians(p_lat))
+        * power(sin(radians(p_lng - v_area.center_lng) / 2), 2)
+    )) <= 50;
+  end if;
+  if not v_inside then
+    raise exception using errcode = '22023', message = '場所が地域の範囲の外です';
+  end if;
+
+  -- 数えている間にほかの投稿が入って上限を超えないよう、投稿を直列にする
+  perform pg_advisory_xact_lock(hashtext('public.submit_spot'));
+
+  -- 連投: 同じ地域に、正規化して同じ名前の投稿が24時間以内にあれば拒否する
+  if exists (
+    select 1
+    from public.spots s
+    where s.source = 'user'
+      and s.area_id = p_area_id
+      and s.created_at > now() - interval '24 hours'
+      and public.normalize_for_moderation(s.name) = public.normalize_for_moderation(p_name)
+  ) then
+    raise exception using errcode = 'AN003', message = '同じスポットがすでに投稿されています';
+  end if;
 
   if (
     select count(*)
-    from public.spot_submissions s
-    where s.created_at > now() - interval '1 hour'
+    from public.spots s
+    where s.source = 'user'
+      and s.created_at > now() - interval '1 hour'
   ) >= 20 then
     raise exception using errcode = 'AN004', message = '投稿が混み合っています。しばらくしてからお試しください';
   end if;
 
-  return new;
+  insert into public.spots (area_id, name, category, lat, lng, description, source, status, nickname)
+  values (p_area_id, p_name, p_category, p_lat, p_lng, p_description, 'user', 'published', p_nickname)
+  returning id into v_spot_id;
+
+  if p_client_hash is not null then
+    insert into public.spot_client_hashes (spot_id, client_hash) values (v_spot_id, p_client_hash);
+  end if;
+
+  return v_spot_id;
 end;
 $$;
-
-create trigger spot_submissions_before_insert
-  before insert on public.spot_submissions
-  for each row execute function public.spot_submissions_before_insert();
 
 -- ---------------------------------------------------------------------------
 -- レート制限（#52 の口コミ・投稿、#25 の /api/plan が使う）
@@ -358,50 +510,6 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- 投稿の承認（管理者が SQL Editor から呼ぶ。#55）
--- 承認待ちの投稿を source = 'user' で spots に入れ、投稿を approved にする。新しい spots.id を返す
--- ---------------------------------------------------------------------------
-
-create or replace function public.approve_spot_submission(p_id uuid)
-returns uuid
-language plpgsql
-set search_path = ''
-as $$
-declare
-  v_submission public.spot_submissions%rowtype;
-  v_spot_id uuid;
-begin
-  select * into v_submission
-  from public.spot_submissions
-  where id = p_id
-  for update;
-
-  if not found then
-    raise exception 'spot_submissions に id = % の行がありません', p_id;
-  end if;
-  if v_submission.status <> 'pending' then
-    raise exception 'id = % は承認待ちではありません（status = %）', p_id, v_submission.status;
-  end if;
-
-  insert into public.spots (area_id, name, category, lat, lng, description, source)
-  values (
-    v_submission.area_id,
-    v_submission.name,
-    v_submission.category,
-    v_submission.lat,
-    v_submission.lng,
-    v_submission.description,
-    'user'
-  )
-  returning id into v_spot_id;
-
-  update public.spot_submissions set status = 'approved' where id = p_id;
-
-  return v_spot_id;
-end;
-$$;
-
--- ---------------------------------------------------------------------------
 -- 関数の実行権限
 -- Postgres は関数の execute を public に、Supabase は anon・authenticated に既定で付けるので外す
 -- ---------------------------------------------------------------------------
@@ -410,8 +518,12 @@ revoke execute on function public.normalize_for_moderation(text) from public, an
 revoke execute on function public.assert_visible_text(text, boolean) from public, anon, authenticated;
 revoke execute on function public.assert_postable_text(text) from public, anon, authenticated;
 revoke execute on function public.reviews_before_insert() from public, anon, authenticated;
-revoke execute on function public.spot_submissions_before_insert() from public, anon, authenticated;
+revoke execute on function public.geojson_contains_point(jsonb, double precision, double precision)
+  from public, anon, authenticated;
+revoke execute on function public.submit_spot(uuid, text, text, text, double precision, double precision, text, text)
+  from public, anon, authenticated;
 revoke execute on function public.check_rate_limit(text, integer, integer) from public, anon, authenticated;
-revoke execute on function public.approve_spot_submission(uuid) from public, anon, authenticated;
 
 grant execute on function public.check_rate_limit(text, integer, integer) to anon;
+grant execute on function public.submit_spot(uuid, text, text, text, double precision, double precision, text, text)
+  to anon;

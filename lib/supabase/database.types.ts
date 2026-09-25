@@ -150,52 +150,28 @@ export type Database = {
           },
         ]
       }
-      spot_submissions: {
+      spot_client_hashes: {
         Row: {
-          area_id: string
-          category: string
-          client_hash: string | null
+          client_hash: string
           created_at: string
-          description: string
-          id: string
-          lat: number
-          lng: number
-          name: string
-          nickname: string
-          status: string
+          spot_id: string
         }
         Insert: {
-          area_id: string
-          category: string
-          client_hash?: string | null
+          client_hash: string
           created_at?: string
-          description: string
-          id?: string
-          lat: number
-          lng: number
-          name: string
-          nickname: string
-          status?: string
+          spot_id: string
         }
         Update: {
-          area_id?: string
-          category?: string
-          client_hash?: string | null
+          client_hash?: string
           created_at?: string
-          description?: string
-          id?: string
-          lat?: number
-          lng?: number
-          name?: string
-          nickname?: string
-          status?: string
+          spot_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "spot_submissions_area_id_fkey"
-            columns: ["area_id"]
-            isOneToOne: false
-            referencedRelation: "areas"
+            foreignKeyName: "spot_client_hashes_spot_id_fkey"
+            columns: ["spot_id"]
+            isOneToOne: true
+            referencedRelation: "spots"
             referencedColumns: ["id"]
           },
         ]
@@ -215,8 +191,10 @@ export type Database = {
           lng: number
           local_tip: string | null
           name: string
+          nickname: string | null
           rating: number | null
           source: string
+          status: string
           stay_minutes: number | null
           tags: string[]
           updated_at: string
@@ -235,8 +213,10 @@ export type Database = {
           lng: number
           local_tip?: string | null
           name: string
+          nickname?: string | null
           rating?: number | null
           source?: string
+          status?: string
           stay_minutes?: number | null
           tags?: string[]
           updated_at?: string
@@ -255,8 +235,10 @@ export type Database = {
           lng?: number
           local_tip?: string | null
           name?: string
+          nickname?: string | null
           rating?: number | null
           source?: string
+          status?: string
           stay_minutes?: number | null
           tags?: string[]
           updated_at?: string
@@ -310,7 +292,6 @@ export type Database = {
       }
     }
     Functions: {
-      approve_spot_submission: { Args: { p_id: string }; Returns: string }
       assert_postable_text: { Args: { p_text: string }; Returns: undefined }
       assert_visible_text: {
         Args: { p_allow_newline: boolean; p_text: string }
@@ -320,7 +301,24 @@ export type Database = {
         Args: { p_key: string; p_max: number; p_window_seconds: number }
         Returns: boolean
       }
+      geojson_contains_point: {
+        Args: { p_geojson: Json; p_lat: number; p_lng: number }
+        Returns: boolean
+      }
       normalize_for_moderation: { Args: { p_text: string }; Returns: string }
+      submit_spot: {
+        Args: {
+          p_area_id: string
+          p_category: string
+          p_client_hash?: string
+          p_description: string
+          p_lat: number
+          p_lng: number
+          p_name: string
+          p_nickname: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never

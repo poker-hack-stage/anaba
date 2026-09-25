@@ -53,6 +53,8 @@ function spot(areaId: string, name: string, category: string): Spot {
     image_path: null,
     tags: [],
     source: "seed",
+    status: "published",
+    nickname: null,
     created_at: "2026-09-25T00:00:00Z",
     updated_at: "2026-09-25T00:00:00Z",
   };
