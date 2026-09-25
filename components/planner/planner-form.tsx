@@ -23,7 +23,7 @@ import type {
   PlanResponse,
 } from "@/lib/planner/types";
 import { cn } from "@/lib/utils";
-import { CandidateCard } from "./candidate-card";
+import { CandidateTabs } from "./candidate-tabs";
 import { type PlannerStatus, usePlannerState } from "./planner-state";
 
 /**
@@ -299,14 +299,11 @@ function Result({
     );
   }
   if (status === "loading") {
+    // 候補はタブで1件ずつ見せるので、タブと1件ぶんのカードの形にする
     return (
-      <div className="grid gap-4 xl:grid-cols-2">
-        {[0, 1].map((i) => (
-          <div
-            key={i}
-            className="h-96 animate-pulse rounded-2xl bg-stone-200/60"
-          />
-        ))}
+      <div className="flex flex-col gap-3">
+        <div className="h-14 animate-pulse rounded-2xl bg-stone-200/60" />
+        <div className="h-[36rem] animate-pulse rounded-2xl bg-stone-200/60" />
       </div>
     );
   }
@@ -344,16 +341,7 @@ function Result({
           </span>
         </p>
       )}
-      <div className="grid gap-4 xl:grid-cols-2">
-        {candidates.map((candidate, i) => (
-          <CandidateCard
-            key={candidate.id}
-            candidate={candidate}
-            index={i}
-            onSpotClick={onSpotClick}
-          />
-        ))}
-      </div>
+      <CandidateTabs candidates={candidates} onSpotClick={onSpotClick} />
     </>
   );
 }
