@@ -19,7 +19,7 @@ export async function getAreas(): Promise<Area[]> {
     .select("*")
     .order("display_order", { ascending: true });
 
-  if (error) throw error;
+  if (error) throw new Error("地域を読み込めませんでした", { cause: error });
   return data;
 }
 
@@ -31,7 +31,11 @@ export async function getAreasWithSpots(): Promise<AreaWithSpots[]> {
     .select("*, spots (*)")
     .order("display_order", { ascending: true });
 
-  if (error) throw error;
+  // Supabase のエラーはただのオブジェクトなので、Error に包んで投げる（ログにメッセージとスタックが出るように。
+  // 画面の表示は app/error.tsx）
+  if (error) {
+    throw new Error("地域とスポットを読み込めませんでした", { cause: error });
+  }
   return data.map((area) => ({
     ...area,
     recommended: pickRecommended(area.spots),

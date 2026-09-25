@@ -196,6 +196,51 @@ describe("generateCandidates", () => {
     );
   });
 
+  test("興味が同じなら、評価より穴場度の高いスポットを先に経路に入れる", () => {
+    const town: PlannableArea = {
+      ...area("穴場の町", 36.238, 137.972, []),
+      spots: [
+        spot("穴場の町", "有名", "nature", { rating: 5.0, gem: 1 }),
+        spot("穴場の町", "穴場", "nature", { rating: 3.0, gem: 5 }),
+        spot("穴場の町", "やや穴場", "nature", { rating: 3.0, gem: 4 }),
+        spot("穴場の町", "穴場度なし", "nature", { rating: 5.0, gem: null }),
+        spot("穴場の町", "ふつう", "nature", { rating: 2.0, gem: 3 }),
+      ],
+    };
+
+    const [candidate] = generateCandidates(
+      [town],
+      request({ areaId: "穴場の町" }),
+    );
+
+    // 4件まで。穴場度がないスポットがいちばん後ろで、評価が高くても外れる
+    expect(candidate.days[0].route.map((s) => s.name).sort()).toEqual(
+      ["穴場", "やや穴場", "ふつう", "有名"].sort(),
+    );
+  });
+
+  test("穴場度が同じなら、評価の高いスポットを経路に入れる", () => {
+    const town: PlannableArea = {
+      ...area("同じ穴場度の町", 36.238, 137.972, []),
+      spots: [
+        spot("同じ穴場度の町", "低い", "nature", { rating: 2.0, gem: 3 }),
+        spot("同じ穴場度の町", "高い", "nature", { rating: 4.8, gem: 3 }),
+        spot("同じ穴場度の町", "評価なし", "nature", { rating: null, gem: 3 }),
+        spot("同じ穴場度の町", "中くらい", "nature", { rating: 3.5, gem: 3 }),
+        spot("同じ穴場度の町", "やや低い", "nature", { rating: 3.0, gem: 3 }),
+      ],
+    };
+
+    const [candidate] = generateCandidates(
+      [town],
+      request({ areaId: "同じ穴場度の町" }),
+    );
+
+    expect(candidate.days[0].route.map((s) => s.name)).not.toContain(
+      "評価なし",
+    );
+  });
+
   test("1日の所要時間は、滞在の合計と移動の目安から計算する", () => {
     const town: PlannableArea = {
       ...area("所要時間の町", 36.238, 137.972, []),
@@ -252,16 +297,16 @@ describe("generateCandidates", () => {
     expect(candidates[0]).toMatchObject({
       title: "松本市をめぐる1泊2日プラン",
       summary: "松本市のキャッチコピー",
-      reason: "興味の「温泉」に合うスポットを、評価の高い順に選びました。",
+      reason: "興味の「温泉」に合うスポットを、穴場度の高い順に選びました。",
     });
     expect(candidates[1].reason).toBe(
-      "松本市の近くの地域から選びました。興味の「温泉」に合うスポットを、評価の高い順に選びました。",
+      "松本市の近くの地域から選びました。興味の「温泉」に合うスポットを、穴場度の高い順に選びました。",
     );
   });
 
-  test("興味を選ばなければ、評価の高いスポットを選んだと書く", () => {
+  test("興味を選ばなければ、穴場度の高いスポットを選んだと書く", () => {
     const [candidate] = generateCandidates(areas, request());
 
-    expect(candidate.reason).toBe("評価の高いスポットを選びました。");
+    expect(candidate.reason).toBe("穴場度の高いスポットを選びました。");
   });
 });

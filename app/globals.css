@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /*
-  めぐりまちのテーマ色（shadcn/ui のトークン）。値は HSL。
+  anaba のテーマ色（shadcn/ui のトークン）。値は HSL。
   ベースは stone、メインカラーは ink（深緑）。ダークモードは使わない。
 */
 @layer base {

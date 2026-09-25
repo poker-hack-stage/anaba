@@ -9,7 +9,7 @@ export function SiteHeader() {
         <Link href="/" className="flex shrink-0 items-center gap-2">
           <LogoMark />
           <span className="font-brand text-xl font-bold tracking-wide text-ink">
-            めぐりまち
+            anaba
           </span>
         </Link>
 

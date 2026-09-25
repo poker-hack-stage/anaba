@@ -16,7 +16,7 @@ export default {
         brand: ["var(--font-brand)", "sans-serif"],
       },
       colors: {
-        // めぐりまちのブランドカラー
+        // anaba のブランドカラー
         ink: {
           DEFAULT: "#24463d", // 深緑（メイン）
           light: "#e7efeb",
