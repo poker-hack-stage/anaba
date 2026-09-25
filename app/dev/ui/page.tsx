@@ -32,7 +32,21 @@ const BRAND_COLORS = [
   { name: "shu", hex: brand.shu.DEFAULT, note: "朱色（アクセント）" },
   { name: "shu-light", hex: brand.shu.light, note: "shu の薄い背景" },
   { name: "shu-border", hex: brand.shu.border, note: "shu の枠線" },
-  { name: "washi", hex: brand.washi, note: "生成り（ヒーローの背景）" },
+  {
+    name: "hero-from",
+    hex: brand.hero.from,
+    note: "ヒーローのグラデーション（始点）",
+  },
+  {
+    name: "hero-via",
+    hex: brand.hero.via,
+    note: "ヒーローのグラデーション（中間）",
+  },
+  {
+    name: "hero-to",
+    hex: brand.hero.to,
+    note: "ヒーローのグラデーション（終点。いちばん明るい）",
+  },
 ];
 
 /**

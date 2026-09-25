@@ -21,7 +21,7 @@ export function contrastRatio(foreground: string, background: string) {
   return (light + 0.05) / (dark + 0.05);
 }
 
-/** tailwind.config.ts のブランドカラー（ink・shu・washi） */
+/** tailwind.config.ts のブランドカラー（ink・shu・hero） */
 export const brand = tailwindConfig.theme.extend.colors;
 
 // app/globals.css の HSL の CSS 変数は読めないので書き写している。globals.css を変えたらここも直す
@@ -39,9 +39,9 @@ export const TEXT_PAIRS = [
   {
     usage: "本文",
     fg: colors.stone[900],
-    bg: colors.stone[50],
+    bg: colors.white,
     fgName: "stone-900",
-    bgName: "stone-50（背景）",
+    bgName: "white（背景）",
   },
   {
     usage: "説明文・タグ",
@@ -58,13 +58,6 @@ export const TEXT_PAIRS = [
     bgName: "white",
   },
   {
-    usage: "補足の小さい文字（背景の上）",
-    fg: colors.stone[500],
-    bg: colors.stone[50],
-    fgName: "stone-500",
-    bgName: "stone-50",
-  },
-  {
     usage: "muted-foreground",
     fg: MUTED_FOREGROUND,
     bg: colors.stone[100],
@@ -72,11 +65,18 @@ export const TEXT_PAIRS = [
     bgName: "muted（stone-100）",
   },
   {
-    usage: "見出し",
-    fg: brand.ink.DEFAULT,
-    bg: brand.washi,
-    fgName: "ink",
-    bgName: "washi",
+    usage: "ヒーローの見出し（グラデーションのいちばん明るい所）",
+    fg: colors.white,
+    bg: brand.hero.to,
+    fgName: "white",
+    bgName: "hero-to",
+  },
+  {
+    usage: "ヒーローの説明文（グラデーションのいちばん明るい所）",
+    fg: brand.ink.light,
+    bg: brand.hero.to,
+    fgName: "ink-light",
+    bgName: "hero-to",
   },
   {
     usage: "アクセントの小見出し",
@@ -84,13 +84,6 @@ export const TEXT_PAIRS = [
     bg: colors.white,
     fgName: "shu",
     bgName: "white",
-  },
-  {
-    usage: "アクセントの小見出し（ヒーロー）",
-    fg: brand.shu.DEFAULT,
-    bg: brand.washi,
-    fgName: "shu",
-    bgName: "washi",
   },
   {
     usage: "選択中のタブ（AI旅プラン）",
