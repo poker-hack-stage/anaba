@@ -3,8 +3,8 @@ import { COMPANIONS, DURATIONS, INTERESTS, TRANSPORTS } from "./options";
 
 // /api/plan の入力の検証と、Gemini に返させる JSON の形（#18）
 
-/** リクエストの本文の上限（文字数）。正しい条件なら数百文字に収まる */
-export const MAX_REQUEST_LENGTH = 2_000;
+/** リクエストの本文の上限（バイト数）。正しい条件なら数百バイトに収まる（日本語は1文字3バイト） */
+export const MAX_REQUEST_BYTES = 8_000;
 
 /**
  * 「絞る」で送られてくる条件（PlanConditions）。選択肢にない値や、余計な項目は受け付けない。

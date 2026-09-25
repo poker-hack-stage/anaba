@@ -1,7 +1,8 @@
 import { getAreasWithSpots } from "@/lib/data/areas";
+import { readLimitedText } from "@/lib/http/read-limited-text";
 import { toPlanRequest } from "@/lib/planner/conditions";
 import { createPlan } from "@/lib/planner/create-plan";
-import { MAX_REQUEST_LENGTH, planConditionsSchema } from "@/lib/planner/schema";
+import { MAX_REQUEST_BYTES, planConditionsSchema } from "@/lib/planner/schema";
 
 /**
  * 関数の最大実行時間（秒）。Gemini は最大45秒待つ（lib/ai/gemini.ts）ので、DB の読み出しを含めても収まる。
@@ -13,8 +14,9 @@ export const maxDuration = 60;
 export async function POST(request: Request) {
   // TODO(#25): レート制限はここ（入力を読む前）に差し込む
 
-  const text = await request.text();
-  if (text.length > MAX_REQUEST_LENGTH) {
+  // 大きな本文を全部メモリに読まないよう、上限を超えた時点で読むのをやめる
+  const text = await readLimitedText(request, MAX_REQUEST_BYTES);
+  if (text === null) {
     return Response.json({ error: "request_too_large" }, { status: 413 });
   }
   const parsed = planConditionsSchema.safeParse(parseJson(text));
