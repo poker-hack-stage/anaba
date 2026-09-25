@@ -21,7 +21,13 @@ export function SpotImage({
         background: `linear-gradient(135deg, ${meta.color}33, ${meta.color}88)`,
       }}
     >
-      {meta.emoji}
+      {/* アイコンの大きさは文字の大きさ（text-4xl など）に合わせる */}
+      <meta.icon
+        aria-hidden
+        className="h-[1em] w-[1em]"
+        style={{ color: meta.color }}
+        strokeWidth={1.5}
+      />
     </div>
   );
 }

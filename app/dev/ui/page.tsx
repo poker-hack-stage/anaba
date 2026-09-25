@@ -172,9 +172,10 @@ export default function UiCatalogPage() {
           {Object.values(CATEGORIES).map((c) => (
             <span
               key={c.label}
-              className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${c.badge}`}
+              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${c.badge}`}
             >
-              {c.emoji} {c.label}
+              <c.icon aria-hidden className="h-3 w-3" />
+              {c.label}
             </span>
           ))}
         </div>
