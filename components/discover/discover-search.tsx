@@ -1,4 +1,6 @@
-import type { RefObject } from "react";
+"use client";
+
+import { useState, type RefObject } from "react";
 import { Search, X } from "lucide-react";
 import { Chip } from "@/components/ui/chip";
 import { Input } from "@/components/ui/input";
@@ -12,7 +14,9 @@ const CATEGORY_ENTRIES = Object.entries(CATEGORIES) as [
 
 /**
  * 「穴場を探す」の検索欄・カテゴリのチップ・件数と「条件をクリア」（docs/spec.md 画面-3）。
- * PC は1行、狭い画面では折り返す。件数の変化は aria-live で読み上げる
+ * PC は1行、狭い画面では折り返す。件数の変化は aria-live で読み上げる。
+ * スマホ（sm 未満）では検索欄だけを見せ、検索欄を押したらカテゴリのチップを出す。
+ * フォーカスが検索欄とチップの外へ出たら閉じる。検索欄とチップは背景でひとまとまりに見せる（kosei の判断）
  */
 export function DiscoverSearch({
   text,
@@ -42,44 +46,66 @@ export function DiscoverSearch({
   /** 絞り込み中の件数。条件がないときは null */
   summary: { areas: number; spots: number } | null;
 }) {
+  // スマホでチップを出しているか（PC では常に出す）
+  const [chipsOpen, setChipsOpen] = useState(false);
+
   return (
     <div role="search" className="flex flex-wrap items-center gap-x-3 gap-y-3">
-      <div className="relative w-full sm:w-72 lg:w-64">
-        <Search
-          aria-hidden
-          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400"
-        />
-        <Input
-          type="search"
-          value={text}
-          onChange={(e) => onTextChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.nativeEvent.isComposing) onSubmit();
-          }}
-          {...inputProps}
-          maxLength={MAX_QUERY_LENGTH}
-          placeholder="スポット名・地域・タグで探す"
-          aria-label="スポット名・地域・タグで探す"
-          className="h-10 rounded-xl border-stone-200 bg-white pl-9"
-        />
-      </div>
-
+      {/* スマホでは検索欄とチップを背景でひとまとまりにする。sm 以上では contents で枠をなくし、今までどおり1行に並べる */}
       <div
-        role="group"
-        aria-label="カテゴリで絞り込む"
-        className="flex flex-wrap gap-1.5"
+        className={`flex w-full flex-col rounded-2xl transition-all duration-200 ease-out motion-reduce:transition-none sm:contents ${chipsOpen ? "gap-2 bg-ink-light p-2" : "gap-0 bg-transparent p-0"}`}
+        onFocus={() => setChipsOpen(true)}
+        onBlur={(e) => {
+          // フォーカスが検索欄とチップの外へ出たときだけ閉じる
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+            setChipsOpen(false);
+          }
+        }}
       >
-        {CATEGORY_ENTRIES.map(([key, { label, icon: Icon }]) => (
-          <Chip
-            key={key}
-            active={categories.includes(key)}
-            onClick={() => onToggleCategory(key)}
-            className="inline-flex items-center gap-1 lg:px-2.5"
+        <div className="relative w-full sm:w-72 lg:w-64">
+          <Search
+            aria-hidden
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400"
+          />
+          <Input
+            type="search"
+            value={text}
+            onChange={(e) => onTextChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.nativeEvent.isComposing) onSubmit();
+            }}
+            {...inputProps}
+            maxLength={MAX_QUERY_LENGTH}
+            placeholder="スポット名・地域・タグで探す"
+            aria-label="スポット名・地域・タグで探す"
+            className="h-10 rounded-xl border-stone-200 bg-white pl-9"
+          />
+        </div>
+
+        {/* スマホでは高さ（grid の 0fr ↔ 1fr）と透明度でふわっと開閉する。閉じている間は invisible でフォーカスもしない */}
+        <div
+          className={`grid transition-[grid-template-rows,opacity,visibility] duration-200 ease-out motion-reduce:transition-none sm:contents ${chipsOpen ? "visible grid-rows-[1fr] opacity-100" : "invisible grid-rows-[0fr] opacity-0 sm:visible"}`}
+        >
+          <div
+            role="group"
+            aria-label="カテゴリで絞り込む"
+            className="flex min-h-0 flex-wrap gap-1.5 overflow-hidden sm:overflow-visible"
+            // チップを押してもフォーカスを検索欄から動かさない（スマホでタップしたとき閉じないように）
+            onMouseDown={(e) => e.preventDefault()}
           >
-            <Icon aria-hidden className="h-3.5 w-3.5" />
-            {label}
-          </Chip>
-        ))}
+            {CATEGORY_ENTRIES.map(([key, { label, icon: Icon }]) => (
+              <Chip
+                key={key}
+                active={categories.includes(key)}
+                onClick={() => onToggleCategory(key)}
+                className="inline-flex items-center gap-1 lg:px-2.5"
+              >
+                <Icon aria-hidden className="h-3.5 w-3.5" />
+                {label}
+              </Chip>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="flex items-center gap-2 lg:ml-auto">
