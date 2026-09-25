@@ -217,6 +217,17 @@ describe("generateCandidates", () => {
     expect(candidate.reason).toContain("2日目は近くの安曇野市をめぐります。");
   });
 
+  test("近い地域がなければ、残りの日のぶんを候補の地域に残して組む", () => {
+    // 遠い町は4件で近い地域もないので、1泊2日は2件＋2件で組む
+    const [candidate] = generateCandidates(
+      areas,
+      request({ areaId: "遠い町", duration: "1n2d" }),
+    );
+
+    expect(candidate.days.map((d) => d.areaId)).toEqual(["遠い町", "遠い町"]);
+    expect(candidate.days.map((d) => d.route.length)).toEqual([2, 2]);
+  });
+
   test("組めない候補は捨てる", () => {
     // 遠い町は4件しかなく近い地域もないので、2泊3日は組めない
     const candidates = generateCandidates(
