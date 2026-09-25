@@ -19,18 +19,18 @@ export default function DiscoverPage() {
 
 function Hero() {
   return (
-    <section className="flex flex-col gap-4 rounded-3xl border border-stone-200 bg-washi p-5 sm:flex-row sm:items-center sm:justify-between sm:p-7">
+    <section className="flex flex-col gap-4 rounded-3xl bg-gradient-to-br from-hero-from via-hero-via to-hero-to p-5 sm:flex-row sm:items-center sm:justify-between sm:p-7">
       <div>
-        <h1 className="font-brand text-xl font-bold leading-snug text-ink sm:text-2xl">
+        <h1 className="font-brand text-xl font-bold leading-snug text-white sm:text-2xl">
           地元の人の「いつもの場所」へ。
         </h1>
-        <p className="mt-1 text-sm text-stone-600">
+        <p className="mt-1 text-sm text-ink-light">
           地域の人が教える穴場を、地図でめぐろう。
         </p>
       </div>
       <Link
         href="/planner"
-        className="inline-flex w-fit shrink-0 items-center gap-1.5 rounded-xl bg-ink px-4 py-2.5 text-sm font-bold text-white hover:bg-ink/90"
+        className="inline-flex w-fit shrink-0 items-center gap-1.5 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-ink hover:bg-ink-light"
       >
         <Route className="h-4 w-4" />
         旅プランをつくる

@@ -16,17 +16,22 @@ export default {
         brand: ["var(--font-brand)", "sans-serif"],
       },
       colors: {
-        // めぐりまちのブランドカラー
+        // anaba のブランドカラー
         ink: {
           DEFAULT: "#24463d", // 深緑（メイン）
           light: "#e7efeb",
         },
         shu: {
           DEFAULT: "#c0432b", // 朱色（御朱印のイメージ。アクセント）
-          light: "#fbece7",
+          light: "#fcf0ec", // shu の文字を載せて 4.5:1 以上になる明るさ
           border: "#f0cabf",
         },
-        washi: "#f6f1e7", // 和紙っぽい生成り色
+        // ヒーロー（ページ上部の見出し）の深緑のグラデーション。白い文字を載せる
+        hero: {
+          from: "#24463d", // = ink
+          via: "#2f5d50",
+          to: "#3b7263", // 白文字で 5.5:1、ink-light の文字で 4.7:1
+        },
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         card: {

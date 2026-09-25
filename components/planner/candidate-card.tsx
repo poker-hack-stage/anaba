@@ -1,14 +1,25 @@
+"use client";
+
+import dynamic from "next/dynamic";
 import { BedDouble, Clock, Lightbulb, MapPin } from "lucide-react";
-import { SpotMap } from "@/components/map/spot-map";
+import { SpotMapSkeleton } from "@/components/map/spot-map-skeleton";
 import type { Spot } from "@/lib/data/spots";
 import { formatMinutes } from "@/lib/planner/duration";
 import type { PlanCandidate, PlanDay } from "@/lib/planner/types";
 import { cn } from "@/lib/utils";
 import { getDayColor } from "./day-colors";
 
+const MAP_CLASS_NAME = "h-56 rounded-none border-0 border-b";
+
+// Leaflet は window を使うので、サーバーでは描画しない
+const SpotMap = dynamic(
+  () => import("@/components/map/spot-map").then((m) => m.SpotMap),
+  { ssr: false, loading: () => <SpotMapSkeleton className={MAP_CLASS_NAME} /> },
+);
+
 /**
  * 旅プランの候補カード。地図と、日ごとの経路・所要時間・選ばれた理由を出す（docs/spec.md の 6.2・#57）
- * TODO(#57): 地図で日ごとに線とマーカーの色を変え、凡例を出す（Leaflet の地図、PR #41 のあと）。今は全日の経路を1本で出している
+ * TODO(#57): 地図で日ごとに線とマーカーの色を変え、凡例を出す（地図の部品の作業。#78 の MapLibre 版のあと）。今は全日の経路を1本で出している
  */
 export function CandidateCard({
   candidate,
@@ -26,7 +37,7 @@ export function CandidateCard({
         route={candidate.days.flatMap((day) => day.route)}
         others={candidate.otherSpots}
         onSpotClick={onSpotClick}
-        className="h-56 rounded-none border-0 border-b"
+        className={MAP_CLASS_NAME}
       />
       <div className="flex flex-col gap-4 p-4">
         <div>
@@ -49,7 +60,7 @@ export function CandidateCard({
         </div>
 
         {candidate.reason && (
-          <div className="flex gap-2 rounded-xl bg-washi px-3 py-2.5 text-sm leading-relaxed text-stone-700">
+          <div className="bg-washi flex gap-2 rounded-xl px-3 py-2.5 text-sm leading-relaxed text-stone-700">
             <Lightbulb
               className="mt-0.5 h-4 w-4 shrink-0 text-shu"
               aria-hidden

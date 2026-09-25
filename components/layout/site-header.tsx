@@ -1,6 +1,4 @@
 import Link from "next/link";
-import { Suspense } from "react";
-import { AuthButton } from "@/components/auth-button";
 import { LogoMark } from "@/components/brand/logo-mark";
 import { HeaderTabs } from "./header-tabs";
 
@@ -11,16 +9,11 @@ export function SiteHeader() {
         <Link href="/" className="flex shrink-0 items-center gap-2">
           <LogoMark />
           <span className="font-brand text-xl font-bold tracking-wide text-ink">
-            めぐりまち
+            anaba
           </span>
         </Link>
 
         <HeaderTabs />
-
-        {/* ログイン状態は cookie を読むので Suspense の内側で描画する */}
-        <Suspense fallback={<div className="h-9 w-20" />}>
-          <AuthButton />
-        </Suspense>
       </div>
     </header>
   );

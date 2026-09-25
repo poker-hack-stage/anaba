@@ -1,45 +1,55 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { FlaskConical, Loader2, Route, Search, SearchX } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { SpotDetailDialog } from "@/components/spots/spot-detail-dialog";
 import { Chip } from "@/components/ui/chip";
 import type { Spot } from "@/lib/data/spots";
-import { toPlanRequest } from "@/lib/planner/conditions";
+import { DURATION_LABELS } from "@/lib/planner/duration";
+import {
+  ANY_AREA_LABEL,
+  COMPANIONS,
+  DURATIONS,
+  INTERESTS,
+  TRANSPORTS,
+} from "@/lib/planner/options";
 import { generateCandidates, type PlannableArea } from "@/lib/planner/generate";
 import type {
   PlanCandidate,
   PlanConditions,
+  PlanDuration,
   PlanResponse,
 } from "@/lib/planner/types";
+import { cn } from "@/lib/utils";
 import { CandidateCard } from "./candidate-card";
 import { type PlannerStatus, usePlannerState } from "./planner-state";
 
-const DURATIONS = ["日帰り", "1泊2日", "2泊3日"];
-const INTERESTS = ["食", "自然", "絶景", "温泉", "体験", "歴史"];
-const COMPANIONS = ["ひとり", "友人", "カップル", "家族（子連れ）"];
-const TRANSPORTS = ["車", "電車・バス", "自転車"];
-
-/** /api/plan の応答を待つ上限 */
-const PLAN_TIMEOUT_MS = 30_000;
+/**
+ * /api/plan の応答を待つ上限。サーバーは Gemini を最大45秒待ち、だめならデモモードで返す（maxDuration は60秒）ので、
+ * それより先にブラウザ側が諦めないよう長めに取る。時間切れならブラウザでデモモードの候補を作る
+ */
+const PLAN_TIMEOUT_MS = 55_000;
 
 const DEFAULT_CONDITIONS: PlanConditions = {
-  area: "おまかせ",
+  areaId: null,
   duration: DURATIONS[0],
   interests: [],
   companion: COMPANIONS[0],
   transport: TRANSPORTS[0],
 };
 
+/** URL のクエリで「おまかせ」を表す値（地域の id と重ならない） */
+const ANY_AREA_QUERY = "any";
+
 /**
- * 条件を URL のクエリにする（例: ?area=…&duration=…&interests=食&interests=温泉&…）。
+ * 条件を URL のクエリにする（例: ?area=<地域の id>&duration=1n2d&interests=食&interests=温泉&…）。
  * 「クエリがない = タブやリンクから来た」と見分けるため、既定値も含めて書く
  */
 function toQuery(conditions: PlanConditions) {
   const params = new URLSearchParams({
-    area: conditions.area,
+    area: conditions.areaId ?? ANY_AREA_QUERY,
     duration: conditions.duration,
     companion: conditions.companion,
     transport: conditions.transport,
@@ -62,19 +72,24 @@ function pickConditionQuery(params: URLSearchParams) {
   return picked.toString();
 }
 
-/** URL のクエリから条件を読む。クエリがなければ null。知らない値は既定値にする */
+/** URL のクエリから条件を読む。クエリがなければ null。知らない値は既定値（地域は「おまかせ」）にする */
 function fromQuery(
   params: URLSearchParams,
-  areaOptions: string[],
+  areaIds: readonly string[],
 ): PlanConditions | null {
   if (!QUERY_KEYS.some((key) => params.has(key))) return null;
 
-  const pick = (key: string, options: string[], fallback: string) => {
+  const pick = <T extends string>(
+    key: string,
+    options: readonly T[],
+    fallback: T,
+  ): T => {
     const value = params.get(key);
-    return value && options.includes(value) ? value : fallback;
+    return options.includes(value as T) ? (value as T) : fallback;
   };
+  const area = params.get("area");
   return {
-    area: pick("area", areaOptions, DEFAULT_CONDITIONS.area),
+    areaId: area !== null && areaIds.includes(area) ? area : null,
     duration: pick("duration", DURATIONS, DEFAULT_CONDITIONS.duration),
     interests: INTERESTS.filter((i) => params.getAll("interests").includes(i)),
     companion: pick("companion", COMPANIONS, DEFAULT_CONDITIONS.companion),
@@ -103,13 +118,10 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
     usePlannerState();
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
 
-  const areaOptions = useMemo(
-    () => [DEFAULT_CONDITIONS.area, ...areas.map((area) => area.name)],
-    [areas],
-  );
+  const areaIds = useMemo(() => areas.map((area) => area.id), [areas]);
   const queryConditions = useMemo(
-    () => fromQuery(searchParams, areaOptions),
-    [searchParams, areaOptions],
+    () => fromQuery(searchParams, areaIds),
+    [searchParams, areaIds],
   );
   const conditions = queryConditions ?? savedConditions ?? DEFAULT_CONDITIONS;
   const { status, candidates, mode } = result;
@@ -178,10 +190,7 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
       try {
         setResult({
           status: "done",
-          candidates: generateCandidates(
-            areas,
-            toPlanRequest(requested, areas),
-          ),
+          candidates: generateCandidates(areas, requested),
           conditions: requested,
           mode: "demo",
         });
@@ -202,17 +211,16 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
     <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
       <section className="flex h-fit flex-col gap-4 rounded-2xl border border-stone-200 bg-white p-5 lg:sticky lg:top-24">
         <h2 className="font-extrabold text-stone-900">旅の条件</h2>
-        <Choice
-          label="エリア"
-          options={areaOptions}
-          selected={[conditions.area]}
-          onSelect={(v) => set("area", v)}
+        <AreaField
+          areas={areas}
+          areaId={conditions.areaId}
+          onChange={(areaId) => set("areaId", areaId)}
         />
         <Choice
           label="日程"
-          options={DURATIONS}
-          selected={[conditions.duration]}
-          onSelect={(v) => set("duration", v)}
+          options={DURATIONS.map((d) => DURATION_LABELS[d])}
+          selected={[DURATION_LABELS[conditions.duration]]}
+          onSelect={(label) => set("duration", toDuration(label))}
         />
         <Choice
           label="興味のあること（複数選べます）"
@@ -350,6 +358,60 @@ function Result({
   );
 }
 
+/** 日程の表示の文言から、日程のコードに戻す */
+function toDuration(label: string): PlanDuration {
+  return DURATIONS.find((d) => DURATION_LABELS[d] === label) ?? DURATIONS[0];
+}
+
+/**
+ * エリア: 「おまかせ」のチップと、地域の select（docs/spec.md の画面-1）。送る値は地域の id（同じ名前の市町村がありうるため）
+ * TODO(#11): prefecture 列ができたら、地域を都道府県ごとの optgroup にまとめる
+ */
+function AreaField({
+  areas,
+  areaId,
+  onChange,
+}: {
+  areas: PlannableArea[];
+  areaId: string | null;
+  onChange: (areaId: string | null) => void;
+}) {
+  const selectId = useId();
+  return (
+    <div>
+      <label
+        htmlFor={selectId}
+        className="mb-1.5 block text-xs font-bold text-stone-700"
+      >
+        エリア
+      </label>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Chip active={areaId === null} onClick={() => onChange(null)}>
+          {ANY_AREA_LABEL}
+        </Chip>
+        <select
+          id={selectId}
+          value={areaId ?? ""}
+          onChange={(e) => onChange(e.target.value || null)}
+          className={cn(
+            "min-w-0 flex-1 rounded-full border bg-white px-3 py-1.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+            areaId === null
+              ? "border-stone-200 text-stone-600"
+              : "border-stone-900 text-stone-900",
+          )}
+        >
+          <option value="">地域を選ぶ</option>
+          {areas.map((area) => (
+            <option key={area.id} value={area.id}>
+              {area.name}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+}
+
 function Choice({
   label,
   options,
@@ -357,7 +419,7 @@ function Choice({
   onSelect,
 }: {
   label: string;
-  options: string[];
+  options: readonly string[];
   selected: string[];
   onSelect: (value: string) => void;
 }) {

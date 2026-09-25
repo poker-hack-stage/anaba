@@ -14,6 +14,7 @@ function spot(name: string, stay_minutes: number | null = 60): Spot {
     lat: 36.2,
     lng: 137.9,
     rating: 4.0,
+    hidden_gem_score: null,
     stay_minutes,
     catchphrase: null,
     description: null,
