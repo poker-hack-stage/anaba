@@ -100,6 +100,32 @@ describe("callGemini", () => {
     });
   });
 
+  test("呼び出し側の設定で、タイムアウト・再試行・中断を変えられない", async () => {
+    generateContent.mockResolvedValue(fakeResponse());
+
+    await callGemini({
+      ...params,
+      config: {
+        systemInstruction: "指示",
+        // 型では禁止しているが、実行時に紛れ込んでも取り除く
+        ...({
+          httpOptions: { timeout: 600_000, retryOptions: { attempts: 5 } },
+          abortSignal: new AbortController().signal,
+        } as object),
+      },
+    });
+
+    expect(generateContent).toHaveBeenCalledWith({
+      ...params,
+      model: DEFAULT_GEMINI_MODEL,
+      config: {
+        systemInstruction: "指示",
+        httpOptions: undefined,
+        abortSignal: undefined,
+      },
+    });
+  });
+
   test("API キーとタイムアウトを渡し、再試行の設定は渡さない", async () => {
     generateContent.mockResolvedValue(fakeResponse());
 

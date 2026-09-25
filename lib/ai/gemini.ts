@@ -4,6 +4,7 @@ import {
   ApiError,
   FinishReason,
   GoogleGenAI,
+  type GenerateContentConfig,
   type GenerateContentParameters,
   type GenerateContentResponse,
 } from "@google/genai";
@@ -49,6 +50,17 @@ const BLOCKED_FINISH_REASONS: ReadonlySet<FinishReason | undefined> = new Set([
   FinishReason.SPII,
 ]);
 
+/**
+ * callGemini() に渡せるリクエスト。モデルは環境変数で決める。
+ * 時間切れ・再試行・中断（httpOptions・abortSignal）はこのファイルで決めるので、呼び出し側からは変えられない
+ */
+export type GeminiParams = Omit<
+  GenerateContentParameters,
+  "model" | "config"
+> & {
+  config?: Omit<GenerateContentConfig, "httpOptions" | "abortSignal">;
+};
+
 /** 使うモデル。GEMINI_MODEL で切り替える（例: gemini-3.8-flash） */
 export function getGeminiModel(): string {
   return process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL;
@@ -56,11 +68,8 @@ export function getGeminiModel(): string {
 
 /**
  * Gemini にリクエストを送る。失敗しても例外は投げず、理由を `ok: false` で返す。
- * モデルは環境変数で決めるので、params には含めない。
  */
-export async function callGemini(
-  params: Omit<GenerateContentParameters, "model">,
-): Promise<GeminiResult> {
+export async function callGemini(params: GeminiParams): Promise<GeminiResult> {
   const model = getGeminiModel();
 
   const apiKey = process.env.GEMINI_API_KEY?.trim();
@@ -77,7 +86,16 @@ export async function callGemini(
 
   const startedAt = Date.now();
   try {
-    const response = await ai.models.generateContent({ ...params, model });
+    const response = await ai.models.generateContent({
+      ...params,
+      model,
+      // 型で禁止していても、実行時に紛れ込んだ設定で45秒の上限や「再試行しない」が崩れないよう取り除く
+      config: params.config && {
+        ...params.config,
+        httpOptions: undefined,
+        abortSignal: undefined,
+      },
+    });
     const finishReason = response.candidates?.[0]?.finishReason;
     const blockReason = response.promptFeedback?.blockReason;
     // モデルの切り替えと、応答時間・トークン数（無料枠の上限との比較）を確かめるためのログ
@@ -105,7 +123,7 @@ export async function callGemini(
 
 function toFailureReason(error: unknown): GeminiFailureReason {
   if (error instanceof ApiError && error.status === 429) return "rate_limited";
-  // httpOptions.timeout を過ぎると、SDK が fetch を中断する
+  // httpOptions.timeout を過ぎると、SDK が fetch を中断する（呼び出し側からは中断させないので、AbortError は時間切れだけ）
   if (error instanceof Error && error.name === "AbortError") return "timeout";
   return "api_error";
 }
