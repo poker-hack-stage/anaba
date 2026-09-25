@@ -429,8 +429,9 @@ function AreaField({
           {groupAreasByPrefecture(areas).map((group) => (
             <optgroup key={group.prefecture} label={group.prefecture}>
               {group.areas.map((area) => (
+                // 選択肢の一覧で都道府県の見出しが見えないブラウザがあり、選んだ後の欄にも出ないので、名前に添える
                 <option key={area.id} value={area.id}>
-                  {area.name}
+                  {area.name}（{group.prefecture}）
                 </option>
               ))}
             </optgroup>
