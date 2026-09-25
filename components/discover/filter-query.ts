@@ -54,7 +54,7 @@ export function isSameFilter(a: DiscoverFilter, b: DiscoverFilter): boolean {
 }
 
 // 最後の条件。「AI旅プラン」タブから戻ってきて URL にクエリがないときに使う。
-// ブラウザでだけ書き換える（サーバーではリクエストをまたいで共有されてしまうため、effect の中だけで触る）
+// ブラウザでだけ書き換える（サーバーではリクエストをまたいで共有されてしまうため、effect・イベント・タイマーの中だけで書き換える）
 let lastFilter: DiscoverFilter = EMPTY_FILTER;
 
 export function getLastFilter(): DiscoverFilter {

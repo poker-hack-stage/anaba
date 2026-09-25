@@ -7,11 +7,14 @@ import { SpotDetailDialog } from "@/components/spots/spot-detail-dialog";
 import { Button } from "@/components/ui/button";
 import type { AreaWithSpots } from "@/lib/data/areas";
 import type { Spot } from "@/lib/data/spots";
-import { filterAreas, hasActiveFilter } from "@/lib/spots/filter";
+import {
+  filterAreas,
+  hasActiveFilter,
+  parseKeywords,
+} from "@/lib/spots/filter";
 import { AreaMap } from "./area-map";
 import { AreaNav } from "./area-nav";
 import { DiscoverSearch } from "./discover-search";
-import { toFilterQuery } from "./filter-query";
 import { SpotPanel } from "./spot-panel";
 import { useAutoRotate } from "./use-auto-rotate";
 import { useDiscoverFilter } from "./use-discover-filter";
@@ -40,8 +43,9 @@ export function AreaRotator({ areas }: { areas: AreaWithSpots[] }) {
       paused: selectedSpot !== null || search.focused,
     });
 
-  // 条件が変わったら、一致した最初の地域から巡回し直す
-  const filterKey = toFilterQuery(new URLSearchParams(), filter);
+  // 条件が変わったら、一致した最初の地域から巡回し直す。
+  // キーワードは絞り込みと同じ正規化をしてから比べる（前後の空白だけ変わっても戻さないように）
+  const filterKey = `${parseKeywords(filter.q).join(" ")}|${filter.categories.join(",")}`;
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
   if (prevFilterKey !== filterKey) {
     setPrevFilterKey(filterKey);
@@ -57,7 +61,7 @@ export function AreaRotator({ areas }: { areas: AreaWithSpots[] }) {
         text={search.text}
         onTextChange={search.setText}
         onSubmit={search.flush}
-        inputFocusHandlers={search.inputFocusHandlers}
+        inputProps={search.inputProps}
         categories={filter.categories}
         onToggleCategory={search.toggleCategory}
         onClear={search.clear}

@@ -45,6 +45,8 @@ export type SpotMapProps = {
   onSpotClick?: (spot: Spot) => void;
   /** ピンにマウスが乗ったらそのスポット、離れたら null を渡す */
   onSpotHover?: (spot: Spot | null) => void;
+  /** スポットも境界もないときに「地図」のプレースホルダーを出すか（既定は出す） */
+  emptyPlaceholder?: boolean;
   className?: string;
 };
 
@@ -76,6 +78,7 @@ export function SpotMap({
   boundary,
   onSpotClick,
   onSpotHover,
+  emptyPlaceholder = true,
   className,
 }: SpotMapProps) {
   const all = [...highlighted, ...route, ...others];
@@ -174,7 +177,7 @@ export function SpotMap({
         </MapContainer>
       )}
 
-      {all.length === 0 && !boundaryLayer && (
+      {emptyPlaceholder && all.length === 0 && !boundaryLayer && (
         <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center">
           <div className="flex flex-col items-center gap-2 rounded-2xl bg-white/80 px-5 py-4 text-stone-500 shadow-sm backdrop-blur-sm">
             <Map className="h-6 w-6" />

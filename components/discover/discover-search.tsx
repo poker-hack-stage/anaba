@@ -1,3 +1,4 @@
+import type { RefObject } from "react";
 import { Search, X } from "lucide-react";
 import { Chip } from "@/components/ui/chip";
 import { Input } from "@/components/ui/input";
@@ -17,7 +18,7 @@ export function DiscoverSearch({
   text,
   onTextChange,
   onSubmit,
-  inputFocusHandlers,
+  inputProps,
   categories,
   onToggleCategory,
   onClear,
@@ -27,7 +28,14 @@ export function DiscoverSearch({
   onTextChange: (text: string) => void;
   /** Enter を押したとき（入力を待たずに反映する） */
   onSubmit: () => void;
-  inputFocusHandlers: { onFocus: () => void; onBlur: () => void };
+  /** 検索欄に渡す ref とイベント（フォーカス・IME の変換） */
+  inputProps: {
+    ref: RefObject<HTMLInputElement | null>;
+    onFocus: () => void;
+    onBlur: () => void;
+    onCompositionStart: () => void;
+    onCompositionEnd: () => void;
+  };
   categories: readonly SpotCategory[];
   onToggleCategory: (category: SpotCategory) => void;
   onClear: () => void;
@@ -48,7 +56,7 @@ export function DiscoverSearch({
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.nativeEvent.isComposing) onSubmit();
           }}
-          {...inputFocusHandlers}
+          {...inputProps}
           maxLength={MAX_QUERY_LENGTH}
           placeholder="スポット名・地域・タグで探す"
           aria-label="スポット名・地域・タグで探す"

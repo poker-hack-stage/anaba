@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { SpotCategory } from "@/lib/spots/categories";
 import {
@@ -35,7 +35,7 @@ function replaceFilterQuery(filter: DiscoverFilter) {
 
 /**
  * 「穴場を探す」の絞り込み条件（docs/spec.md 画面-3）。条件は URL のクエリ（`/?q=…&cat=onsen,view`）に持つ。
- * 検索欄の入力は 300ms 待ってから URL に書く。カテゴリは押したらすぐ書く。
+ * 検索欄の入力は 300ms 待ってから URL に書く（IME の変換中は書かず、確定してから待つ）。カテゴリは押したらすぐ書く。
  * 「AI旅プラン」タブから戻ってきて URL にクエリがないときは、最後の条件を URL に戻す
  */
 export function useDiscoverFilter() {
@@ -44,6 +44,9 @@ export function useDiscoverFilter() {
 
   const [text, setText] = useState(filter.q);
   const [focused, setFocused] = useState(false);
+  // IME の変換中か（変換中の読みを URL に書いて、件数や空状態がちらつかないように）
+  const [composing, setComposing] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // URL のキーワードが外から変わったとき（最後の条件を戻した、など）は検索欄に写す。
   // 入力中は写さない（300ms 前の入力で、打っている途中の文字を上書きしないように）
@@ -65,13 +68,13 @@ export function useDiscoverFilter() {
   }, [searchParams, filter]);
 
   useEffect(() => {
-    if (text === filter.q) return;
+    if (composing || text === filter.q) return;
     const id = setTimeout(
       () => replaceFilterQuery({ ...filter, q: text }),
       INPUT_DEBOUNCE_MS,
     );
     return () => clearTimeout(id);
-  }, [text, filter]);
+  }, [composing, text, filter]);
 
   /** 待たずにすぐ反映する（Enter を押したとき） */
   const flush = useCallback(() => {
@@ -86,9 +89,11 @@ export function useDiscoverFilter() {
     replaceFilterQuery({ q: text, categories });
   };
 
+  // 押したボタン（件数の横・空状態）は消えるので、フォーカスを検索欄に戻す（body に落ちないように）
   const clear = () => {
     setText("");
     replaceFilterQuery(EMPTY_FILTER);
+    inputRef.current?.focus();
   };
 
   return {
@@ -100,9 +105,13 @@ export function useDiscoverFilter() {
     clear,
     /** 検索欄にフォーカスがあるか（ある間は自動巡回を止める） */
     focused,
-    inputFocusHandlers: {
+    /** 検索欄に渡す ref とイベント */
+    inputProps: {
+      ref: inputRef,
       onFocus: () => setFocused(true),
       onBlur: () => setFocused(false),
+      onCompositionStart: () => setComposing(true),
+      onCompositionEnd: () => setComposing(false),
     },
   };
 }
