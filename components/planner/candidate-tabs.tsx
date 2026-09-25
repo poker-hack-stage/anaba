@@ -102,16 +102,8 @@ export function CandidateTabs({
                   : "text-stone-600 hover:bg-stone-100",
               )}
             >
-              <span
-                className={cn(
-                  "text-[11px] font-bold",
-                  selected ? "text-white/80" : "text-shu",
-                )}
-              >
-                候補{i + 1}
-              </span>
-              {/* 読み上げで「候補1白馬村」とつながらないよう区切る */}
-              <span className="sr-only">：</span>
+              {/* 画面には町の名前だけを出す（kosei の判断）。読み上げでは何番目の候補かを伝える */}
+              <span className="sr-only">候補{i + 1}：</span>
               <span className="w-full truncate text-sm font-extrabold">
                 {c.areaName}
               </span>
