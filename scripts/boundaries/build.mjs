@@ -9,6 +9,7 @@
 // ダウンロードしたファイルは OS の一時ディレクトリ（OSM_CACHE_DIR で変更可）に置き、リポジトリには入れない。
 
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
@@ -147,7 +148,13 @@ const BEGIN =
 const END = "-- END boundaries";
 
 async function download() {
-  const path = join(cacheDir, "relations.osm.json");
+  // AREAS の relation を変えたら取り直すよう、ファイル名に relation の id の一覧を入れる
+  const ids = AREAS.map((a) => a.osm).sort((a, b) => a - b);
+  const key = createHash("sha256")
+    .update(ids.join(","))
+    .digest("hex")
+    .slice(0, 12);
+  const path = join(cacheDir, `relations-${key}.osm.json`);
   if (existsSync(path) && !refresh) return path;
   // relation と、その輪郭をつくる way・node をまとめて取る
   const query = `[out:json][timeout:300];
