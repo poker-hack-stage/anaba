@@ -11,7 +11,7 @@ close #
 ## 動作確認
 
 - [ ] ローカルで動作確認した
-- [ ] `npm run lint` / `npm run typecheck` が通る
+- [ ] `npm run lint` / `npm run typecheck` / `npm test` が通る
 - [ ] DB 変更がある場合、マイグレーションを追加し `npm run db:types` で型を更新した
 
 ## スクリーンショット（UI 変更がある場合）
