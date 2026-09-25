@@ -12,7 +12,9 @@ export const HIDDEN_GEM_SCORE_MAX = 5;
 
 /**
  * 評価（0〜5、小数1桁）。値がない・範囲外のときは null（表示しない）
- * DB の check 制約と同じ範囲だが、手で入れたデータやモックに備えてここでも確かめる
+ * DB の check 制約と同じ範囲だが、手で入れたデータやモックに備えてここでも確かめる。
+ * シードの spots.rating だけを見て、匿名の口コミの星は入れない（荒らしで並びが動かないように。#56、docs/spec.md 画面-4）。
+ * 口コミの平均は口コミ欄に別に出す（lib/community/reviews.ts）
  */
 export function getRating(spot: Pick<Spot, "rating">): number | null {
   const { rating } = spot;
