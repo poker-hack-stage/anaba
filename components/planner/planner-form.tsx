@@ -8,6 +8,13 @@ import { SpotDetailDialog } from "@/components/spots/spot-detail-dialog";
 import { Chip } from "@/components/ui/chip";
 import type { Spot } from "@/lib/data/spots";
 import { toPlanRequest } from "@/lib/planner/conditions";
+import {
+  ANY_AREA,
+  COMPANIONS,
+  DURATIONS,
+  INTERESTS,
+  TRANSPORTS,
+} from "@/lib/planner/options";
 import { generateCandidates, type PlannableArea } from "@/lib/planner/generate";
 import type {
   PlanCandidate,
@@ -17,16 +24,14 @@ import type {
 import { CandidateCard } from "./candidate-card";
 import { type PlannerStatus, usePlannerState } from "./planner-state";
 
-const DURATIONS = ["日帰り", "1泊2日", "2泊3日"];
-const INTERESTS = ["食", "自然", "絶景", "温泉", "体験", "歴史"];
-const COMPANIONS = ["ひとり", "友人", "カップル", "家族（子連れ）"];
-const TRANSPORTS = ["車", "電車・バス", "自転車"];
-
-/** /api/plan の応答を待つ上限 */
-const PLAN_TIMEOUT_MS = 30_000;
+/**
+ * /api/plan の応答を待つ上限。サーバーは Gemini を最大45秒待ち、だめならデモモードで返す（maxDuration は60秒）ので、
+ * それより先にブラウザ側が諦めないよう長めに取る。時間切れならブラウザでデモモードの候補を作る
+ */
+const PLAN_TIMEOUT_MS = 55_000;
 
 const DEFAULT_CONDITIONS: PlanConditions = {
-  area: "おまかせ",
+  area: ANY_AREA,
   duration: DURATIONS[0],
   interests: [],
   companion: COMPANIONS[0],
@@ -69,7 +74,7 @@ function fromQuery(
 ): PlanConditions | null {
   if (!QUERY_KEYS.some((key) => params.has(key))) return null;
 
-  const pick = (key: string, options: string[], fallback: string) => {
+  const pick = (key: string, options: readonly string[], fallback: string) => {
     const value = params.get(key);
     return value && options.includes(value) ? value : fallback;
   };
@@ -357,7 +362,7 @@ function Choice({
   onSelect,
 }: {
   label: string;
-  options: string[];
+  options: readonly string[];
   selected: string[];
   onSelect: (value: string) => void;
 }) {

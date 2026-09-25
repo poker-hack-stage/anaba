@@ -67,7 +67,7 @@ npm run dev             # http://localhost:3000
 app/                  ルーティング（ページ・Route Handler）
   page.tsx            穴場を探す（トップ）
   planner/            AI旅プラン
-  api/plan/           旅プランの候補を返す API（今は仮実装。Gemini API に差し替える）
+  api/plan/           旅プランの候補を返す API（Gemini で作り、作れなければデモモード）
   auth/               ログイン・サインアップ等（スターター由来）
   dev/ui/             UI 部品の見本（開発者向け。Vercel の Production では 404）
 components/           共通コンポーネント
@@ -83,7 +83,7 @@ lib/
   auth.ts             ログイン中ユーザーの取得
   data/               DB 読み取り関数（ページからはここを呼ぶ）
   spots/categories.ts スポットのカテゴリ定義（色・絵文字）。テストは隣の categories.test.ts
-  planner/            旅プランの型と、Gemini を使わない候補の生成（デモモード: generate.ts。近い地域: nearby.ts、所要時間: duration.ts）
+  planner/            旅プランの型と候補の生成。create-plan.ts が入口（Gemini: ai-prompt.ts・ai-candidates.ts、デモモード: generate.ts、入力の検証: schema.ts）
 lib/supabase/         Supabase クライアント
   server.ts           Server Component / Server Action / Route Handler 用
   client.ts           Client Component 用
@@ -93,7 +93,7 @@ supabase/
   migrations/         DB スキーマ変更（SQL）
   seed.sql            ローカル用初期データ
 proxy.ts              Next.js Proxy（旧 middleware）
-test/                 テストの共通設定（setup.ts）とモック（mocks/）
+test/                 テストの共通設定（setup.ts）・モック（mocks/）・フィクスチャ（fixtures/）
 vitest.config.mts     Vitest の設定
 ```
 

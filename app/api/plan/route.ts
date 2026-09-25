@@ -1,19 +1,39 @@
 import { getAreasWithSpots } from "@/lib/data/areas";
+import { readLimitedText } from "@/lib/http/read-limited-text";
 import { toPlanRequest } from "@/lib/planner/conditions";
-import { generateCandidates } from "@/lib/planner/generate";
-import type { PlanConditions, PlanResponse } from "@/lib/planner/types";
+import { createPlan } from "@/lib/planner/create-plan";
+import { MAX_REQUEST_BYTES, planConditionsSchema } from "@/lib/planner/schema";
 
-// 旅プランの候補を返す API
-// TODO(#18): 入力を検証し、Gemini（lib/ai/gemini.ts）で候補を作る。Gemini を呼べないときは今のデモモードで返す
-// TODO(#25): 悪用対策（レート制限など）
+/**
+ * 関数の最大実行時間（秒）。Gemini は最大45秒待つ（lib/ai/gemini.ts）ので、DB の読み出しを含めても収まる。
+ * Vercel Hobby の上限は300秒
+ */
+export const maxDuration = 60;
+
+// 旅プランの候補を返す API。Gemini で作り、作れなければデモモードで返す（#18・#19）
 export async function POST(request: Request) {
-  const conditions = (await request.json()) as PlanConditions;
+  // TODO(#25): レート制限はここ（入力を読む前）に差し込む
+
+  // 大きな本文を全部メモリに読まないよう、上限を超えた時点で読むのをやめる
+  const text = await readLimitedText(request, MAX_REQUEST_BYTES);
+  if (text === null) {
+    return Response.json({ error: "request_too_large" }, { status: 413 });
+  }
+  const parsed = planConditionsSchema.safeParse(parseJson(text));
+  if (!parsed.success) {
+    return Response.json({ error: "invalid_request" }, { status: 400 });
+  }
 
   const areas = await getAreasWithSpots();
-  const body: PlanResponse = {
-    candidates: generateCandidates(areas, toPlanRequest(conditions, areas)),
-    mode: "demo",
-  };
+  return Response.json(
+    await createPlan(areas, toPlanRequest(parsed.data, areas)),
+  );
+}
 
-  return Response.json(body);
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
 }
