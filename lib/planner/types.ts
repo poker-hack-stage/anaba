@@ -1,29 +1,65 @@
 import type { Spot } from "@/lib/data/spots";
 
-// AI旅プランの画面と API（app/api/plan/route.ts）で共有する型
+// AI旅プランの画面と API（app/api/plan/route.ts）で共有する型。形は docs/spec.md のデータ-4
 
-/** 「絞る」で送る条件 */
+/** 日程 */
+export type PlanDuration = "day" | "1n2d" | "2n3d";
+
+/** 「絞る」で送る条件（画面のフォームの形） */
+// TODO(#17): 地域名・日程の文言ではなく、PlanRequest と同じ areaId・PlanDuration で送るようにする
 export type PlanConditions = {
   /** 地域名。"おまかせ" なら指定なし */
   area: string;
+  /** 日程の文言（日帰り・1泊2日・2泊3日） */
   duration: string;
   interests: string[];
   companion: string;
   transport: string;
 };
 
+/** 候補を作るときの条件（docs/spec.md のデータ-4 の PlanConditions の形） */
+export type PlanRequest = {
+  /** 地域の id。null なら「おまかせ」 */
+  areaId: string | null;
+  duration: PlanDuration;
+  interests: string[];
+  companion: string;
+  transport: string;
+};
+
+/** 1日ぶんの経路 */
+export type PlanDay = {
+  /** 何日目か（1から） */
+  day: number;
+  areaId: string;
+  areaName: string;
+  /** めぐる順。2〜4件 */
+  route: Spot[];
+  /** その日の所要時間の目安（分）。サーバーで計算する（docs/spec.md の画面-2） */
+  durationMinutes: number;
+};
+
 /** 候補1件（カード1枚ぶん） */
 export type PlanCandidate = {
+  /** 1日目の地域の id（1地域につき1候補） */
   id: string;
+  /** 1日目の地域名 */
   areaName: string;
   title: string;
   summary: string;
-  /** おすすめの経路（めぐる順） */
-  route: Spot[];
-  /** 経路に入っていない地域内のスポット（地図に表示し、クリックで詳細） */
+  /** 選ばれた理由（1〜2文、docs/spec.md の画面-2） */
+  reason: string;
+  duration: PlanDuration;
+  /** 日帰りは1要素、1泊2日は2要素、2泊3日は3要素 */
+  days: PlanDay[];
+  /** 候補の地域のスポットのうち、どの日の経路にも入っていないもの（地図に表示し、クリックで詳細） */
   otherSpots: Spot[];
+  /** 地域を選んだときの2・3件目（近くの地域）なら true（docs/spec.md のデータ-2） */
+  nearby: boolean;
 };
 
 export type PlanResponse = {
   candidates: PlanCandidate[];
+  /** Gemini を使わずに作ったとき（#19）は "demo" */
+  mode: "ai" | "demo";
 };
