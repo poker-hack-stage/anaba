@@ -63,6 +63,16 @@ describe("createPlan", () => {
     expect(plan.candidates.map((c) => c.title)).toEqual(["松本の旅"]);
   });
 
+  test("useAi が false（レート制限）なら、Gemini を呼ばずにデモモードで返す", async () => {
+    const plan = await createPlan(areas, request({ areaId: "松本市" }), {
+      useAi: false,
+    });
+
+    expect(callGemini).not.toHaveBeenCalled();
+    expect(plan.mode).toBe("demo");
+    expect(plan.candidates.length).toBeGreaterThan(0);
+  });
+
   test("構造化出力（JSON Schema）とシステムの指示を渡す", async () => {
     callGemini.mockResolvedValue(geminiText(validOutput()));
 
