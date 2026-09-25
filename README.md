@@ -153,5 +153,5 @@ Vitest + React Testing Library（`jsdom`）。設定は `vitest.config.mts`、�
 ## 実装の約束ごと
 
 - `next.config.ts` で Cache Components が有効。cookie や DB を読むコンポーネントは `<Suspense>` の内側に置く（外に置くとビルドエラーになる）
-- 未実装の箇所には `TODO(#番号)` コメントを付けている（番号は `docs/issues.md` のイシュー）
+- 未実装の箇所には `TODO(#番号)` コメントを付けている（番号は GitHub の Issue）
 - ログイン機能はない（#3 で決定、#37 で削除）。投稿・口コミはログインなしの匿名（ニックネームだけ）で受け付ける。DB の読み取りは匿名キー（publishable key）で行う
