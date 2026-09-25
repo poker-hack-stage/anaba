@@ -37,6 +37,12 @@ Gemini API のキーの決まり:
 | `GEMINI_API_KEY` | Gemini API のキー。サーバー側だけで使う（`NEXT_PUBLIC_` を付けない）                                                                                                 |
 | `GEMINI_MODEL`   | 使うモデル。空なら既定の `gemini-3.5-flash-lite`（無料枠は1分15回・1日500回）。質を比べたいときは `gemini-3.8-flash`（無料枠は1日20回）。上限は AI Studio で確かめる |
 
+口コミ・スポットの投稿（#52）のレート制限に使う値:
+
+| 環境変数          | 内容                                                                                                                                                                                       |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `RATE_LIMIT_SALT` | 送信元の IP と一緒にハッシュにする秘密の値。サーバー側だけで使う（`NEXT_PUBLIC_` を付けない）。開発では空でよい（固定の開発用の値を使う）。本番では必須で、空だと投稿を受け付けない（503） |
+
 ```bash
 npm run dev             # http://localhost:3000
 ```
@@ -67,6 +73,8 @@ app/                  ルーティング（ページ・Route Handler）
   page.tsx            穴場を探す（トップ）
   planner/            AI旅プラン
   api/plan/           旅プランの候補を返す API（Gemini で作り、作れなければデモモード）
+  api/spots/[id]/reviews/  口コミの一覧（GET）と投稿（POST）の API
+  api/spot-submissions/    スポットの投稿（穴場を教える）の API
   dev/ui/             UI 部品の見本（開発者向け。Vercel の Production では 404）
 components/           共通コンポーネント
   layout/             ヘッダー・タブ・下部ナビ・フッター（タブは nav-items.ts で管理）
@@ -80,6 +88,8 @@ lib/
   ai/gemini.ts        Gemini API の呼び出し（サーバー専用。Gemini を呼ぶのはここだけ）
   data/               DB 読み取り関数（ページからはここを呼ぶ）
   spots/categories.ts スポットのカテゴリ定義（色・絵文字）。テストは隣の categories.test.ts
+  community/          口コミ・スポットの投稿の API の中身（入力の検証: schema.ts、DB のエラーの変換: errors.ts、
+                      送信元のハッシュ: client-hash.ts、レート制限: write.ts、口コミの読み出し: reviews.ts）
   planner/            旅プランの型と候補の生成。create-plan.ts が入口（Gemini: ai-prompt.ts・ai-candidates.ts、デモモード: generate.ts、入力の検証: schema.ts）
 lib/supabase/         Supabase クライアント
   server.ts           Server Component / Server Action / Route Handler 用
@@ -143,6 +153,7 @@ Vitest + React Testing Library（`jsdom`）。設定は `vitest.config.mts`、�
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
    - `GEMINI_API_KEY`・`GEMINI_MODEL`（任意。空なら既定の `gemini-3.5-flash-lite`）
+   - `RATE_LIMIT_SALT`（必須。Production と Preview の両方に入れる。空だと口コミ・スポットの投稿が 503 になる。`openssl rand -hex 32` などで作り、変えると同じ送信元の数え直しになる）
 
 ## 地図タイル
 
