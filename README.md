@@ -23,6 +23,13 @@ npm run db:start        # ローカル Supabase 起動（初回はイメージ�
 
 `db:start` の出力にある `PUBLISHABLE_KEY` を `.env.local` の `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` に貼る。
 
+AI旅プランで Gemini を使うときは、`.env.local` に次を書く（なくてもアプリは動き、旅プランはデモモードになる）。キーは [Google AI Studio](https://aistudio.google.com/apikey) で各自発行する（無料枠で使う。カードは登録しない）。無料枠で送った内容は Google のサービス改善に使われるので、個人情報は送らない。
+
+| 環境変数         | 内容                                                                                                                                      |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `GEMINI_API_KEY` | Gemini API のキー。サーバー側だけで使う（`NEXT_PUBLIC_` を付けない）                                                                      |
+| `GEMINI_MODEL`   | 使うモデル。空なら既定の `gemini-3.8-flash`。無料枠の上限に当たりやすければ `gemini-3.5-flash-lite` にする（上限は AI Studio で確かめる） |
+
 ```bash
 npm run dev             # http://localhost:3000
 ```
@@ -53,7 +60,7 @@ npm run dev             # http://localhost:3000
 app/                  ルーティング（ページ・Route Handler）
   page.tsx            穴場を探す（トップ）
   planner/            AI旅プラン
-  api/plan/           旅プランの候補を返す API（今は仮実装。Claude API に差し替える）
+  api/plan/           旅プランの候補を返す API（今は仮実装。Gemini API に差し替える）
   auth/               ログイン・サインアップ等（スターター由来）
 components/           共通コンポーネント
   layout/             ヘッダー・タブ・下部ナビ・フッター（タブは nav-items.ts で管理）
@@ -63,6 +70,7 @@ components/           共通コンポーネント
   planner/            旅プランの条件フォーム・候補カード
   ui/                 shadcn/ui（`npx shadcn@latest add <name>` で追加）
 lib/
+  ai/gemini.ts        Gemini API の呼び出し（サーバー専用。Gemini を呼ぶのはここだけ）
   auth.ts             ログイン中ユーザーの取得
   data/               DB 読み取り関数（ページからはここを呼ぶ）
   spots/categories.ts スポットのカテゴリ定義（色・絵文字）。テストは隣の categories.test.ts
@@ -120,7 +128,7 @@ Vitest + React Testing Library（`jsdom`）。設定は `vitest.config.mts`、�
   - `lib/` の関数: Vitest で書く
   - クライアントコンポーネント（`"use client"`）: Testing Library で描画して確かめる
   - async の Server Component: Vitest では描画できないので、中のロジックを `lib/` の関数に切り出してその関数をテストする
-- **外部サービスは呼ばない**: Supabase と Claude API はテストから呼ばない。フィクスチャ（`supabase/seed.sql` 相当のデータを TS で書いたもの）や `vi.mock()` で差し替える
+- **外部サービスは呼ばない**: Supabase と Gemini API はテストから呼ばない。フィクスチャ（`supabase/seed.sql` 相当のデータを TS で書いたもの）や `vi.mock()` で差し替える
 - `import "server-only"` を含むファイルもテストで読み込める（`vitest.config.mts` で空のモジュールに差し替えている）
 - `describe` / `expect` / `test` などはグローバルにせず、各ファイルで `import { describe, expect, test } from "vitest"` する
 
@@ -130,6 +138,7 @@ Vitest + React Testing Library（`jsdom`）。設定は `vitest.config.mts`、�
 2. Environment Variables に以下を設定
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+   - `GEMINI_API_KEY`・`GEMINI_MODEL`（任意。空なら既定の `gemini-3.8-flash`）
 3. Supabase ダッシュボード > Authentication > URL Configuration
    - Site URL: 本番 URL
    - Redirect URLs: `https://<本番ドメイン>/**` と Preview 用 `https://*-<vercel-team>.vercel.app/**`
