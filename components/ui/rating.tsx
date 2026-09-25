@@ -36,7 +36,7 @@ export function Rating({
   return (
     <span
       role="img"
-      aria-label={`${max}段階中 ${label}`}
+      aria-label={`評価 ${max}段階中 ${label}`}
       className={cn("inline-flex items-center gap-1", className)}
     >
       <span className="flex items-center gap-px" aria-hidden="true">

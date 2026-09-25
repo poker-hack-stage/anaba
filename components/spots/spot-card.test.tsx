@@ -16,7 +16,7 @@ describe("SpotCard", () => {
     );
     expect(screen.getByRole("heading", { name: "姫川源流" })).toBeTruthy();
     expect(screen.getByText("自然・散策")).toBeTruthy();
-    expect(screen.getByRole("img", { name: "5段階中 4.5" })).toBeTruthy();
+    expect(screen.getByRole("img", { name: "評価 5段階中 4.5" })).toBeTruthy();
     expect(screen.getByRole("img", { name: "穴場度 5段階中 4" })).toBeTruthy();
     expect(screen.getByText("#湧き水")).toBeTruthy();
     expect(screen.queryByText("#4件目")).toBeNull();

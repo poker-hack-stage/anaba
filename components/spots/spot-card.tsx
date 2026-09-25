@@ -50,7 +50,8 @@ export function SpotCard({
         </span>
         <h3 className="truncate font-extrabold text-stone-900">{spot.name}</h3>
         {(rating !== null || hiddenGemScore !== null) && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          // 狭い幅では穴場度の数でカードごとに折り返しがばらつくので、最初から2行にする
+          <div className="flex flex-col items-start gap-y-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3">
             <Rating value={rating} />
             <HiddenGemScore score={hiddenGemScore} />
           </div>
@@ -83,7 +84,8 @@ export function SpotCard({
 
 export function SpotCardSkeleton() {
   return (
-    // 高さは評価・穴場度の行を足したあとのカードの中央値（PC で約 184px）に合わせる
-    <div className="h-[184px] animate-pulse rounded-2xl bg-stone-200/60" />
+    // 高さはカードの実測に合わせて幅で分ける。スマホは評価・穴場度が2行になり 204〜242px
+    // （375px の中央値 242px・414px の中央値 204px の間を取る）、sm〜lg は1列で約 146px、lg 以上は約 184px
+    <div className="h-[228px] animate-pulse rounded-2xl bg-stone-200/60 sm:h-[146px] lg:h-[184px]" />
   );
 }
