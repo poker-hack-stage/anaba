@@ -67,7 +67,7 @@ export function CandidateCard({
         </div>
 
         {candidate.reason && (
-          <div className="bg-washi flex gap-2 rounded-xl px-3 py-2.5 text-sm leading-relaxed text-stone-700">
+          <div className="flex gap-2 rounded-xl bg-stone-50 px-3 py-2.5 text-sm leading-relaxed text-stone-700">
             <Lightbulb
               className="mt-0.5 h-4 w-4 shrink-0 text-shu"
               aria-hidden
