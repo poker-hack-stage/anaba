@@ -14,7 +14,7 @@ const SpotMap = dynamic(
 );
 
 /**
- * 「穴場を探す」の地図部分。表示中の地域とおすすめ3件をハイライトする。
+ * 「穴場を探す」の地図部分。表示中の地域とおすすめ3件をハイライトする。area がないときは日本全体を出す。
  * 地図コンポーネントの読み込みはこのファイルだけで行う。
  */
 export function AreaMap({
@@ -31,6 +31,8 @@ export function AreaMap({
       highlighted={area?.recommended}
       others={area?.spots.filter((s) => !area.recommended.includes(s))}
       onSpotClick={onSpotClick}
+      // 絞り込みで0件のとき（area がない）は、読み込みに失敗したように見えないようプレースホルダーを出さない
+      emptyPlaceholder={area !== undefined}
       className={`${MAP_CLASS_NAME} animate-in fade-in`}
     />
   );
