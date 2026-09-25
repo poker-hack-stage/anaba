@@ -291,6 +291,8 @@ export function SpotMap({
   }, [map, styleLoaded, routeKey]);
 
   const markerProps = { onSpotClick, onSpotHover };
+  // 経路が2本以上で名前があれば凡例を出す
+  const showLegend = routes.length > 1 && routes.some((r) => r.name);
 
   return (
     // isolate: 地図の中の z-index がヘッダーやダイアログより前に出ないようにする。
@@ -367,33 +369,34 @@ export function SpotMap({
         </p>
       )}
 
-      {routes.length > 1 && routes.some((r) => r.name) && (
-        // 凡例。ピンの番号は経路ごとに1からなので、色でどの日か分かるようにする
-        <ul
-          aria-label="凡例"
-          className="pointer-events-none absolute left-3 top-3 z-10 flex flex-wrap gap-1.5"
-        >
-          {routes.map((r, i) => (
-            <li
-              key={i}
-              className="inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-xs font-bold text-stone-700 shadow-sm"
-            >
-              <span
-                aria-hidden
-                className="h-2.5 w-2.5 rounded-full"
-                style={{ background: routeColor(r) }}
-              />
-              {r.name}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {areaName && (
-        <span className="pointer-events-none absolute left-3 top-3 z-10 inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-ink shadow-sm">
-          <MapPin aria-hidden className="h-3.5 w-3.5" />
-          {areaName}
-        </span>
+      {(areaName || showLegend) && (
+        // 左上の表示（地域名と凡例）。両方あるときは縦に並べ、重ならないようにする
+        <div className="pointer-events-none absolute left-3 right-14 top-3 z-10 flex flex-col items-start gap-1.5">
+          {areaName && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-ink shadow-sm">
+              <MapPin aria-hidden className="h-3.5 w-3.5" />
+              {areaName}
+            </span>
+          )}
+          {showLegend && (
+            // 凡例。ピンの番号は経路ごとに1からなので、色でどの日か分かるようにする
+            <ul aria-label="凡例" className="flex flex-wrap gap-1.5">
+              {routes.map((r, i) => (
+                <li
+                  key={i}
+                  className="inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-xs font-bold text-stone-700 shadow-sm"
+                >
+                  <span
+                    aria-hidden
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{ background: routeColor(r) }}
+                  />
+                  {r.name}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </div>
   );
