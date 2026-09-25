@@ -61,6 +61,7 @@ const areas: PlannableArea[] = [
   {
     id: "matsumoto",
     name: "松本市",
+    prefecture: "長野県",
     catchphrase: null,
     center_lat: 36.238,
     center_lng: 137.972,
@@ -191,6 +192,17 @@ describe("PlannerForm", () => {
       fireEvent.click(any);
       expect(any.getAttribute("aria-pressed")).toBe("true");
       expect(select.value).toBe("");
+    });
+
+    test("地域は都道府県ごとの optgroup にまとめる", () => {
+      renderForm({ submit: false });
+      const select = screen.getByLabelText<HTMLSelectElement>("エリア");
+
+      const groups = [...select.querySelectorAll("optgroup")];
+      expect(groups.map((g) => g.label)).toEqual(["長野県"]);
+      expect(
+        [...groups[0].querySelectorAll("option")].map((o) => o.textContent),
+      ).toEqual(["松本市"]);
     });
 
     test("URL のクエリの条件を読む", () => {

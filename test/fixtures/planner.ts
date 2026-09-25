@@ -50,10 +50,12 @@ export function area(
   center_lat: number,
   center_lng: number,
   categories: string[],
+  prefecture = "長野県",
 ): PlannableArea {
   return {
     id,
     name: id,
+    prefecture,
     catchphrase: `${id}のキャッチコピー`,
     center_lat,
     center_lng,
@@ -82,12 +84,13 @@ export const matsumoto = area("松本市", 36.238, 137.972, EIGHT_CATEGORIES);
 export const azumino = area("安曇野市", 36.304, 137.906, EIGHT_CATEGORIES);
 export const omachi = area("大町市", 36.503, 137.851, EIGHT_CATEGORIES);
 export const hakuba = area("白馬村", 36.698, 137.862, EIGHT_CATEGORIES);
-export const far = area("遠い町", 43.06, 141.35, [
-  "gourmet",
-  "nature",
-  "onsen",
-  "view",
-]);
+export const far = area(
+  "遠い町",
+  43.06,
+  141.35,
+  ["gourmet", "nature", "onsen", "view"],
+  "北海道",
+);
 /** display_order の順（北から） */
 export const areas = [hakuba, omachi, azumino, matsumoto, far];
 

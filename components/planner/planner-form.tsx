@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/empty-state";
 import { SpotDetailDialog } from "@/components/spots/spot-detail-dialog";
 import { Chip } from "@/components/ui/chip";
 import type { Spot } from "@/lib/data/spots";
+import { groupAreasByPrefecture } from "@/lib/planner/area-groups";
 import { DURATION_LABELS } from "@/lib/planner/duration";
 import {
   ANY_AREA_LABEL,
@@ -364,8 +365,8 @@ function toDuration(label: string): PlanDuration {
 }
 
 /**
- * エリア: 「おまかせ」のチップと、地域の select（docs/spec.md の画面-1）。送る値は地域の id（同じ名前の市町村がありうるため）
- * TODO(#11): prefecture 列ができたら、地域を都道府県ごとの optgroup にまとめる
+ * エリア: 「おまかせ」のチップと、都道府県ごとの optgroup にまとめた地域の select（docs/spec.md の画面-1）。
+ * 送る値は地域の id（同じ名前の市町村がありうるため）
  */
 function AreaField({
   areas,
@@ -401,10 +402,14 @@ function AreaField({
           )}
         >
           <option value="">地域を選ぶ</option>
-          {areas.map((area) => (
-            <option key={area.id} value={area.id}>
-              {area.name}
-            </option>
+          {groupAreasByPrefecture(areas).map((group) => (
+            <optgroup key={group.prefecture} label={group.prefecture}>
+              {group.areas.map((area) => (
+                <option key={area.id} value={area.id}>
+                  {area.name}
+                </option>
+              ))}
+            </optgroup>
           ))}
         </select>
       </div>
