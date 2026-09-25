@@ -33,6 +33,7 @@ export function AreaRotator({ areas }: { areas: AreaWithSpots[] }) {
 
       <SpotPanel
         area={area}
+        nextArea={areas[(index + 1) % areas.length]}
         onSelectSpot={setSelectedSpot}
         footer={
           <AreaNav
