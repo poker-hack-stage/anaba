@@ -20,6 +20,9 @@
 # production
 /build
 
+# MapLibre のワーカー（scripts/copy-maplibre-worker.mjs が npm run dev / build の前に写す）
+/public/maplibre/
+
 # misc
 .DS_Store
 *.pem
