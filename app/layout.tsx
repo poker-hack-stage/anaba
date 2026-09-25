@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Noto_Sans_JP, Zen_Maru_Gothic } from "next/font/google";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { SiteHeader } from "@/components/layout/site-header";
+import { PlannerStateProvider } from "@/components/planner/planner-state";
 import "./globals.css";
 
 const defaultUrl = process.env.VERCEL_URL
@@ -11,8 +12,8 @@ const defaultUrl = process.env.VERCEL_URL
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
   title: {
-    default: "めぐりまち - 地元の穴場とAI旅プラン",
-    template: "%s | めぐりまち",
+    default: "anaba - 地元の穴場とAI旅プラン",
+    template: "%s | anaba",
   },
   description:
     "地元の人が教える穴場スポットと、AIがつくる旅プランで、まだ知らない地域をめぐろう。",
@@ -44,7 +45,7 @@ export default function RootLayout({
         <SiteHeader />
         {/* スマホでは下部ナビの高さぶん余白をとる */}
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 pb-24 pt-5 sm:px-6 md:pb-10 lg:px-8">
-          {children}
+          <PlannerStateProvider>{children}</PlannerStateProvider>
         </main>
         <BottomNav />
       </body>
