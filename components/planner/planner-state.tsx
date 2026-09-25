@@ -24,11 +24,14 @@ type PlannerState = {
   saveConditions: (conditions: PlanConditions) => void;
   result: PlannerResult;
   setResult: (result: PlannerResult) => void;
+  /** タブで選んでいる候補の番号（0 始まり）。候補が変わったら（絞り直し）0 に戻る */
+  selectedCandidate: number;
+  selectCandidate: (index: number) => void;
 };
 
 const PlannerStateContext = createContext<PlannerState | null>(null);
 
-// AI旅プランの条件と結果を app/layout.tsx に置き、タブを切り替えても消えないようにする
+// AI旅プランの条件と結果（選んでいる候補も）を app/layout.tsx に置き、タブを切り替えても消えないようにする
 export function PlannerStateProvider({
   children,
 }: {
@@ -43,10 +46,25 @@ export function PlannerStateProvider({
     conditions: null,
     mode: null,
   });
+  // 選んだ番号は、どの候補の中で選んだかと一緒に持つ。候補の配列が差し替わったら（絞り直し）選び直しになり、0 番を返す
+  const [selection, setSelection] = useState<{
+    candidates: PlanCandidate[];
+    index: number;
+  } | null>(null);
+  const selectedCandidate =
+    selection?.candidates === result.candidates ? selection.index : 0;
 
   const value = useMemo(
-    () => ({ savedConditions, saveConditions, result, setResult }),
-    [savedConditions, result],
+    () => ({
+      savedConditions,
+      saveConditions,
+      result,
+      setResult,
+      selectedCandidate,
+      selectCandidate: (index: number) =>
+        setSelection({ candidates: result.candidates, index }),
+    }),
+    [savedConditions, result, selectedCandidate],
   );
 
   return (

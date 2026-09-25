@@ -23,7 +23,7 @@ import type {
   PlanResponse,
 } from "@/lib/planner/types";
 import { cn } from "@/lib/utils";
-import { CandidateCard } from "./candidate-card";
+import { CandidateTabs } from "./candidate-tabs";
 import { type PlannerStatus, usePlannerState } from "./planner-state";
 
 /**
@@ -114,8 +114,14 @@ function replaceQuery(conditions: PlanConditions) {
 // 結果と最後の条件は app/layout.tsx の PlannerStateProvider に持ち、タブを切り替えても残す
 export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
   const searchParams = useSearchParams();
-  const { savedConditions, saveConditions, result, setResult } =
-    usePlannerState();
+  const {
+    savedConditions,
+    saveConditions,
+    result,
+    setResult,
+    selectedCandidate,
+    selectCandidate,
+  } = usePlannerState();
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
 
   const areaIds = useMemo(() => areas.map((area) => area.id), [areas]);
@@ -268,6 +274,8 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
           status={status}
           candidates={candidates}
           mode={mode}
+          selectedCandidate={selectedCandidate}
+          onSelectCandidate={selectCandidate}
           onSpotClick={setSelectedSpot}
         />
       </section>
@@ -281,11 +289,15 @@ function Result({
   status,
   candidates,
   mode,
+  selectedCandidate,
+  onSelectCandidate,
   onSpotClick,
 }: {
   status: PlannerStatus;
   candidates: PlanCandidate[];
   mode: PlanResponse["mode"] | null;
+  selectedCandidate: number;
+  onSelectCandidate: (index: number) => void;
   onSpotClick: (spot: Spot) => void;
 }) {
   if (status === "idle") {
@@ -299,14 +311,11 @@ function Result({
     );
   }
   if (status === "loading") {
+    // 候補はタブで1件ずつ見せるので、タブと1件ぶんのカードの形にする
     return (
-      <div className="grid gap-4 xl:grid-cols-2">
-        {[0, 1].map((i) => (
-          <div
-            key={i}
-            className="h-96 animate-pulse rounded-2xl bg-stone-200/60"
-          />
-        ))}
+      <div className="flex flex-col gap-3">
+        <div className="h-14 animate-pulse rounded-2xl bg-stone-200/60" />
+        <div className="h-[36rem] animate-pulse rounded-2xl bg-stone-200/60" />
       </div>
     );
   }
@@ -344,16 +353,12 @@ function Result({
           </span>
         </p>
       )}
-      <div className="grid gap-4 xl:grid-cols-2">
-        {candidates.map((candidate, i) => (
-          <CandidateCard
-            key={candidate.id}
-            candidate={candidate}
-            index={i}
-            onSpotClick={onSpotClick}
-          />
-        ))}
-      </div>
+      <CandidateTabs
+        candidates={candidates}
+        selectedIndex={selectedCandidate}
+        onSelect={onSelectCandidate}
+        onSpotClick={onSpotClick}
+      />
     </>
   );
 }
