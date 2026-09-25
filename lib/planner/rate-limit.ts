@@ -15,6 +15,12 @@ import type { createClient } from "@/lib/supabase/server";
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
 /**
+ * check_rate_limit() を待つ上限（ミリ秒）。DB が接続したまま応答しないとき、ここで止まり続けず unavailable にする。
+ * supabase-js は、中断を例外ではなく error として返す
+ */
+export const RATE_LIMIT_TIMEOUT_MS = 3_000;
+
+/**
  * 同じ送信元（IP）から Gemini を使える回数。発表の会場（20人前後）が同じ Wi-Fi（同じ IP）で試しても
  * 足りるよう、多めにしている。1つの IP だけで1日の無料枠を1時間ほどで使い切れる緩さだが、
  * 使い切られてもお金はかからず、その日の残りがデモモードになるだけなので、会場で使えることを優先した
@@ -25,7 +31,7 @@ export const PLAN_RATE_LIMIT = { windowSeconds: 10 * 60, max: 100 } as const;
  * レート制限の結果。
  * - allowed: Gemini を使ってよい
  * - limited: 上限を超えた（429 を返す）
- * - unavailable: 回数を数えられない（DB に接続できない・本番で RATE_LIMIT_SALT がない）。
+ * - unavailable: 回数を数えられない（DB のエラー・時間切れ・本番で RATE_LIMIT_SALT がない）。
  *   利用者のせいではないので 429 にはせず、Gemini を使わずにデモモードで返す（無料枠を守る側に倒す）
  */
 export type PlanRateLimitResult = "allowed" | "limited" | "unavailable";
@@ -44,11 +50,13 @@ export async function checkPlanRateLimit(
   }
 
   const clientHash = hashClient(getClientIp(request.headers), salt);
-  const { data: allowed, error } = await supabase.rpc("check_rate_limit", {
-    p_key: `plan:${clientHash}`,
-    p_window_seconds: PLAN_RATE_LIMIT.windowSeconds,
-    p_max: PLAN_RATE_LIMIT.max,
-  });
+  const { data: allowed, error } = await supabase
+    .rpc("check_rate_limit", {
+      p_key: `plan:${clientHash}`,
+      p_window_seconds: PLAN_RATE_LIMIT.windowSeconds,
+      p_max: PLAN_RATE_LIMIT.max,
+    })
+    .abortSignal(AbortSignal.timeout(RATE_LIMIT_TIMEOUT_MS));
   if (error) {
     console.error("[plan] レート制限を数えられませんでした", {
       code: error.code,

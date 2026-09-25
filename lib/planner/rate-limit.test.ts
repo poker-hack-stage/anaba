@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { hashClient } from "@/lib/community/client-hash";
-import { checkPlanRateLimit, PLAN_RATE_LIMIT } from "./rate-limit";
+import {
+  checkPlanRateLimit,
+  PLAN_RATE_LIMIT,
+  RATE_LIMIT_TIMEOUT_MS,
+} from "./rate-limit";
 
 const SALT = "test-salt";
 
@@ -10,8 +14,11 @@ function supabaseReturning(result: {
   data: boolean | null;
   error: { code: string; message: string } | null;
 }) {
-  const rpc = vi.fn().mockResolvedValue(result);
-  return { rpc, client: { rpc } as never };
+  const abortSignal = vi.fn(async () => result);
+  const rpc = vi.fn<(name: string, args: { p_key: string }) => unknown>(() => ({
+    abortSignal,
+  }));
+  return { rpc, abortSignal, client: { rpc } as never };
 }
 
 const ok = { data: true, error: null };
@@ -45,6 +52,16 @@ describe("checkPlanRateLimit", () => {
       p_window_seconds: PLAN_RATE_LIMIT.windowSeconds,
       p_max: PLAN_RATE_LIMIT.max,
     });
+  });
+
+  test("DB を待つ上限を付ける（応答しないときに止まり続けない）", async () => {
+    const { abortSignal, client } = supabaseReturning(ok);
+    const timeout = vi.spyOn(AbortSignal, "timeout");
+
+    await checkPlanRateLimit(planRequest(), client);
+
+    expect(timeout).toHaveBeenCalledWith(RATE_LIMIT_TIMEOUT_MS);
+    expect(abortSignal).toHaveBeenCalledWith(timeout.mock.results[0].value);
   });
 
   test("上限を超えたら limited", async () => {

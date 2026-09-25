@@ -14,7 +14,8 @@ export const maxDuration = 60;
 
 // 旅プランの候補を返す API。Gemini で作り、作れなければデモモードで返す（#18・#19）
 export async function POST(request: Request) {
-  // 入力を読む前に数える（#25）。上限を超えたら 429。数えられないときは、Gemini を使わずデモモードで返す
+  // 入力を読む前に数える（#25）。上限を超えたら 429。数えられないときは Gemini を使わない
+  // （デモモードで返す。DB がまるごと止まっていれば、次の地域の読み出しで 500 になり、ブラウザがデモモードの候補を作る）
   const rateLimit = await checkPlanRateLimit(request, await createClient());
   if (rateLimit === "limited") {
     return Response.json(
