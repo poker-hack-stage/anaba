@@ -1,15 +1,16 @@
-import { DURATION_LABELS } from "./duration";
+import type { PlanDuration } from "./types";
 
 // 「絞る」のフォームの選択肢（docs/spec.md の画面-1）。フォームと、API の入力の検証（schema.ts）で共有する
 
-/** 「おまかせ」（地域を指定しない） */
-export const ANY_AREA = "おまかせ";
+/** 「おまかせ」（地域を指定しない）の表示 */
+export const ANY_AREA_LABEL = "おまかせ";
 
-/** 日程の文言 */
-export const DURATIONS = Object.values(DURATION_LABELS) as [
-  string,
-  ...string[],
-];
+/** 日程。表示の文言は duration.ts の DURATION_LABELS */
+export const DURATIONS = [
+  "day",
+  "1n2d",
+  "2n3d",
+] as const satisfies readonly PlanDuration[];
 
 /** 興味のあること（複数選べる）。カテゴリ6種と1対1（generate.ts の INTEREST_TO_CATEGORY） */
 export const INTERESTS = [

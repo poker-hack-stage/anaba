@@ -8,10 +8,10 @@ export const MAX_REQUEST_BYTES = 8_000;
 
 /**
  * 「絞る」で送られてくる条件（PlanConditions）。選択肢にない値や、余計な項目は受け付けない。
- * 地域名は、ここでは長さだけを確かめる（知らない地域名は toPlanRequest() で「おまかせ」になる）
+ * 地域の id は、ここでは長さだけを確かめる（知らない id は「おまかせ」として扱う、generate.ts・ai-prompt.ts）
  */
 export const planConditionsSchema = z.strictObject({
-  area: z.string().trim().min(1).max(40),
+  areaId: z.string().trim().min(1).max(64).nullable(),
   duration: z.enum(DURATIONS),
   interests: z
     .array(z.enum(INTERESTS))

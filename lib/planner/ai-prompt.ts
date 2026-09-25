@@ -7,7 +7,7 @@ import {
   type PlannableArea,
 } from "./generate";
 import { findNearbyAreas } from "./nearby";
-import type { PlanRequest } from "./types";
+import type { PlanConditions } from "./types";
 
 // Gemini に渡すプロンプト（#18）。Supabase も Gemini も呼ばない純粋な関数
 
@@ -21,7 +21,7 @@ export type PlanScope = {
 
 export function getPlanScope(
   areas: readonly PlannableArea[],
-  request: PlanRequest,
+  request: PlanConditions,
 ): PlanScope {
   const selected = areas.find((area) => area.id === request.areaId);
   const bases = selected
@@ -59,7 +59,7 @@ const SYSTEM_INSTRUCTION = `あなたは、日本各地の地元の人しか知�
  */
 export function buildPlanPrompt(
   areas: readonly PlannableArea[],
-  request: PlanRequest,
+  request: PlanConditions,
 ): PlanPrompt {
   const { selected, bases } = getPlanScope(areas, request);
   const dayCount = DAY_COUNTS[request.duration];

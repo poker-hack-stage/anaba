@@ -9,7 +9,7 @@ import {
 } from "./generate";
 import { findNearbyAreas } from "./nearby";
 import type { AiPlan } from "./schema";
-import type { PlanCandidate, PlanDay, PlanRequest } from "./types";
+import type { PlanCandidate, PlanDay, PlanConditions } from "./types";
 
 // Gemini の出力を確かめて、候補（PlanCandidate）の形に戻す（#18）。Gemini の答えは信用せず、ここで決まりを守らせる
 
@@ -31,7 +31,7 @@ const MAX_TEXT_LENGTH = 200;
 export function toPlanCandidates(
   plan: AiPlan,
   areas: readonly PlannableArea[],
-  request: PlanRequest,
+  request: PlanConditions,
   { areaIdByKey, spotIdByKey }: Pick<PlanPrompt, "areaIdByKey" | "spotIdByKey">,
 ): PlanCandidate[] {
   const { selected, bases } = getPlanScope(areas, request);

@@ -1,6 +1,5 @@
 import { getAreasWithSpots } from "@/lib/data/areas";
 import { readLimitedText } from "@/lib/http/read-limited-text";
-import { toPlanRequest } from "@/lib/planner/conditions";
 import { createPlan } from "@/lib/planner/create-plan";
 import { MAX_REQUEST_BYTES, planConditionsSchema } from "@/lib/planner/schema";
 
@@ -25,9 +24,7 @@ export async function POST(request: Request) {
   }
 
   const areas = await getAreasWithSpots();
-  return Response.json(
-    await createPlan(areas, toPlanRequest(parsed.data, areas)),
-  );
+  return Response.json(await createPlan(areas, parsed.data));
 }
 
 function parseJson(text: string): unknown {

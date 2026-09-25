@@ -5,20 +5,8 @@ import type { Spot } from "@/lib/data/spots";
 /** 日程 */
 export type PlanDuration = "day" | "1n2d" | "2n3d";
 
-/** 「絞る」で送る条件（画面のフォームの形） */
-// TODO(#17): 地域名・日程の文言ではなく、PlanRequest と同じ areaId・PlanDuration で送るようにする
+/** 「絞る」で送る条件（docs/spec.md のデータ-4） */
 export type PlanConditions = {
-  /** 地域名。"おまかせ" なら指定なし */
-  area: string;
-  /** 日程の文言（日帰り・1泊2日・2泊3日） */
-  duration: string;
-  interests: string[];
-  companion: string;
-  transport: string;
-};
-
-/** 候補を作るときの条件（docs/spec.md のデータ-4 の PlanConditions の形） */
-export type PlanRequest = {
   /** 地域の id。null なら「おまかせ」 */
   areaId: string | null;
   duration: PlanDuration;
