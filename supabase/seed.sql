@@ -329,6 +329,7 @@ values
 --   出典・座標の取り方・穴場度の根拠は docs/spot-sources.md の「全国のほかの地域（#58）」。
 -- - 全スポットの座標が、その地域の境界（areas.boundary、#10）の中にあることを確かめた。
 -- - この段では東川町・丸森町・中之条町・大野市。高島市・高梁市・竹田市は続けて足す。
+-- - 本番に何度流しても壊れないよう、on conflict (id) do update を付ける（#35 の方針）。
 
 insert into public.spots
   (id, area_id, name, category, lat, lng, catchphrase, description, local_tip,
@@ -481,7 +482,22 @@ values
    '金森長近が亀山に築いた城',
    '天正3年（1575年）、織田信長の命で大野郡を平定した金森長近が亀山に築いた城。今の天守は昭和43年（1968年）に旧士族の寄付で再建され、中は土井氏の遺品などを展示する資料館になっている。',
    '12月1日〜3月31日は休館。大人400円、中学生以下は無料',
-   '4〜11月', 45, array['城', '天守', '城下町'], 4.0, 2, null);
+   '4〜11月', 45, array['城', '天守', '城下町'], 4.0, 2, null)
+on conflict (id) do update set
+  area_id = excluded.area_id,
+  name = excluded.name,
+  category = excluded.category,
+  lat = excluded.lat,
+  lng = excluded.lng,
+  catchphrase = excluded.catchphrase,
+  description = excluded.description,
+  local_tip = excluded.local_tip,
+  best_time = excluded.best_time,
+  stay_minutes = excluded.stay_minutes,
+  tags = excluded.tags,
+  rating = excluded.rating,
+  hidden_gem_score = excluded.hidden_gem_score,
+  image_path = excluded.image_path;
 
 -- ---------------------------------------------------------------------------
 -- NG ワードの初期値（#51）。管理者があとから足す（#55、docs/moderation.md）
