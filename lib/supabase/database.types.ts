@@ -295,6 +295,7 @@ export type Database = {
       }
     }
     Functions: {
+      assert_no_bidi_control: { Args: { p_text: string }; Returns: undefined }
       assert_postable_text: { Args: { p_text: string }; Returns: undefined }
       assert_visible_text: {
         Args: { p_allow_newline: boolean; p_text: string }

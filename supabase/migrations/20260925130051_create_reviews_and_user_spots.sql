@@ -14,8 +14,8 @@
 --   AN001 : NG ワードを含む（400。どの語に当たったかは返さない）
 --   AN002 : URL を含む（400）
 --   AN003 : 連投（同じ本文の口コミ・同じ名前のスポット）（429）
---   AN004 : 全体の上限を超えた（429）
---   ほかに check 制約違反・長さ・見えない文字だけの入力・続く改行は 23514（400）、
+--   AN004 : 全体・1スポット・1地域の上限を超えた（429）
+--   ほかに check 制約違反・長さ・見えない文字だけの入力・続く改行・向きの制御文字は 23514（400）、
 --   存在しない（か非表示の）スポット・地域は 23503（400）、場所が地域の範囲の外・形の違う引数は 22023（400）、
 --   指定できない列を指定したときは 42501
 
@@ -32,8 +32,10 @@ alter table public.spots
   add column nickname text check (char_length(nickname) <= 20),
   add constraint spots_user_nickname_check check (source = 'seed' or nickname is not null);
 
--- 投稿の連投・全体の上限の判定に使う
+-- 投稿の全体の上限の判定に使う
 create index spots_user_created_at_idx on public.spots (created_at) where source = 'user';
+-- 投稿の連投・1地域の上限の判定に使う
+create index spots_user_area_id_created_at_idx on public.spots (area_id, created_at) where source = 'user';
 
 -- ---------------------------------------------------------------------------
 -- テーブル
@@ -130,13 +132,16 @@ create policy "spots: 公開の状態なら誰でも閲覧可"
 -- 公開用のビュー
 -- anon は reviews を読めないので、所有者の権限で読むビュー（security_invoker にしない）にして、
 -- 公開してよい行と列だけを出す。security_barrier で、呼ぶ側の条件より先に status の条件を評価させる
+-- 所有者の権限で読むので spots の RLS（status = 'published'）が効かない。非表示のスポットの口コミを
+-- 出さないよう、スポットの状態もここで見る
 -- 公開してよいデータなので、ログインしたままの人（authenticated）も読める
 -- ---------------------------------------------------------------------------
 
 create view public.published_reviews with (security_barrier = true) as
-  select id, spot_id, nickname, rating, body, created_at
-  from public.reviews
-  where status = 'published';
+  select r.id, r.spot_id, r.nickname, r.rating, r.body, r.created_at
+  from public.reviews r
+  where r.status = 'published'
+    and exists (select 1 from public.spots s where s.id = r.spot_id and s.status = 'published');
 
 revoke all on table public.published_reviews from anon, authenticated;
 grant select on table public.published_reviews to anon, authenticated;
@@ -207,6 +212,21 @@ begin
 end;
 $$;
 
+-- 文字の向きを変える制御文字（U+061C・U+200E・U+200F・U+202A〜U+202E・U+2066〜U+2069）を含んでいたら
+-- 拒否する（23514）。判定では消しているが、保存した元の文字で画面の文字の並びが逆になるため
+create or replace function public.assert_no_bidi_control(p_text text)
+returns void
+language plpgsql
+immutable
+set search_path = ''
+as $$
+begin
+  if p_text ~ '[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]' then
+    raise exception using errcode = 'check_violation', message = '文字の向きを変える制御文字は使えません';
+  end if;
+end;
+$$;
+
 -- NG ワード・URL を含んでいたら例外を出す
 create or replace function public.assert_postable_text(p_text text)
 returns void
@@ -249,6 +269,7 @@ begin
 
   perform public.assert_visible_text(new.nickname, false);
   perform public.assert_visible_text(new.body, true);
+  perform public.assert_no_bidi_control(new.nickname || new.body);
   perform public.assert_postable_text(new.nickname || ' ' || new.body);
 
   -- 数えている間にほかの insert が入って上限を超えないよう、口コミの insert を直列にする
@@ -395,6 +416,7 @@ begin
   perform public.assert_visible_text(p_nickname, false);
   perform public.assert_visible_text(p_name, false);
   perform public.assert_visible_text(p_description, true);
+  perform public.assert_no_bidi_control(p_nickname || p_name || p_description);
   perform public.assert_postable_text(p_nickname || ' ' || p_name || ' ' || p_description);
 
   if p_client_hash is not null and p_client_hash !~ '^[0-9a-f]{64}$' then
@@ -438,6 +460,17 @@ begin
       and public.normalize_for_moderation(s.name) = public.normalize_for_moderation(p_name)
   ) then
     raise exception using errcode = 'AN003', message = '同じスポットがすでに投稿されています';
+  end if;
+
+  -- 1地域の上限: 1人が全体の上限を使い切って1つの地域を荒らしても、ほかの地域には投稿できるようにする
+  if (
+    select count(*)
+    from public.spots s
+    where s.source = 'user'
+      and s.area_id = p_area_id
+      and s.created_at > now() - interval '1 hour'
+  ) >= 5 then
+    raise exception using errcode = 'AN004', message = '投稿が混み合っています。しばらくしてからお試しください';
   end if;
 
   if (
@@ -516,6 +549,7 @@ $$;
 
 revoke execute on function public.normalize_for_moderation(text) from public, anon, authenticated;
 revoke execute on function public.assert_visible_text(text, boolean) from public, anon, authenticated;
+revoke execute on function public.assert_no_bidi_control(text) from public, anon, authenticated;
 revoke execute on function public.assert_postable_text(text) from public, anon, authenticated;
 revoke execute on function public.reviews_before_insert() from public, anon, authenticated;
 revoke execute on function public.geojson_contains_point(jsonb, double precision, double precision)
