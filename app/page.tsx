@@ -46,14 +46,18 @@ async function Discover() {
 
 function DiscoverSkeleton() {
   return (
-    <section className="grid gap-4 lg:grid-cols-[1fr_400px]">
-      <div className="h-72 animate-pulse rounded-2xl bg-stone-200/60 sm:h-96 lg:h-[520px]" />
-      <div className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-5">
-        <div className="h-12 w-40 animate-pulse rounded-lg bg-stone-200/60" />
-        <SpotCardSkeleton />
-        <SpotCardSkeleton />
-        <SpotCardSkeleton />
-      </div>
-    </section>
+    <div className="flex flex-col gap-4">
+      {/* 検索欄の行（components/discover/discover-search.tsx）の高さぶん */}
+      <div className="h-24 animate-pulse rounded-xl bg-stone-200/60 sm:h-10" />
+      <section className="grid gap-4 lg:grid-cols-[1fr_400px]">
+        <div className="h-72 animate-pulse rounded-2xl bg-stone-200/60 sm:h-96 lg:h-[520px]" />
+        <div className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-5">
+          <div className="h-12 w-40 animate-pulse rounded-lg bg-stone-200/60" />
+          <SpotCardSkeleton />
+          <SpotCardSkeleton />
+          <SpotCardSkeleton />
+        </div>
+      </section>
+    </div>
   );
 }
