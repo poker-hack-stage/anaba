@@ -1,7 +1,11 @@
 "use client";
 
 import { createContext, useContext, useMemo, useState } from "react";
-import type { PlanCandidate, PlanConditions } from "@/lib/planner/types";
+import type {
+  PlanCandidate,
+  PlanConditions,
+  PlanResponse,
+} from "@/lib/planner/types";
 
 export type PlannerStatus = "idle" | "loading" | "done" | "error";
 
@@ -10,6 +14,8 @@ export type PlannerResult = {
   candidates: PlanCandidate[];
   /** この結果を出したときの条件（idle のときは null）。今の条件とずれていないか比べるのに使う */
   conditions: PlanConditions | null;
+  /** 候補の作り方（Gemini か、Gemini を使わないデモモードか）。結果がないときは null */
+  mode: PlanResponse["mode"] | null;
 };
 
 type PlannerState = {
@@ -35,6 +41,7 @@ export function PlannerStateProvider({
     status: "idle",
     candidates: [],
     conditions: null,
+    mode: null,
   });
 
   const value = useMemo(

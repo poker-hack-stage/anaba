@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { PlannerForm } from "@/components/planner/planner-form";
-import { getAreas } from "@/lib/data/areas";
+import { getAreasWithSpots } from "@/lib/data/areas";
 
 export const metadata: Metadata = {
   title: "AI旅プラン",
@@ -31,6 +31,21 @@ export default function PlannerPage() {
 }
 
 async function Planner() {
-  const areas = await getAreas();
-  return <PlannerForm areaNames={areas.map((area) => area.name)} />;
+  const areas = await getAreasWithSpots();
+  // /api/plan が失敗したときにブラウザでデモの候補を作れるよう（#19）、スポットも渡す。
+  // 境界（boundary）などの大きい列は使わないので渡さない
+  return (
+    <PlannerForm
+      areas={areas.map(
+        ({ id, name, catchphrase, center_lat, center_lng, spots }) => ({
+          id,
+          name,
+          catchphrase,
+          center_lat,
+          center_lng,
+          spots,
+        }),
+      )}
+    />
+  );
 }

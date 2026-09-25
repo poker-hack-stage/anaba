@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Loader2, Route, Search, SearchX } from "lucide-react";
+import { FlaskConical, Loader2, Route, Search, SearchX } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { SpotDetailDialog } from "@/components/spots/spot-detail-dialog";
 import { Chip } from "@/components/ui/chip";
 import type { Spot } from "@/lib/data/spots";
+import { toPlanRequest } from "@/lib/planner/conditions";
+import { generateCandidates, type PlannableArea } from "@/lib/planner/generate";
 import type {
   PlanCandidate,
   PlanConditions,
@@ -95,22 +97,22 @@ function replaceQuery(conditions: PlanConditions) {
 
 // 条件は URL のクエリに持つ（再読み込み・共有しても同じ条件になる）。
 // 結果と最後の条件は app/layout.tsx の PlannerStateProvider に持ち、タブを切り替えても残す
-export function PlannerForm({ areaNames }: { areaNames: string[] }) {
+export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
   const searchParams = useSearchParams();
   const { savedConditions, saveConditions, result, setResult } =
     usePlannerState();
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
 
   const areaOptions = useMemo(
-    () => [DEFAULT_CONDITIONS.area, ...areaNames],
-    [areaNames],
+    () => [DEFAULT_CONDITIONS.area, ...areas.map((area) => area.name)],
+    [areas],
   );
   const queryConditions = useMemo(
     () => fromQuery(searchParams, areaOptions),
     [searchParams, areaOptions],
   );
   const conditions = queryConditions ?? savedConditions ?? DEFAULT_CONDITIONS;
-  const { status, candidates } = result;
+  const { status, candidates, mode } = result;
   // 表示中の候補が今の条件で出したものでないとき（読み込み中や結果が出たあとに条件を変えた、
   // ブラウザの「戻る」で前の条件に戻ったなど）は、そのことを知らせる
   const isStale =
@@ -154,7 +156,7 @@ export function PlannerForm({ areaNames }: { areaNames: string[] }) {
     // 結果は Context に入れるので、読み込み中に別のタブへ移動しても戻ると表示される
     // 結果には、送ったときの条件を付けておく（あとで条件が変わってもずれが分かるように）
     const requested = conditions;
-    setResult({ status: "loading", candidates, conditions: requested });
+    setResult({ status: "loading", candidates, conditions: requested, mode });
     try {
       const res = await fetch("/api/plan", {
         method: "POST",
@@ -169,9 +171,28 @@ export function PlannerForm({ areaNames }: { areaNames: string[] }) {
         status: "done",
         candidates: data.candidates,
         conditions: requested,
+        mode: data.mode,
       });
     } catch {
-      setResult({ status: "error", candidates: [], conditions: requested });
+      // API がエラー・時間切れでもデモが止まらないよう、ブラウザでデモモードの候補を作る（#19）
+      try {
+        setResult({
+          status: "done",
+          candidates: generateCandidates(
+            areas,
+            toPlanRequest(requested, areas),
+          ),
+          conditions: requested,
+          mode: "demo",
+        });
+      } catch {
+        setResult({
+          status: "error",
+          candidates: [],
+          conditions: requested,
+          mode: null,
+        });
+      }
     }
   };
 
@@ -238,6 +259,7 @@ export function PlannerForm({ areaNames }: { areaNames: string[] }) {
         <Result
           status={status}
           candidates={candidates}
+          mode={mode}
           onSpotClick={setSelectedSpot}
         />
       </section>
@@ -250,10 +272,12 @@ export function PlannerForm({ areaNames }: { areaNames: string[] }) {
 function Result({
   status,
   candidates,
+  mode,
   onSpotClick,
 }: {
   status: PlannerStatus;
   candidates: PlanCandidate[];
+  mode: PlanResponse["mode"] | null;
   onSpotClick: (spot: Spot) => void;
 }) {
   if (status === "idle") {
@@ -292,23 +316,37 @@ function Result({
     return (
       <EmptyState
         icon={SearchX}
-        title="条件に合う候補がありません"
-        description="条件を変えて、もう一度絞ってみてください。"
+        title="この条件では候補を組めませんでした"
+        description="日程を短くするか、エリアを「おまかせ」にしてください。"
         className="min-h-72"
       />
     );
   }
   return (
-    <div className="grid gap-4 xl:grid-cols-2">
-      {candidates.map((candidate, i) => (
-        <CandidateCard
-          key={candidate.id}
-          candidate={candidate}
-          index={i}
-          onSpotClick={onSpotClick}
-        />
-      ))}
-    </div>
+    <>
+      {mode === "demo" && (
+        <p
+          role="status"
+          className="flex items-start gap-2 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-700"
+        >
+          <FlaskConical className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            デモモードで作成しました。AI
+            を使わず、興味に合うスポットを評価の高い順に選んでいます。
+          </span>
+        </p>
+      )}
+      <div className="grid gap-4 xl:grid-cols-2">
+        {candidates.map((candidate, i) => (
+          <CandidateCard
+            key={candidate.id}
+            candidate={candidate}
+            index={i}
+            onSpotClick={onSpotClick}
+          />
+        ))}
+      </div>
+    </>
   );
 }
 
