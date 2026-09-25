@@ -8,6 +8,7 @@ import type { Spot } from "@/lib/data/spots";
 import { getCategory } from "@/lib/spots/categories";
 import { formatRating, getRating } from "@/lib/spots/score";
 import { SpotImage } from "./spot-image";
+import { SpotReviewsSection } from "./spot-reviews";
 
 /**
  * スポット詳細。「穴場を探す」と「AI旅プラン」の両方で使う（#24）
@@ -148,6 +149,8 @@ export function SpotDetailDialog({
                 )}
               </dl>
             )}
+
+            <SpotReviewsSection key={shown.id} spotId={shown.id} />
           </div>
         </DialogPrimitive.Content>
       </DialogPortal>
