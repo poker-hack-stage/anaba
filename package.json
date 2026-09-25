@@ -57,7 +57,7 @@
     "vite": "^8.3.1",
     "vitest": "^4.1.11"
   },
-  "name": "hack-stage-product",
+  "name": "anaba",
   "engines": {
     "node": "^20.19.0 || ^22.13.0 || >=24.0.0"
   }

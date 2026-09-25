@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * スポットの写真。
- * TODO(#13): Supabase Storage の画像（spots.image_path）を表示する。今はカテゴリ色のプレースホルダーのみ
+ * TODO(#15): Supabase Storage の画像（spots.image_path）を表示する。今はカテゴリ色のプレースホルダーのみ
  */
 export function SpotImage({
   category,
