@@ -1,8 +1,17 @@
 "use client";
 
-import { SpotMap } from "@/components/map/spot-map";
+import dynamic from "next/dynamic";
+import { SpotMapSkeleton } from "@/components/map/spot-map-skeleton";
 import type { AreaWithSpots } from "@/lib/data/areas";
 import type { Spot } from "@/lib/data/spots";
+
+const MAP_CLASS_NAME = "h-72 sm:h-96 lg:h-auto lg:min-h-[520px]";
+
+// Leaflet は window を使うので、サーバーでは描画しない
+const SpotMap = dynamic(
+  () => import("@/components/map/spot-map").then((m) => m.SpotMap),
+  { ssr: false, loading: () => <SpotMapSkeleton className={MAP_CLASS_NAME} /> },
+);
 
 /**
  * 「穴場を探す」の地図部分。表示中の地域とおすすめ3件をハイライトする。
@@ -22,7 +31,7 @@ export function AreaMap({
       highlighted={area?.recommended}
       others={area?.spots.filter((s) => !area.recommended.includes(s))}
       onSpotClick={onSpotClick}
-      className="h-72 animate-in fade-in sm:h-96 lg:h-auto lg:min-h-[520px]"
+      className={`${MAP_CLASS_NAME} animate-in fade-in`}
     />
   );
 }
