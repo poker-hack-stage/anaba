@@ -406,6 +406,7 @@
 - 座標の取り方: OpenStreetMap の「大雪旭岳源水」（湧き水）の位置。公式の住所（ノカナン1046番41）は国土地理院で番地まで当たらない
 - <https://taisetsu-mizu.jp/>: 正式名・住所・上水道のない町
 - <https://water-pub.env.go.jp/water-pub/mizu-site/newmeisui/data/index.asp?info=1>: 湧出量（1日6千トン）・周りの森と動物・水をくみに来る人
+- <https://www.welcome-higashikawa.jp/info-kuma/>: ヒグマの出没で木道は当面閉鎖・水汲み場は7月1日に再開・長時間の滞在や夕方〜早朝を控える（2026-06-09〜）
 
 ##### 北の住まい設計社（`20000000-0000-4000-8000-000000000605`）
 
