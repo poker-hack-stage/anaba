@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Noto_Sans_JP, Zen_Maru_Gothic } from "next/font/google";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { SiteHeader } from "@/components/layout/site-header";
+import { SiteFooter } from "@/components/layout/site-footer";
 import { PlannerStateProvider } from "@/components/planner/planner-state";
 import "./globals.css";
 
@@ -43,10 +44,11 @@ export default function RootLayout({
         className={`${notoSansJP.className} ${zenMaruGothic.variable} flex min-h-screen flex-col antialiased`}
       >
         <SiteHeader />
-        {/* スマホでは下部ナビの高さぶん余白をとる */}
-        <main className="mx-auto w-full max-w-7xl flex-1 px-4 pb-24 pt-5 sm:px-6 md:pb-10 lg:px-8">
+        {/* スマホの下部ナビの高さぶんの余白は、フッター（site-footer.tsx）がとる */}
+        <main className="mx-auto w-full max-w-7xl flex-1 px-4 pb-6 pt-5 sm:px-6 md:pb-8 lg:px-8">
           <PlannerStateProvider>{children}</PlannerStateProvider>
         </main>
+        <SiteFooter />
         <BottomNav />
       </body>
     </html>
