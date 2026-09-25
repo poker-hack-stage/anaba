@@ -6,6 +6,7 @@ import { FlaskConical, Loader2, Route, Search, SearchX } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { SpotDetailDialog } from "@/components/spots/spot-detail-dialog";
 import { Chip } from "@/components/ui/chip";
+import { Select } from "@/components/ui/select";
 import type { Spot } from "@/lib/data/spots";
 import { groupAreasByPrefecture } from "@/lib/planner/area-groups";
 import { DURATION_LABELS } from "@/lib/planner/duration";
@@ -411,28 +412,31 @@ function AreaField({
         <Chip active={areaId === null} onClick={() => onChange(null)}>
           {ANY_AREA_LABEL}
         </Chip>
-        <select
+        <Select
           id={selectId}
+          shape="pill"
           value={areaId ?? ""}
           onChange={(e) => onChange(e.target.value || null)}
+          containerClassName="min-w-0 flex-1"
+          // 地域を選んでいるときは、選択中の Chip と同じ濃い枠にする
           className={cn(
-            "min-w-0 flex-1 rounded-full border bg-white px-3 py-1.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
             areaId === null
-              ? "border-stone-200 text-stone-600"
-              : "border-stone-900 text-stone-900",
+              ? "text-stone-600"
+              : "border-stone-900 hover:border-stone-900",
           )}
         >
           <option value="">地域を選ぶ</option>
           {groupAreasByPrefecture(areas).map((group) => (
             <optgroup key={group.prefecture} label={group.prefecture}>
               {group.areas.map((area) => (
+                // 選択肢の一覧で都道府県の見出しが見えないブラウザがあり、選んだ後の欄にも出ないので、名前に添える
                 <option key={area.id} value={area.id}>
-                  {area.name}
+                  {area.name}（{group.prefecture}）
                 </option>
               ))}
             </optgroup>
           ))}
-        </select>
+        </Select>
       </div>
     </div>
   );

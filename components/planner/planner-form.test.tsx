@@ -224,7 +224,7 @@ describe("PlannerForm", () => {
       expect(groups.map((g) => g.label)).toEqual(["長野県"]);
       expect(
         [...groups[0].querySelectorAll("option")].map((o) => o.textContent),
-      ).toEqual(["松本市"]);
+      ).toEqual(["松本市（長野県）"]);
     });
 
     test("URL のクエリの条件を読む", () => {

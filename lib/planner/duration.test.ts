@@ -1,6 +1,11 @@
 import { describe, expect, test } from "vitest";
 
-import { calcDayMinutes, DAY_COUNTS, DEFAULT_STAY_MINUTES } from "./duration";
+import {
+  calcDayMinutes,
+  DAY_COUNTS,
+  DEFAULT_STAY_MINUTES,
+  formatMinutes,
+} from "./duration";
 
 const stays = (...minutes: (number | null)[]) =>
   minutes.map((stay_minutes) => ({ stay_minutes }));
@@ -33,5 +38,20 @@ describe("calcDayMinutes", () => {
 describe("DAY_COUNTS", () => {
   test("日帰りは1日、1泊2日は2日、2泊3日は3日", () => {
     expect(DAY_COUNTS).toEqual({ day: 1, "1n2d": 2, "2n3d": 3 });
+  });
+});
+
+describe("formatMinutes", () => {
+  test("1時間未満は分で表す", () => {
+    expect(formatMinutes(45)).toBe("約45分");
+    expect(formatMinutes(0)).toBe("約0分");
+  });
+
+  test("1時間以上は30分単位に丸めて表す", () => {
+    expect(formatMinutes(60)).toBe("約1時間");
+    expect(formatMinutes(90)).toBe("約1時間半");
+    expect(formatMinutes(240)).toBe("約4時間");
+    expect(formatMinutes(255)).toBe("約4時間半");
+    expect(formatMinutes(314)).toBe("約5時間");
   });
 });
