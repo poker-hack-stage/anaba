@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MessageSquarePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Rating } from "@/components/ui/rating";
@@ -27,29 +27,43 @@ export function SpotReviewsSection({ spotId }: { spotId: string }) {
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [formOpen, setFormOpen] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
+  // 読み込みの世代。いちばん新しい読み込み（と書いたあとの読み直し）の結果だけを表示に使う。
+  // 書く前に始まった読み込みが遅れて届いても、書いた口コミを古い一覧で上書きしないため
+  const generationRef = useRef(0);
 
   useEffect(() => {
+    const generation = ++generationRef.current;
+    let cancelled = false;
+    const isLatest = () => !cancelled && generation === generationRef.current;
     const controller = new AbortController();
-    const signal = AbortSignal.any([
-      controller.signal,
-      AbortSignal.timeout(LOAD_TIMEOUT_MS),
-    ]);
+    // AbortSignal.any は Safari 17.3 以前にないので、時間切れは setTimeout で止める
+    const timer = setTimeout(() => controller.abort(), LOAD_TIMEOUT_MS);
     (async () => {
       try {
-        const res = await fetch(`/api/spots/${spotId}/reviews`, { signal });
+        const res = await fetch(`/api/spots/${spotId}/reviews`, {
+          signal: controller.signal,
+        });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = (await res.json()) as SpotReviews;
-        setState({ status: "done", data });
+        if (isLatest()) setState({ status: "done", data });
       } catch {
-        // 閉じた・別のスポットに替わったときは、もう表示しないので何もしない
-        if (!controller.signal.aborted) setState({ status: "error" });
+        // 閉じた・別のスポットに替わった・あとから書いたときは、もう表示しないので何もしない
+        if (isLatest()) setState({ status: "error" });
+      } finally {
+        clearTimeout(timer);
       }
     })();
-    return () => controller.abort();
+    return () => {
+      cancelled = true;
+      controller.abort();
+      clearTimeout(timer);
+    };
   }, [spotId, reloadCount]);
 
   const handlePosted = (review: PostedReview) => {
     setFormOpen(false);
+    // 書く前に始まった読み込みの結果は捨てる
+    const generation = ++generationRef.current;
     // 書いた口コミがすぐ見えるよう、先に一覧の先頭に足す。件数・平均は読み直して正しい値にする
     // （API は id・created_at を返さないので、仮の値を入れておく）
     setState((prev) => {
@@ -71,7 +85,11 @@ export function SpotReviewsSection({ spotId }: { spotId: string }) {
         },
       };
     });
-    void refreshQuietly(spotId, (data) => setState({ status: "done", data }));
+    void refreshQuietly(spotId, (data) => {
+      if (generation === generationRef.current) {
+        setState({ status: "done", data });
+      }
+    });
   };
 
   return (

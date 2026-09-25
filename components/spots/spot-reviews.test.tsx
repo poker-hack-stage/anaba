@@ -114,6 +114,79 @@ describe("SpotReviewsSection の一覧", () => {
   });
 });
 
+describe("SpotReviewsSection の読み込みの順番とブラウザの違い", () => {
+  test("AbortSignal.any のないブラウザ（Safari 17.3 以前）でも読み込める", async () => {
+    vi.stubGlobal(
+      "AbortSignal",
+      Object.assign(Object.create(AbortSignal), { any: undefined }),
+    );
+    stubFetch(Response.json(REVIEWS));
+    render(<SpotReviewsSection spotId={SPOT_ID} />);
+
+    expect(await screen.findByText("安曇野の人")).toBeTruthy();
+  });
+
+  test("最初の読み込みが書いたあとに遅れて届いても、書いた口コミを古い一覧で上書きしない", async () => {
+    let resolveFirst!: (res: Response) => void;
+    const first = new Promise<Response>((resolve) => (resolveFirst = resolve));
+    const afterPost: SpotReviews = {
+      reviews: [
+        {
+          id: "r3",
+          spot_id: SPOT_ID,
+          nickname: "地元の人",
+          rating: 4,
+          body: "夕方がおすすめ",
+          created_at: "2026-09-25T01:00:00Z",
+        },
+        ...REVIEWS.reviews,
+      ],
+      count: 3,
+      average: 4,
+    };
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(first)
+      .mockResolvedValueOnce(
+        Response.json(
+          {
+            review: {
+              spot_id: SPOT_ID,
+              nickname: "地元の人",
+              rating: 4,
+              body: "夕方がおすすめ",
+            },
+          },
+          { status: 201 },
+        ),
+      )
+      .mockResolvedValueOnce(Response.json(afterPost));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<SpotReviewsSection spotId={SPOT_ID} />);
+
+    // 読み込み中のまま書く
+    const form = openForm();
+    fillForm(form);
+    fireEvent.submit(form);
+    expect(await screen.findByText("夕方がおすすめ")).toBeTruthy();
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    await vi.waitFor(() =>
+      expect(
+        screen.getByRole("heading", { name: /口コミ/ }).textContent,
+      ).toContain("（3件）"),
+    );
+
+    // 書く前の一覧（2件）があとから届く
+    resolveFirst(Response.json(REVIEWS));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.getByText("夕方がおすすめ")).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: /口コミ/ }).textContent,
+    ).toContain("（3件）");
+  });
+});
+
 describe("SpotReviewsSection のフォーム", () => {
   test("書いたら一覧の先頭に足し、フォームを閉じ、ニックネームを覚える", async () => {
     const fetchMock = stubFetch(
