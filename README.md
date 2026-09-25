@@ -170,6 +170,26 @@ Vitest + React Testing Library（`jsdom`）。設定は `vitest.config.mts`、�
 - `import "server-only"` を含むファイルもテストで読み込める（`vitest.config.mts` で空のモジュールに差し替えている）
 - `describe` / `expect` / `test` などはグローバルにせず、各ファイルで `import { describe, expect, test } from "vitest"` する
 
+## 外部サービス
+
+| サービス                | 持ち主     | ほかのメンバー                                 | 料金   |
+| ----------------------- | ---------- | ---------------------------------------------- | ------ |
+| Supabase（本番の DB）   | hayato-psg | Organization に招待する（「本番の Supabase」） | Free   |
+| Vercel（本番・Preview） | hayato-psg | 招待できない（Hobby）                          | Hobby  |
+| Gemini API              | 各自       | 各自でキーを作る（「セットアップ」）           | 無料枠 |
+
+キーの受け取り方:
+
+- 開発で使う値は配らない。Supabase はローカル（`npm run db:start` の出力）、Gemini のキーは各自で作る、`RATE_LIMIT_SALT` は開発では空でよい
+- 本番の値（Supabase の URL と publishable key、本番用の Gemini のキー、`RATE_LIMIT_SALT`）は、Vercel の持ち主が Vercel の環境変数だけに入れる
+- キーは、リポジトリ・Issue・PR・Slack の公開チャンネルに貼らない
+- Supabase の Secret key（service_role）はアプリで使わない
+
+Vercel の Hobby プランの制限:
+
+- メンバーを招待できない。デプロイのログと環境変数を見られるのは持ち主だけ
+- Preview URL は誰でも開ける。ログが必要なときは持ち主に頼む
+
 ## デプロイ（Vercel）
 
 1. Vercel で GitHub リポジトリをインポート（リポジトリ直下でない場合は **Root Directory** にこのディレクトリを指定）
@@ -197,7 +217,7 @@ MapLibre の Web Worker（`maplibre-gl-worker.mjs`）はバンドラーが出力
 ## 注意
 
 - `.env.local` はコミットしない
-- `SECRET_KEY`（service_role）はクライアントに絶対出さない。使う場合は `NEXT_PUBLIC_` を付けずサーバー側のみで使う
+- Supabase の Secret key（service_role）はアプリで使わない。リポジトリにも `NEXT_PUBLIC_` の環境変数にも入れない
 - 新しいテーブルは必ず RLS を有効化する
 
 ## 実装の約束ごと
