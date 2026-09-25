@@ -13,9 +13,9 @@ import {
 
 /**
  * GEMINI_MODEL が未指定のときに使うモデル（docs/spec.md の技術-1）。
- * 無料枠で使える安定版の Flash のうち、いちばん新しいもの
+ * 無料枠の回数に余裕がある（1分15回・1日500回）。gemini-3.8-flash は無料枠が1日20回で、開発とデモには足りない
  */
-export const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
+export const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite";
 
 /**
  * 1回の呼び出しで待つ時間の上限（ミリ秒）。
@@ -49,7 +49,7 @@ const BLOCKED_FINISH_REASONS: ReadonlySet<FinishReason | undefined> = new Set([
   FinishReason.SPII,
 ]);
 
-/** 使うモデル。GEMINI_MODEL で切り替える（例: gemini-3.5-flash-lite） */
+/** 使うモデル。GEMINI_MODEL で切り替える（例: gemini-3.8-flash） */
 export function getGeminiModel(): string {
   return process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL;
 }

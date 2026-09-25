@@ -32,10 +32,10 @@ Gemini API のキーの決まり:
 - アカウントの都合（年齢の条件や、学校・会社のアカウントの制限）で作れない人は、キーなし（デモモード）で開発する
 - 本番（Vercel）のキーは、Vercel の持ち主（#4）が本番用に別に作り、Vercel の環境変数だけに入れる。開発では使わない
 
-| 環境変数         | 内容                                                                                                                                      |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `GEMINI_API_KEY` | Gemini API のキー。サーバー側だけで使う（`NEXT_PUBLIC_` を付けない）                                                                      |
-| `GEMINI_MODEL`   | 使うモデル。空なら既定の `gemini-3.8-flash`。無料枠の上限に当たりやすければ `gemini-3.5-flash-lite` にする（上限は AI Studio で確かめる） |
+| 環境変数         | 内容                                                                                                                                                                 |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GEMINI_API_KEY` | Gemini API のキー。サーバー側だけで使う（`NEXT_PUBLIC_` を付けない）                                                                                                 |
+| `GEMINI_MODEL`   | 使うモデル。空なら既定の `gemini-3.5-flash-lite`（無料枠は1分15回・1日500回）。質を比べたいときは `gemini-3.8-flash`（無料枠は1日20回）。上限は AI Studio で確かめる |
 
 ```bash
 npm run dev             # http://localhost:3000
@@ -145,7 +145,7 @@ Vitest + React Testing Library（`jsdom`）。設定は `vitest.config.mts`、�
 2. Environment Variables に以下を設定
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-   - `GEMINI_API_KEY`・`GEMINI_MODEL`（任意。空なら既定の `gemini-3.8-flash`）
+   - `GEMINI_API_KEY`・`GEMINI_MODEL`（任意。空なら既定の `gemini-3.5-flash-lite`）
 3. Supabase ダッシュボード > Authentication > URL Configuration
    - Site URL: 本番 URL
    - Redirect URLs: `https://<本番ドメイン>/**` と Preview 用 `https://*-<vercel-team>.vercel.app/**`

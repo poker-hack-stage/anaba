@@ -67,12 +67,12 @@ afterEach(() => {
 
 describe("getGeminiModel", () => {
   test("GEMINI_MODEL が未指定なら既定のモデルを使う", () => {
-    expect(getGeminiModel()).toBe("gemini-3.8-flash");
+    expect(getGeminiModel()).toBe("gemini-3.5-flash-lite");
   });
 
   test("GEMINI_MODEL を指定すればそのモデルを使う", () => {
-    vi.stubEnv("GEMINI_MODEL", "gemini-3.5-flash-lite");
-    expect(getGeminiModel()).toBe("gemini-3.5-flash-lite");
+    vi.stubEnv("GEMINI_MODEL", "gemini-3.8-flash");
+    expect(getGeminiModel()).toBe("gemini-3.8-flash");
   });
 
   test("空白だけなら未指定として扱う", () => {
@@ -83,7 +83,7 @@ describe("getGeminiModel", () => {
 
 describe("callGemini", () => {
   test("環境変数のモデルで呼び、応答を返す", async () => {
-    vi.stubEnv("GEMINI_MODEL", "gemini-3.5-flash-lite");
+    vi.stubEnv("GEMINI_MODEL", "gemini-3.8-flash");
     const response = fakeResponse();
     generateContent.mockResolvedValue(response);
 
@@ -91,12 +91,12 @@ describe("callGemini", () => {
 
     expect(result).toEqual({
       ok: true,
-      model: "gemini-3.5-flash-lite",
+      model: "gemini-3.8-flash",
       response,
     });
     expect(generateContent).toHaveBeenCalledWith({
       ...params,
-      model: "gemini-3.5-flash-lite",
+      model: "gemini-3.8-flash",
     });
   });
 
