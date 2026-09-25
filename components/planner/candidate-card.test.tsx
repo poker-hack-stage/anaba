@@ -4,7 +4,24 @@ import { describe, expect, test, vi } from "vitest";
 import type { Spot } from "@/lib/data/spots";
 import { spot as fixtureSpot } from "@/test/fixtures/planner";
 import type { PlanCandidate, PlanDay } from "@/lib/planner/types";
+import type { SpotMapProps } from "@/components/map/spot-map";
 import { CandidateCard } from "./candidate-card";
+import { getDayColor } from "./day-colors";
+
+// 地図（MapLibre）は jsdom で描けないので、渡された経路を文字で出す部品に差し替える
+vi.mock("@/components/map/spot-map", () => ({
+  SpotMap: ({ routes = [] }: SpotMapProps) => (
+    <div role="group" aria-label="地図の経路">
+      {routes.map((r, i) => (
+        <p key={i}>
+          {[r.name ?? "（名前なし）", r.color ?? "（既定の色）"]
+            .concat(r.spots.map((s) => s.name))
+            .join(" / ")}
+        </p>
+      ))}
+    </div>
+  ),
+}));
 
 /** 名前を id に使うスポット（地域は使わないので固定） */
 function spot(name: string, stay: number | null = 60): Spot {
@@ -95,6 +112,39 @@ describe("CandidateCard", () => {
         .map((li) => li.textContent?.[0]),
     ).toEqual(["1", "2"]);
     screen.getByText(/宿は含みません/);
+  });
+
+  test("日帰りの地図は、1本の経路を既定の色で出す（凡例の名前を付けない）", async () => {
+    renderCard(candidate());
+
+    const routes = await screen.findByRole("group", { name: "地図の経路" });
+    expect([...routes.querySelectorAll("p")].map((p) => p.textContent)).toEqual(
+      ["（名前なし） / （既定の色） / わさび田 / 湧き水"],
+    );
+  });
+
+  test("複数日の地図は、日ごとの経路を日の見出しと同じ色・名前で出す", async () => {
+    renderCard(
+      candidate({
+        duration: "1n2d",
+        days: [
+          day(1, "安曇野市", [spot("わさび田"), spot("湧き水")], 240),
+          day(2, "松本市", [spot("城"), spot("縄手通り")], 180),
+        ],
+      }),
+    );
+
+    const routes = await screen.findByRole("group", { name: "地図の経路" });
+    expect([...routes.querySelectorAll("p")].map((p) => p.textContent)).toEqual(
+      [
+        `1日目 / ${getDayColor(1).hex} / わさび田 / 湧き水`,
+        `2日目 / ${getDayColor(2).hex} / 城 / 縄手通り`,
+      ],
+    );
+    // 見出しの文字も同じ日の色
+    expect(screen.getByText("2日目").closest("h4")?.className).toContain(
+      getDayColor(2).text,
+    );
   });
 
   test("滞在の目安がないスポットは、滞在の目安を出さない", () => {

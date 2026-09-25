@@ -19,8 +19,8 @@ const SpotMap = dynamic(
 
 /**
  * 旅プランの候補カード。地図と、日ごとの経路・所要時間・選ばれた理由を出す（docs/spec.md の 6.2・#57）。
- * 何件目の候補かは、包むタブ（candidate-tabs.tsx）に出す
- * TODO(#57): 地図で日ごとに線とマーカーの色を変え、凡例を出す（地図の部品の作業で、担当は未定）。今は全日の経路を1本で出している
+ * 何件目の候補かは、包むタブ（candidate-tabs.tsx）に出す。
+ * 複数日の候補は、地図の線・ピンと日の見出しを日ごとの色（day-colors.ts）でそろえ、地図に凡例を出す
  */
 export function CandidateCard({
   candidate,
@@ -33,7 +33,16 @@ export function CandidateCard({
   return (
     <article className="flex flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white">
       <SpotMap
-        route={candidate.days.flatMap((day) => day.route)}
+        routes={candidate.days.map((day) =>
+          // 日帰りは今までどおり1本の朱の経路にし、凡例も出さない
+          multiDay
+            ? {
+                spots: day.route,
+                color: getDayColor(day.day).hex,
+                name: `${day.day}日目`,
+              }
+            : { spots: day.route },
+        )}
         others={candidate.otherSpots}
         onSpotClick={onSpotClick}
         className={MAP_CLASS_NAME}
