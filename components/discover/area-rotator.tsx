@@ -17,10 +17,8 @@ import { useAutoRotate } from "./use-auto-rotate";
 export function AreaRotator({ areas }: { areas: AreaWithSpots[] }) {
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   // 詳細を開いている間は止める
-  const { index, next, prev, goTo, hoverHandlers } = useAutoRotate(
-    areas.length,
-    { paused: selectedSpot !== null },
-  );
+  const { index, next, prev, goTo, hoverHandlers, focusHandlers } =
+    useAutoRotate(areas.length, { paused: selectedSpot !== null });
 
   const area = areas[index];
   const closeDetail = useCallback(() => setSelectedSpot(null), []);
@@ -29,6 +27,7 @@ export function AreaRotator({ areas }: { areas: AreaWithSpots[] }) {
     <section
       className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_400px]"
       {...hoverHandlers}
+      {...focusHandlers}
     >
       {/* TODO(#1): 地図と情報パネルの左右（スマホでは上下）の配置を決める */}
       <AreaMap area={area} onSpotClick={setSelectedSpot} />
