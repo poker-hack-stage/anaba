@@ -33,7 +33,7 @@ vi.mock("next/navigation", async () => {
   };
 });
 
-// 地図（MapLibre）は jsdom では描けないので、表示中の地域名と、おすすめのピン（SpotMap と同じ番号の付け方）だけ出す
+// 地図（MapLibre）は jsdom では描けないので、表示中の地域名と、おすすめのピンだけ出す
 vi.mock("./area-map", () => ({
   AreaMap: ({
     area,
@@ -45,14 +45,14 @@ vi.mock("./area-map", () => ({
     <div>
       <div data-testid="map">{area?.name ?? "日本全体"}</div>
       <div data-testid="pins">
-        {area?.recommended.map((s, i) => (
+        {area?.recommended.map((s) => (
           <button
             key={s.id}
             type="button"
             onMouseEnter={() => onSpotHover?.(s)}
             onMouseLeave={() => onSpotHover?.(null)}
           >
-            {`${i + 1}. ${s.name}`}
+            {s.name}
           </button>
         ))}
       </div>
@@ -276,21 +276,18 @@ describe("AreaRotator の絞り込み（#50）", () => {
   });
 });
 
-/** 地図のピンの名前（番号付き） */
+/** 地図のピンの名前 */
 function pins() {
   return within(screen.getByTestId("pins"))
     .queryAllByRole("button")
     .map((button) => button.textContent);
 }
 
-/** 情報パネルのカードの番号と名前 */
+/** 情報パネルのカードの名前 */
 function cards() {
   return screen
     .queryAllByRole("listitem")
-    .map(
-      (item) =>
-        `${item.lastChild?.textContent}. ${item.querySelector("h3")?.textContent}`,
-    );
+    .map((item) => item.querySelector("h3")?.textContent);
 }
 
 function activeCards() {
@@ -301,24 +298,26 @@ function activeCards() {
 }
 
 describe("地図のピンと情報パネルの連動（#14）", () => {
-  test("ピンの番号と情報パネルの並びが一致し、地域・絞り込みで差し替わる", () => {
+  test("ピンと情報パネルのカードが同じスポットで、地域・絞り込みで差し替わる", () => {
     render(<AreaRotator areas={areas} />);
-    expect(pins()).toEqual(["1. 白馬八方温泉", "2. 八方池"]);
+    expect(pins()).toEqual(["白馬八方温泉", "八方池"]);
     expect(cards()).toEqual(pins());
 
     fireEvent.click(screen.getByRole("button", { name: "次の地域" }));
-    expect(pins()).toEqual(["1. 松本城"]);
+    expect(pins()).toEqual(["松本城"]);
     expect(cards()).toEqual(pins());
 
     fireEvent.click(screen.getByRole("button", { name: "絶景" }));
     expect(currentArea()).toBe("白馬村");
-    expect(pins()).toEqual(["1. 八方池"]);
+    expect(pins()).toEqual(["八方池"]);
     expect(cards()).toEqual(pins());
   });
 
   test("ピンにマウスを乗せると同じカードを強調し、離すと戻す", () => {
     render(<AreaRotator areas={areas} />);
-    const pin = screen.getByRole("button", { name: "2. 八方池" });
+    const pin = within(screen.getByTestId("pins")).getByRole("button", {
+      name: "八方池",
+    });
 
     fireEvent.mouseEnter(pin);
     expect(activeCards()).toEqual(["八方池"]);
@@ -330,7 +329,9 @@ describe("地図のピンと情報パネルの連動（#14）", () => {
   test("地域が切り替わったら強調を消す（戻ってきても残さない）", () => {
     render(<AreaRotator areas={areas} />);
     fireEvent.mouseEnter(
-      screen.getByRole("button", { name: "1. 白馬八方温泉" }),
+      within(screen.getByTestId("pins")).getByRole("button", {
+        name: "白馬八方温泉",
+      }),
     );
     expect(activeCards()).toEqual(["白馬八方温泉"]);
 

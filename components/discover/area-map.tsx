@@ -16,7 +16,7 @@ const SpotMap = dynamic(
 );
 
 /**
- * 「穴場を探す」の地図部分。表示中の地域の境界を塗り、おすすめ3件に情報パネルと同じ番号のピンを立てる。
+ * 「穴場を探す」の地図部分。表示中の地域の外側を暗くして境界を線で示し、おすすめ3件を大きなピンで出す。
  * 地域が変わっても地図は作り直さず、新しい地域へなめらかに移動する。area がないときは日本全体を出す。
  * 地図コンポーネントの読み込みはこのファイルだけで行う。
  */
@@ -41,7 +41,6 @@ export function AreaMap({
       areaName={area?.name}
       boundary={boundary}
       highlighted={area?.recommended}
-      numberHighlighted
       others={area?.spots.filter((s) => !area.recommended.includes(s))}
       onSpotClick={onSpotClick}
       onSpotHover={onSpotHover}

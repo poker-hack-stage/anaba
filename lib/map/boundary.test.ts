@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { toAreaBoundary } from "./boundary";
+import type { MultiPolygon, Polygon, Position } from "geojson";
+import { outsideOf, toAreaBoundary } from "./boundary";
 
 const ring = [
   [137.8, 36.6],
@@ -60,5 +61,46 @@ describe("toAreaBoundary", () => {
     expect(
       toAreaBoundary({ type: "MultiPolygon", coordinates: [[ring], []] }),
     ).toBeNull();
+  });
+});
+
+describe("outsideOf", () => {
+  // ring は反時計回り
+  const clockwise = [...ring].reverse();
+
+  it("世界全体の外周に、地域の外周を時計回りの穴としてくり抜く", () => {
+    const polygon: Polygon = { type: "Polygon", coordinates: [ring] };
+    const [outer, ...holes] = outsideOf(polygon).coordinates;
+
+    expect(outer).toContainEqual([180, 85]);
+    expect(holes).toEqual([clockwise]);
+  });
+
+  it("もともと時計回りの外周はそのまま使う", () => {
+    const polygon: Polygon = { type: "Polygon", coordinates: [clockwise] };
+    expect(outsideOf(polygon).coordinates.slice(1)).toEqual([clockwise]);
+  });
+
+  it("MultiPolygon は各ポリゴンの外周をくり抜き、中の穴は使わない", () => {
+    const inner: Position[] = [
+      [137.85, 36.62],
+      [137.86, 36.62],
+      [137.86, 36.63],
+      [137.85, 36.62],
+    ];
+    const multi: MultiPolygon = {
+      type: "MultiPolygon",
+      coordinates: [[ring, inner], [clockwise]],
+    };
+    expect(outsideOf(multi).coordinates.slice(1)).toEqual([
+      clockwise,
+      clockwise,
+    ]);
+  });
+
+  it("元の境界の配列は書き換えない", () => {
+    const original = ring.map((p) => [...p]);
+    outsideOf({ type: "Polygon", coordinates: [ring] });
+    expect(ring).toEqual(original);
   });
 });

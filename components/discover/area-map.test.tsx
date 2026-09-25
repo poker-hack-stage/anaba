@@ -63,14 +63,13 @@ beforeEach(() => {
 });
 
 describe("AreaMap（#14）", () => {
-  test("境界を渡し、おすすめに番号を付け、なめらかに移動させる", () => {
+  test("境界とおすすめを渡し、なめらかに移動させる", () => {
     const hakuba = area("hakuba", polygon);
     render(<AreaMap area={hakuba} onSpotClick={() => {}} />);
 
     const props = lastProps();
     expect(props.boundary).toBe(polygon);
     expect(props.highlighted).toBe(hakuba.recommended);
-    expect(props.numberHighlighted).toBe(true);
     expect(props.animateMove).toBe(true);
     expect(props.others?.map((s) => s.id)).toEqual(["hakuba-other"]);
   });

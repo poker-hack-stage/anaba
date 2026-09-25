@@ -18,6 +18,7 @@ import type {
 } from "geojson";
 import { Map, MapPin } from "lucide-react";
 import type { Spot } from "@/lib/data/spots";
+import { outsideOf, toAreaBoundary } from "@/lib/map/boundary";
 import { computeBounds } from "@/lib/map/bounds";
 import { getCategory } from "@/lib/spots/categories";
 import { cn } from "@/lib/utils";
@@ -49,8 +50,6 @@ export type SpotMapProps = {
   routes?: SpotRoute[];
   /** そのほかのスポット。小さく表示 */
   others?: Spot[];
-  /** ハイライトのピンに 1 からの番号を付ける（`highlighted` の並び順。情報パネルの並びと合わせる） */
-  numberHighlighted?: boolean;
   /** ハイライトする地域名（地図の左上に出す） */
   areaName?: string;
   /**
@@ -92,13 +91,16 @@ const SINGLE_SPOT_ZOOM = 14;
 const FIT_PADDING = { top: 40, right: 56, bottom: 64, left: 40 };
 
 const ROUTE_COLOR = "#c0432b";
-const INK_COLOR = "#24463d";
-const BOUNDARY_COLOR = INK_COLOR;
+const BOUNDARY_COLOR = "#24463d"; // ink
+/** 地域の外側を暗くする色と濃さ。表示中の地域だけが見えるよう、外はほとんど見えなくする */
+const OUTSIDE_COLOR = "#1c1917"; // stone-900
+const OUTSIDE_OPACITY = 0.85;
 /** 移動にかける時間。自動の切り替え（6秒ごと）より十分短くする */
 const MOVE_DURATION_MS = 1200;
 
 const ROUTE_SOURCE = "spot-route";
 const BOUNDARY_SOURCE = "area-boundary";
+const OUTSIDE_SOURCE = "area-outside";
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 
 /**
@@ -144,7 +146,6 @@ export function SpotMap({
   highlighted = [],
   routes = [],
   others = [],
-  numberHighlighted = false,
   areaName,
   boundary,
   onSpotClick,
@@ -256,29 +257,21 @@ export function SpotMap({
   // 境界の塗りつぶしと経路の線を置く場所を用意する
   useEffect(() => {
     if (!map || !styleLoaded) return;
-    // 境界は地名の文字より下に敷く
-    const firstLabel = map
-      .getStyle()
-      .layers.find((layer) => layer.type === "symbol")?.id;
+    // 地域の外側を暗くする。外の地名も暗くするので、地名の文字より上に重ねる
+    map.addSource(OUTSIDE_SOURCE, { type: "geojson", data: EMPTY });
+    map.addLayer({
+      id: `${OUTSIDE_SOURCE}-fill`,
+      type: "fill",
+      source: OUTSIDE_SOURCE,
+      paint: { "fill-color": OUTSIDE_COLOR, "fill-opacity": OUTSIDE_OPACITY },
+    });
     map.addSource(BOUNDARY_SOURCE, { type: "geojson", data: EMPTY });
-    map.addLayer(
-      {
-        id: `${BOUNDARY_SOURCE}-fill`,
-        type: "fill",
-        source: BOUNDARY_SOURCE,
-        paint: { "fill-color": BOUNDARY_COLOR, "fill-opacity": 0.08 },
-      },
-      firstLabel,
-    );
-    map.addLayer(
-      {
-        id: `${BOUNDARY_SOURCE}-line`,
-        type: "line",
-        source: BOUNDARY_SOURCE,
-        paint: { "line-color": BOUNDARY_COLOR, "line-width": 2 },
-      },
-      firstLabel,
-    );
+    map.addLayer({
+      id: `${BOUNDARY_SOURCE}-line`,
+      type: "line",
+      source: BOUNDARY_SOURCE,
+      paint: { "line-color": BOUNDARY_COLOR, "line-width": 2.5 },
+    });
     map.addSource(ROUTE_SOURCE, { type: "geojson", data: EMPTY });
     map.addLayer({
       id: `${ROUTE_SOURCE}-line`,
@@ -302,6 +295,10 @@ export function SpotMap({
     const data =
       boundary && computeBounds([], boundary) ? (boundary as GeoJSON) : EMPTY;
     map.getSource<GeoJSONSource>(BOUNDARY_SOURCE)?.setData(data);
+    const area = toAreaBoundary(boundary);
+    map
+      .getSource<GeoJSONSource>(OUTSIDE_SOURCE)
+      ?.setData(area ? outsideOf(area) : EMPTY);
   }, [map, styleLoaded, boundary]);
 
   useEffect(() => {
@@ -355,17 +352,14 @@ export function SpotMap({
               zIndex={1}
             />
           ))}
-          {highlighted.map((spot, i) => (
+          {highlighted.map((spot) => (
             <SpotMarker
               key={`highlighted-${spot.id}`}
               {...markerProps}
               map={map}
               spot={spot}
               size="lg"
-              label={numberHighlighted ? String(i + 1) : undefined}
-              // 番号付きのハイライト（おすすめ）は ink。経路の朱と見分ける
-              color={numberHighlighted ? INK_COLOR : undefined}
-              title={numberHighlighted ? `${i + 1}. ${spot.name}` : spot.name}
+              title={spot.name}
               zIndex={2}
             />
           ))}
@@ -511,8 +505,7 @@ function SpotMarker({
         "flex cursor-pointer items-center justify-center rounded-full border-2 border-white font-bold text-white shadow-md transition-transform hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink",
         size === "sm" && "text-[10px] opacity-70",
         size === "md" && "text-xs",
-        size === "lg" &&
-          "text-lg ring-4 ring-amber-300/70 motion-safe:animate-pulse",
+        size === "lg" && "text-lg",
       )}
     >
       {label ??
