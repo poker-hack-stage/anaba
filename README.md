@@ -73,7 +73,7 @@ app/                  ルーティング（ページ・Route Handler）
 components/           共通コンポーネント
   layout/             ヘッダー・タブ・下部ナビ・フッター（タブは nav-items.ts で管理）
   discover/           穴場を探す：地域の自動切り替え（地図＋情報パネル）
-  map/                地図（spot-map.tsx。Leaflet ＋ 地理院タイル。使う側は next/dynamic の ssr: false で読み込む）
+  map/                地図（spot-map.tsx。MapLibre ＋ OpenFreeMap。使う側は next/dynamic の ssr: false で読み込む）
   spots/              スポットカード・スポット詳細（両タブ共通）
   planner/            旅プランの条件フォーム・候補カード
   ui/                 shadcn/ui（`npx shadcn@latest add <name>` で追加。生成された `import { cn } from "cn"` は
@@ -154,20 +154,17 @@ Vitest + React Testing Library（`jsdom`）。設定は `vitest.config.mts`、�
 
 ## 地図タイル
 
-地図（`components/map/spot-map.tsx`）は [Leaflet](https://leafletjs.com/)（react-leaflet）で描き、背景に**国土地理院の地理院タイル（淡色地図）**を使っている。
+地図（`components/map/spot-map.tsx`）は [MapLibre GL JS](https://maplibre.org/)（ベクトル地図）で描き、背景に **[OpenFreeMap](https://openfreemap.org/) の Bright スタイル**を使っている。
 
-| 項目       | 内容                                                                                                                                                                                                                        |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| URL        | `https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png`（ズーム 5〜18、日本国内のみ）                                                                                                                                   |
-| 申請       | 不要。ウェブ上でタイルをその場で読み込んで表示する使い方は、出典を明示すれば申請なしで使える（[地理院タイル一覧](https://maps.gsi.go.jp/development/ichiran.html)）                                                         |
-| 本番・商用 | [国土地理院コンテンツ利用規約](https://www.gsi.go.jp/kikakuchousei/kikakuchousei40182.html)（公共データ利用規約 PDL1.0 準拠）に従い、出典を記載すれば商用でも使える。アクセス数の上限は書かれていない（2026-09 時点で確認） |
-| 帰属表示   | 「地理院タイル」と書き、地理院タイル一覧ページへリンクする。地図の右下に Leaflet の帰属表示として常に出している（消さない・隠さない）                                                                                       |
-| 控えること | 規約に明記はないが、国の無償サービスで SLA もないため、タイルの一括ダウンロードや事前の大量取得はしない                                                                                                                     |
+| 項目       | 内容                                                                                                                                                                                                 |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| スタイル   | `https://tiles.openfreemap.org/styles/bright`（地図のデータは OpenStreetMap。世界中を表示できる）                                                                                                    |
+| 申請・料金 | 不要。登録・API キー・cookie なし。公開インスタンスは表示回数・リクエスト数の上限なしで無料、商用利用も可（[公式サイト](https://openfreemap.org/)。2026-09 時点で確認）                              |
+| 利用規約   | [Terms of Service](https://openfreemap.org/tos/)。**サイトやアプリに組み込む人（開発者）は 18 歳以上**であること（地図を見るだけの利用者には年齢の条件はない）。保証なし・予告なく終了することがある |
+| 帰属表示   | 「OpenFreeMap © OpenMapTiles Data from OpenStreetMap」。スタイルに含まれていて、MapLibre が地図の右下に自動で出す（消さない・隠さない）。幅の狭い地図では、操作すると「i」ボタンにたたまれる         |
+| 控えること | SLA がなく寄付で運営されているため、タイルの一括ダウンロードや事前の大量取得はしない（規約でも許可なく自動で集めることを禁止している）。本番で利用者が増えるなら自前のタイルサーバーも検討する       |
 
-OpenStreetMap の標準タイル（`tile.openstreetmap.org`）に替える場合の注意:
-
-- 帰属表示「© OpenStreetMap contributors」を地図上に常に出す
-- [タイル利用ポリシー](https://operations.osmfoundation.org/policies/tiles/)で、大量のアクセスや一括ダウンロードは禁止。SLA はなく、使いすぎると予告なく遮断されることがある。本番で利用者が増えるなら、有料のタイル配信サービスか自前のタイルサーバーを使う
+MapLibre の Web Worker（`maplibre-gl-worker.mjs`）はバンドラーが出力に含めないので、`npm run dev` / `npm run build` の前に `scripts/copy-maplibre-worker.mjs` が `public/maplibre/` へ写す（コミットしない）。
 
 ## 注意
 

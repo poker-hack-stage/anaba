@@ -46,7 +46,7 @@
 
 Issue #3 の「決定済み」をそのまま引き継ぐ。
 
-- 技術スタック: Next.js 16（App Router）+ React 19 + TypeScript + Tailwind CSS + shadcn/ui + Supabase + Vercel。地図は Leaflet（#33）
+- 技術スタック: Next.js 16（App Router）+ React 19 + TypeScript + Tailwind CSS + shadcn/ui + Supabase + Vercel。地図は MapLibre GL JS ＋ OpenFreeMap（#33・#78）
 - デプロイ先: Vercel（Hobby）。設定は #4、本番は #25
 - LLM: Gemini API の無料枠（技術-1）。API キーはサーバー側の環境変数だけに置き、ブラウザに出さない
 - タブは2つ: 「穴場を探す」（`/`）と「AI旅プラン」（`/planner`）（`components/layout/nav-items.ts`）
