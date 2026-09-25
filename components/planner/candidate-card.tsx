@@ -8,7 +8,7 @@ import type { PlanCandidate } from "@/lib/planner/types";
 
 const MAP_CLASS_NAME = "h-56 rounded-none border-0 border-b";
 
-// Leaflet は window を使うので、サーバーでは描画しない
+// 地図（MapLibre）は window と WebGL を使うので、サーバーでは描画しない
 const SpotMap = dynamic(
   () => import("@/components/map/spot-map").then((m) => m.SpotMap),
   { ssr: false, loading: () => <SpotMapSkeleton className={MAP_CLASS_NAME} /> },
