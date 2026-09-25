@@ -62,9 +62,10 @@ export function SpotDetailDialog({
               <X className="h-5 w-5" />
             </DialogPrimitive.Close>
             <span
-              className={`absolute bottom-3 left-3 rounded-full border px-2.5 py-0.5 text-xs font-bold ${meta.badge}`}
+              className={`absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-bold ${meta.badge}`}
             >
-              {meta.emoji} {meta.label}
+              <meta.icon aria-hidden className="h-3.5 w-3.5 shrink-0" />
+              {meta.label}
             </span>
           </div>
 

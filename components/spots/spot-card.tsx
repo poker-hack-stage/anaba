@@ -28,9 +28,10 @@ export function SpotCard({
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex items-center gap-2">
           <span
-            className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${meta.badge}`}
+            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${meta.badge}`}
           >
-            {meta.emoji} {meta.label}
+            <meta.icon aria-hidden className="h-3 w-3 shrink-0" />
+            {meta.label}
           </span>
           {spot.rating !== null && (
             <span className="ml-auto flex items-center gap-0.5 text-xs font-bold text-amber-700">
