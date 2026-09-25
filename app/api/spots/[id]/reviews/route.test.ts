@@ -27,10 +27,18 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function post(body: unknown, id = SPOT_ID) {
+function post(
+  body: unknown,
+  id = SPOT_ID,
+  headers: Record<string, string> = {},
+) {
   const request = new NextRequest(`http://localhost/api/spots/${id}/reviews`, {
     method: "POST",
-    headers: { "content-type": "application/json", "x-forwarded-for": IP },
+    headers: {
+      "content-type": "application/json",
+      "x-forwarded-for": IP,
+      ...headers,
+    },
     body: typeof body === "string" ? body : JSON.stringify(body),
   });
   return POST(request, { params: Promise.resolve({ id }) });
@@ -105,6 +113,79 @@ describe("POST /api/spots/[id]/reviews", () => {
     expect(response.status).toBe(201);
     expect(await response.json()).toEqual(honest);
     expect(mock.insert).not.toHaveBeenCalled();
+  });
+
+  test("おとりの欄に文字列でない値が来ても、型のエラーを返さずに成功と同じ応答を返す", async () => {
+    const response = await post({ ...valid, website: 1 });
+    expect(response.status).toBe(201);
+    expect(mock.insert).not.toHaveBeenCalled();
+  });
+
+  test("自サイトからの JSON の POST は通る（Origin・Referer のホストが host と同じ）", async () => {
+    expect(
+      (await post(valid, SPOT_ID, { origin: "http://localhost" })).status,
+    ).toBe(201);
+    expect(
+      (
+        await post(valid, SPOT_ID, {
+          host: "anaba-git-feat-x.vercel.app",
+          origin: "https://anaba-git-feat-x.vercel.app",
+        })
+      ).status,
+    ).toBe(201);
+    expect(
+      (
+        await post(valid, SPOT_ID, {
+          referer: "http://localhost/spots/1",
+        })
+      ).status,
+    ).toBe(201);
+  });
+
+  test.each([
+    ["別のオリジン", { origin: "https://evil.example" }],
+    [
+      "Origin がなく Referer が別のオリジン",
+      { referer: "https://evil.example/a" },
+    ],
+    ["Origin: null", { origin: "null" }],
+    ["ホストが同じでポートが違う", { origin: "http://localhost:4000" }],
+  ])(
+    "%s からの POST は 403 で、数えず保存もしない（CSRF）",
+    async (_label, headers) => {
+      const response = await post(valid, SPOT_ID, headers);
+      expect(response.status).toBe(403);
+      expect((await response.json()).error).toBe("forbidden_origin");
+      expect(mock.rpc).not.toHaveBeenCalled();
+      expect(mock.insert).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each([
+    ["text/plain", "text/plain"],
+    ["フォーム", "application/x-www-form-urlencoded"],
+    ["multipart", "multipart/form-data; boundary=x"],
+  ])(
+    "Content-Type が %s の POST は 415 で、数えず保存もしない（CSRF）",
+    async (_label, contentType) => {
+      // <form enctype="text/plain"> で作れる本文（JSON としては正しい）
+      const response = await post(
+        '{"nickname":"csrf","rating":1,"website":"","body":"x=y"}',
+        SPOT_ID,
+        { "content-type": contentType },
+      );
+      expect(response.status).toBe(415);
+      expect((await response.json()).error).toBe("unsupported_media_type");
+      expect(mock.rpc).not.toHaveBeenCalled();
+      expect(mock.insert).not.toHaveBeenCalled();
+    },
+  );
+
+  test("Content-Type に charset が付いていても JSON なら通る", async () => {
+    const response = await post(valid, SPOT_ID, {
+      "content-type": "Application/JSON; charset=utf-8",
+    });
+    expect(response.status).toBe(201);
   });
 
   test.each([

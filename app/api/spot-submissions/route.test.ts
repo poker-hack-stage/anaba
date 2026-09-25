@@ -33,11 +33,15 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function post(body: unknown) {
+function post(body: unknown, headers: Record<string, string> = {}) {
   return POST(
     new Request("http://localhost/api/spot-submissions", {
       method: "POST",
-      headers: { "content-type": "application/json", "x-forwarded-for": IP },
+      headers: {
+        "content-type": "application/json",
+        "x-forwarded-for": IP,
+        ...headers,
+      },
       body: JSON.stringify(body),
     }),
   );
@@ -89,6 +93,18 @@ describe("POST /api/spot-submissions", () => {
       message: "公開しました",
     });
     expect(mock.rpc).not.toHaveBeenCalledWith("submit_spot", expect.anything());
+  });
+
+  test("別のオリジンからの POST は 403 で、数えず保存もしない（CSRF）", async () => {
+    const response = await post(valid, { origin: "https://evil.example" });
+    expect(response.status).toBe(403);
+    expect(mock.rpc).not.toHaveBeenCalled();
+  });
+
+  test("Content-Type が text/plain の POST は 415 で、数えず保存もしない（CSRF）", async () => {
+    const response = await post(valid, { "content-type": "text/plain" });
+    expect(response.status).toBe(415);
+    expect(mock.rpc).not.toHaveBeenCalled();
   });
 
   test.each([

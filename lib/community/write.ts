@@ -5,9 +5,11 @@ import type { createClient } from "@/lib/supabase/server";
 import { getClientIp, getRateLimitSalt, hashClient } from "./client-hash";
 import {
   CLOSED,
+  FORBIDDEN_ORIGIN,
   INVALID_REQUEST,
   RATE_LIMITED,
   REQUEST_TOO_LARGE,
+  UNSUPPORTED_MEDIA_TYPE,
   errorResponse,
   isUnexpected,
   toRateLimitApiError,
@@ -15,6 +17,7 @@ import {
   type DbError,
   type WriteKind,
 } from "./errors";
+import { isJsonContentType, isSameOrigin } from "./request-source";
 import { MAX_REQUEST_BYTES } from "./schema";
 
 // 口コミ・スポットの投稿の API（#52）で共通の、書き込む前の手順（本文の読み取りと検証・レート制限）
@@ -29,11 +32,20 @@ export const RATE_LIMITS = {
   submission: { windowSeconds: 60 * 60, max: 2 },
 } as const satisfies Record<WriteKind, unknown>;
 
-/** 本文を上限まで読み、JSON にしてスキーマで確かめる。だめなら 413・400 の応答を返す */
+/**
+ * 送り元と形式を確かめ（ほかのサイトからなら 403、JSON でなければ 415。CSRF の対策）、
+ * 本文を上限まで読み、JSON にしてスキーマで確かめる。だめなら 413・400 の応答を返す
+ */
 export async function parseBody<S extends z.ZodType>(
   request: Request,
   schema: S,
 ): Promise<Result<z.output<S>>> {
+  if (!isSameOrigin(request)) {
+    return { ok: false, response: errorResponse(FORBIDDEN_ORIGIN) };
+  }
+  if (!isJsonContentType(request.headers)) {
+    return { ok: false, response: errorResponse(UNSUPPORTED_MEDIA_TYPE) };
+  }
   const text = await readLimitedText(request, MAX_REQUEST_BYTES);
   if (text === null) {
     return { ok: false, response: errorResponse(REQUEST_TOO_LARGE) };

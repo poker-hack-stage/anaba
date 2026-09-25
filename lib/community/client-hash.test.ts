@@ -20,6 +20,7 @@ describe("getClientIp", () => {
     expect(getClientIp(new Headers({ "x-real-ip": "198.51.100.7" }))).toBe(
       "198.51.100.7",
     );
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(getClientIp(new Headers())).toBe("unknown");
   });
 });

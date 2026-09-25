@@ -26,6 +26,21 @@ export const REQUEST_TOO_LARGE: ApiError = {
   body: { error: "request_too_large", message: "送る内容が大きすぎます" },
 };
 
+/** ほかのサイトから送られたとき（CSRF の対策） */
+export const FORBIDDEN_ORIGIN: ApiError = {
+  status: 403,
+  body: { error: "forbidden_origin", message: "このページからは送れません" },
+};
+
+/** 本文が JSON（Content-Type: application/json）でないとき（CSRF の対策） */
+export const UNSUPPORTED_MEDIA_TYPE: ApiError = {
+  status: 415,
+  body: {
+    error: "unsupported_media_type",
+    message: "送る内容の形式が違います",
+  },
+};
+
 export const RATE_LIMITED: ApiError = {
   status: 429,
   body: {

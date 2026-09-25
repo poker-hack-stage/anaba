@@ -71,9 +71,10 @@ function text(label: string, max: number, { multiline = false } = {}) {
 
 /**
  * おとり（ハニーポット）の欄。画面には出さないので、人が送るときは空になる。
- * 値の中身は見ないが、極端に長いものは本文の上限で止まる
+ * 値の型も中身も検査しない（型のエラーを返すと、ボットに「この欄は見られている」と教えてしまうため）。
+ * 極端に長いものは本文の上限で止まる
  */
-const honeypot = z.string().optional();
+const honeypot = z.unknown().optional();
 
 const RATING_ERROR = "星は1〜5で選んでください";
 
@@ -121,7 +122,12 @@ export type SpotSubmissionInput = z.infer<typeof spotSubmissionInputSchema>;
 /** パスの id（スポットの id）。形の違う値を DB に送らない */
 export const spotIdSchema = z.guid();
 
-/** おとりの欄に値があるか（あればボットとみなし、保存せずに成功と同じ応答を返す） */
-export function isHoneypotFilled(input: { website?: string }): boolean {
-  return (input.website ?? "").trim() !== "";
+/**
+ * おとりの欄に値があるか（あればボットとみなし、保存せずに成功と同じ応答を返す）。
+ * ない・null・空白だけの文字列のときだけ空とみなし、数値などほかの型は入っているとみなす
+ */
+export function isHoneypotFilled(input: { website?: unknown }): boolean {
+  const { website } = input;
+  if (website === undefined || website === null) return false;
+  return typeof website !== "string" || website.trim() !== "";
 }

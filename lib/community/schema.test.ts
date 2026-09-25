@@ -118,9 +118,22 @@ describe("isHoneypotFilled", () => {
     expect(isHoneypotFilled({ website: "https://example.com" })).toBe(true);
   });
 
+  test("文字列でない値（数値・真偽値・オブジェクト）も入っているとみなす", () => {
+    expect(isHoneypotFilled({ website: 1 })).toBe(true);
+    expect(isHoneypotFilled({ website: false })).toBe(true);
+    expect(isHoneypotFilled({ website: {} })).toBe(true);
+  });
+
+  test("おとりの欄はどんな型でも検証で落とさない（ボットに気づかせない）", () => {
+    expect(reviewInputSchema.safeParse({ ...review, website: 1 }).success).toBe(
+      true,
+    );
+  });
+
   test("欄がない・空・空白だけなら false", () => {
     expect(isHoneypotFilled({})).toBe(false);
     expect(isHoneypotFilled({ website: "" })).toBe(false);
     expect(isHoneypotFilled({ website: "  " })).toBe(false);
+    expect(isHoneypotFilled({ website: null })).toBe(false);
   });
 });
