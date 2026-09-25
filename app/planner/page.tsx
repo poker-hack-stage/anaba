@@ -37,9 +37,18 @@ async function Planner() {
   return (
     <PlannerForm
       areas={areas.map(
-        ({ id, name, catchphrase, center_lat, center_lng, spots }) => ({
+        ({
           id,
           name,
+          prefecture,
+          catchphrase,
+          center_lat,
+          center_lng,
+          spots,
+        }) => ({
+          id,
+          name,
+          prefecture,
           catchphrase,
           center_lat,
           center_lng,
