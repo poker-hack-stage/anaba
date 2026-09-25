@@ -6,6 +6,7 @@ import { Clock, Lightbulb, Star, Timer, X } from "lucide-react";
 import { Dialog, DialogOverlay, DialogPortal } from "@/components/ui/dialog";
 import type { Spot } from "@/lib/data/spots";
 import { getCategory } from "@/lib/spots/categories";
+import { formatRating, getRating } from "@/lib/spots/score";
 import { SpotImage } from "./spot-image";
 
 /**
@@ -27,6 +28,7 @@ export function SpotDetailDialog({
 
   if (!shown) return null;
   const meta = getCategory(shown.category);
+  const rating = getRating(shown);
 
   return (
     <Dialog open={spot !== null} onOpenChange={(open) => !open && onClose()}>
@@ -75,10 +77,10 @@ export function SpotDetailDialog({
                 <DialogPrimitive.Title className="text-xl font-extrabold text-stone-900">
                   {shown.name}
                 </DialogPrimitive.Title>
-                {shown.rating !== null && (
+                {rating !== null && (
                   <span className="flex shrink-0 items-center gap-1 font-bold text-amber-700">
                     <Star className="h-4 w-4 fill-amber-500 text-amber-500" />
-                    {shown.rating}
+                    {formatRating(rating)}
                   </span>
                 )}
               </div>

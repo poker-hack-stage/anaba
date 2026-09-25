@@ -1,4 +1,5 @@
 import type { Spot } from "@/lib/data/spots";
+import { compareByRating } from "@/lib/spots/score";
 
 /** 情報パネルに並べるおすすめの件数 */
 export const RECOMMENDED_COUNT = 3;
@@ -16,7 +17,7 @@ export type RecommendableSpot = Pick<Spot, "name" | "category" | "rating">;
  *    カテゴリの種類が足りず `count` 件に届かないときは、残りを上の順で埋める
  * 4. スポットが `count` 件未満なら、ある分だけ返す
  *
- * TODO(#29): 穴場度の列ができたら、評価より前に穴場度の高い順で並べる
+ * TODO(#12): 評価より前に穴場度の高い順で並べる（`compareByHiddenGemScore`（`lib/spots/score.ts`）を使う）
  */
 export function pickRecommended<T extends RecommendableSpot>(
   spots: readonly T[],
@@ -42,7 +43,5 @@ export function pickRecommended<T extends RecommendableSpot>(
 }
 
 function compareSpots(a: RecommendableSpot, b: RecommendableSpot): number {
-  const byRating = (b.rating ?? -1) - (a.rating ?? -1);
-  if (byRating !== 0) return byRating;
-  return a.name.localeCompare(b.name, "ja");
+  return compareByRating(a, b) || a.name.localeCompare(b.name, "ja");
 }

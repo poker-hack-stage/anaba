@@ -1,4 +1,5 @@
 import { getCategory } from "@/lib/spots/categories";
+import { formatRating, getHiddenGemScore, getRating } from "@/lib/spots/score";
 import { DAY_COUNTS, DURATION_LABELS } from "./duration";
 import {
   MAX_CANDIDATES,
@@ -50,6 +51,7 @@ const SYSTEM_INSTRUCTION = `あなたは、日本各地の地元の人しか知�
 - 1つの候補の中で、同じスポットを2回使わない
 - 経路は、実際にめぐりやすい順（近いものから順に）に並べる
 - 興味のあることに合うスポットを優先し、だれと・移動手段にも合うように選ぶ（例: 家族（子連れ）なら子どもと楽しめる場所、自転車なら近い場所どうし）
+- 興味に合うスポットの中では、穴場度の高いスポットを優先する
 - title・summary・reason は日本語で書く。一覧の記号（A1・S1 など）は書かず、地域名・スポット名で書く
 - スポットの説明にないことを事実のように書かない`;
 
@@ -83,11 +85,14 @@ export function buildPlanPrompt(
     for (const spot of area.spots) {
       const key = `S${spotIdByKey.size + 1}`;
       spotIdByKey.set(key, spot.id);
+      const gem = getHiddenGemScore(spot);
+      const rating = getRating(spot);
       spotLines.push(
         [
           `${key} ${areaKey.get(area.id)} ${spot.name}`,
           getCategory(spot.category).label,
-          spot.rating !== null ? `評価${spot.rating}` : null,
+          gem !== null ? `穴場度${gem}` : null,
+          rating !== null ? `評価${formatRating(rating)}` : null,
           spot.stay_minutes !== null ? `滞在${spot.stay_minutes}分` : null,
           spot.tags.length > 0 ? `タグ: ${spot.tags.join("・")}` : null,
           spot.catchphrase,
@@ -147,6 +152,7 @@ ${
 ${areaLines.join("\n")}
 
 # スポット
+穴場度は1〜5で、大きいほど観光客に知られていない地元の穴場。評価は行った人の満足度（0〜5）。
 ${spotLines.join("\n")}`;
 
   return {
