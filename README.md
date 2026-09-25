@@ -115,13 +115,37 @@ npm run db:types                  # 型を再生成してコミット
 
 他の人のマイグレーションを pull したら `npm run db:reset` で取り込む。
 
-本番 DB への反映（担当者のみ）:
+### 本番の Supabase（担当者のみ）
+
+本番（と Vercel の Preview）は、クラウドの Supabase プロジェクト1つを使う。開発はローカルの Supabase で行う。
+
+| 項目         | 内容                                                                         |
+| ------------ | ---------------------------------------------------------------------------- |
+| 持ち主       | hayato-psg（Organization の Owner）                                          |
+| メンバー     | GitHub の poker-hack-stage Organization のメンバー全員                       |
+| プロジェクト | HACK-STAGE（ref: `keiqxofwbvvreowgihjx`、リージョン: 東京 `ap-northeast-1`） |
+| プラン       | Free。自動バックアップはなく、1週間アクセスがないと一時停止する              |
+
+バックアップがないので、`supabase/migrations/` と `supabase/seed.sql` からいつでも作り直せるようにしておく。本番のテーブルやデータを Studio で直接変えない。
+
+最初に一度だけ:
 
 ```bash
 npx supabase login
-npx supabase link --project-ref <project-ref>
-npx supabase db push
+npx supabase link --project-ref keiqxofwbvvreowgihjx   # DB のパスワードを聞かれる
 ```
+
+| 場面                                | やること                                                    |
+| ----------------------------------- | ----------------------------------------------------------- |
+| 空のプロジェクトに作る・作り直す    | `npx supabase db push --include-seed`                       |
+| マイグレーションが増えた            | `npx supabase db push`                                      |
+| `seed.sql` のデータを足した・直した | `seed.sql` の中身をダッシュボードの SQL Editor に貼って Run |
+| `seed.sql` から行を消した           | 本番でも SQL Editor で `delete` を流す                      |
+
+- `db push` の前に `--dry-run` を付けて、何が流れるかを確かめる
+- `--include-seed` はシードを初回しか流さない（2回目以降は記録を更新するだけ）。なので、データの更新は SQL Editor で流す
+- 一時停止したら、ダッシュボードでプロジェクトを開いて Restore する
+- アプリで使うのは Project URL と Publishable key だけ（Vercel の環境変数に入れる。#4）。Secret key（service_role）は使わず、リポジトリにも `NEXT_PUBLIC_` の環境変数にも入れない
 
 ### テストを書くとき
 

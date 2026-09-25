@@ -1,5 +1,11 @@
--- `npm run db:reset` 時にローカル DB へ投入される開発用データ。
--- 本番には反映されない。ここに書いたデータはチーム全員のローカル環境で共有される。
+-- 地域とスポットの初期データ。ローカルでも本番でも、このファイルを正とする。
+-- ここに書いたデータはチーム全員のローカル環境と本番で共有される。
+-- - ローカル: `npm run db:reset` で流れる。
+-- - 本番: 空のプロジェクトに作るときは `npx supabase db push --include-seed`。
+--   `--include-seed` は初回しか流さないので、データを足した・直したときは
+--   このファイルの中身を SQL Editor に貼って Run する（README「本番の Supabase」）。
+-- - 何度流しても壊れないよう、insert には必ず `on conflict (id) do update` を付ける。
+--   行を消しても本番からは消えないので、消すときは本番でも delete を流す。
 -- 地域は #11、スポットは #30（北アルプス山麓）・#58（全国）で作る。
 
 -- ============================================================
@@ -55,4 +61,13 @@ values
    34.791592, 133.616699, 11, null, 11),
   ('10000000-0000-4000-8000-000000000012', '竹田市', '大分県',
    '岡城跡と炭酸泉、湧き水の城下町',
-   32.975739, 131.396973, 11, null, 12);
+   32.975739, 131.396973, 11, null, 12)
+on conflict (id) do update set
+  name = excluded.name,
+  prefecture = excluded.prefecture,
+  catchphrase = excluded.catchphrase,
+  center_lat = excluded.center_lat,
+  center_lng = excluded.center_lng,
+  zoom = excluded.zoom,
+  image_path = excluded.image_path,
+  display_order = excluded.display_order;
