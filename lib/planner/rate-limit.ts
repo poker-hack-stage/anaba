@@ -10,12 +10,16 @@ import type { createClient } from "@/lib/supabase/server";
 // 回数は DB の check_rate_limit()（#51、キーの種類は plan）で数える。Vercel の関数は複数のインスタンスで動くので、
 // メモリの中では数えられない。
 // 全員の合計の上限は持たない。無料枠（1分15回・1日500回）を超えると Gemini が 429 を返し、
-// それでもデモモードに切り替わる（lib/ai/gemini.ts の rate_limited）ので、1人が無料枠を使い切らないようにすれば足りる
+// それでもデモモードに切り替わる（lib/ai/gemini.ts の rate_limited）ので、ここでは1つの送信元が押し続けるのを抑えるだけにする
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
-/** 同じ送信元（IP）から Gemini を使える回数 */
-export const PLAN_RATE_LIMIT = { windowSeconds: 10 * 60, max: 10 } as const;
+/**
+ * 同じ送信元（IP）から Gemini を使える回数。発表の会場（20人前後）が同じ Wi-Fi（同じ IP）で試しても
+ * 足りるよう、多めにしている。1つの IP だけで1日の無料枠を1時間ほどで使い切れる緩さだが、
+ * 使い切られてもお金はかからず、その日の残りがデモモードになるだけなので、会場で使えることを優先した
+ */
+export const PLAN_RATE_LIMIT = { windowSeconds: 10 * 60, max: 100 } as const;
 
 /**
  * この依頼で Gemini を呼んでよいか。
