@@ -19,7 +19,7 @@ export function SpotCard({
     <button
       type="button"
       onClick={() => onSelect?.(spot)}
-      className="flex w-full gap-3 overflow-hidden rounded-2xl border border-stone-200 bg-white p-3 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg"
+      className="flex w-full gap-3 overflow-hidden rounded-2xl border border-stone-200 bg-white p-3 text-left transition-colors hover:border-stone-300 hover:bg-stone-50"
     >
       <SpotImage
         category={spot.category}
