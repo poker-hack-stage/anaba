@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/lib/supabase/database.types";
+import { pickRecommended } from "@/lib/spots/recommend";
 import type { Spot } from "./spots";
 
 export type Area = Tables<"areas">;
@@ -18,7 +19,7 @@ export async function getAreas(): Promise<Area[]> {
     .select("*")
     .order("display_order", { ascending: true });
 
-  if (error) throw error;
+  if (error) throw new Error("地域を読み込めませんでした", { cause: error });
   return data;
 }
 
@@ -30,19 +31,13 @@ export async function getAreasWithSpots(): Promise<AreaWithSpots[]> {
     .select("*, spots (*)")
     .order("display_order", { ascending: true });
 
-  if (error) throw error;
+  // Supabase のエラーはただのオブジェクトなので、Error に包んで投げる（ログにメッセージとスタックが出るように。
+  // 画面の表示は app/error.tsx）
+  if (error) {
+    throw new Error("地域とスポットを読み込めませんでした", { cause: error });
+  }
   return data.map((area) => ({
     ...area,
     recommended: pickRecommended(area.spots),
   }));
-}
-
-/**
- * おすすめ3件を選ぶ。
- * TODO(#14): 今は評価の高い順に3件。選び方を決めたらここを差し替える
- */
-function pickRecommended(spots: Spot[], count = 3): Spot[] {
-  return [...spots]
-    .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
-    .slice(0, count);
 }

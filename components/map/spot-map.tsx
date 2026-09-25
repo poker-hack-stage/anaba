@@ -1,9 +1,36 @@
 "use client";
 
-import { Map } from "lucide-react";
+import "maplibre-gl/dist/maplibre-gl.css";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import {
+  Map as MapLibreMap,
+  Marker,
+  NavigationControl,
+  setWorkerUrl,
+  type GeoJSONSource,
+} from "maplibre-gl";
+import type {
+  Feature,
+  FeatureCollection,
+  GeoJSON,
+  GeoJsonObject,
+} from "geojson";
+import { Map, MapPin } from "lucide-react";
 import type { Spot } from "@/lib/data/spots";
+import { computeBounds } from "@/lib/map/bounds";
 import { getCategory } from "@/lib/spots/categories";
 import { cn } from "@/lib/utils";
+
+/*
+  MapLibre は WebGL と window を使うため、このファイルはサーバーで描画できない。
+  使う側では必ず next/dynamic の ssr: false で読み込む（読み込み中は spot-map-skeleton.tsx）。
+
+  const SpotMap = dynamic(
+    () => import("@/components/map/spot-map").then((m) => m.SpotMap),
+    { ssr: false, loading: () => <SpotMapSkeleton className="h-56" /> },
+  );
+*/
 
 export type SpotMapProps = {
   /** ハイライトするスポット（おすすめ3件など）。大きく強調して表示 */
@@ -14,45 +41,293 @@ export type SpotMapProps = {
   others?: Spot[];
   /** ハイライトする地域名（地図の左上に出す） */
   areaName?: string;
+  /**
+   * 地域の境界（GeoJSON）。塗りつぶして表示し、表示範囲にも含める。
+   * 参照が変わるたびに描き直すので、毎回新しいオブジェクトを作って渡さない（areas.boundary をそのまま渡す）
+   */
+  boundary?: GeoJsonObject | null;
   onSpotClick?: (spot: Spot) => void;
+  /** ピンにマウスが乗ったらそのスポット、離れたら null を渡す */
+  onSpotHover?: (spot: Spot | null) => void;
+  /** スポットも境界もないときに「地図」のプレースホルダーを出すか（既定は出す） */
+  emptyPlaceholder?: boolean;
   className?: string;
 };
 
 /**
- * スポットを載せる地図。
- * TODO(#8, #16, #22): Leaflet（react-leaflet）＋ OpenStreetMap に差し替える。
- *   今は緯度経度を枠内に並べただけの簡易表示。props はそのまま使えるようにしてある。
- *   地域の境界（areas.boundary）のハイライトもここで行う。
+ * 地図のスタイル。OpenFreeMap の Bright（ベクトル地図。無料・API キー不要）。
+ * 利用条件と帰属表示は README の「地図タイル」を参照。帰属表示はスタイルに含まれ、地図の右下に出る
  */
+const STYLE_URL = "https://tiles.openfreemap.org/styles/bright";
+/**
+ * ズームは MapLibre の値（512px のタイルが基準）。Leaflet（256px 基準）の値より 1 小さくすると同じ縮尺になる
+ */
+const MIN_ZOOM = 4;
+const MAX_ZOOM = 17;
+
+/** スポットがないときに見せる範囲（日本全体）。[経度, 緯度] */
+const JAPAN_CENTER: [number, number] = [138, 36.5];
+const JAPAN_ZOOM = 4;
+/** スポットが1件だけのときのズーム */
+const SINGLE_SPOT_ZOOM = 14;
+
+/** 表示範囲の余白。右は＋−ボタン、下は帰属表示の分を広めに取る */
+const FIT_PADDING = { top: 40, right: 56, bottom: 64, left: 40 };
+
+const ROUTE_COLOR = "#c0432b";
+const BOUNDARY_COLOR = "#24463d"; // ink
+
+const ROUTE_SOURCE = "spot-route";
+const BOUNDARY_SOURCE = "area-boundary";
+const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
+
+/**
+ * 幅の狭い地図では帰属表示が最初は全文で出て、地図の下を覆う。MapLibre がたたむのは地図を動かしたときだけで、
+ * スマホでは1本指のスクロールが地図の操作にならず、ずっと出たままになる。読み込みの後この時間が経ったら「i」ボタンにたたむ
+ */
+const ATTRIBUTION_COLLAPSE_MS = 4000;
+
+/**
+ * MapLibre の Web Worker。バンドラーが出力に含めないので、scripts/copy-maplibre-worker.mjs が
+ * npm install のあと（と npm run dev / build の前）に public/maplibre/ へ写したものを使う。地図を作る前に1回だけ設定する
+ */
+setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
+
+/** 地図の操作の案内（cooperativeGestures で出る）とボタンの読み上げを日本語にする */
+const LOCALE = {
+  "CooperativeGesturesHandler.WindowsHelpText":
+    "Ctrl キーを押しながらスクロールで拡大・縮小",
+  "CooperativeGesturesHandler.MacHelpText":
+    "⌘ キーを押しながらスクロールで拡大・縮小",
+  "CooperativeGesturesHandler.MobileHelpText": "2本指で地図を動かせます",
+  "Map.Title": "地図",
+  "NavigationControl.ZoomIn": "拡大",
+  "NavigationControl.ZoomOut": "縮小",
+};
+
+/** スポットを載せる地図（MapLibre ＋ OpenFreeMap） */
 export function SpotMap({
   highlighted = [],
   route = [],
   others = [],
   areaName,
+  boundary,
   onSpotClick,
+  onSpotHover,
+  emptyPlaceholder = true,
   className,
 }: SpotMapProps) {
-  const all = [...highlighted, ...route, ...others];
-  const project = createProjection(all);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [map, setMap] = useState<MapLibreMap | null>(null);
+  // 線や塗りつぶし（source / layer）はスタイルを読み込んでからでないと足せない
+  const [styleLoaded, setStyleLoaded] = useState(false);
+  // スタイルを読めなかった（OpenFreeMap が落ちている、オフラインなど）。背景は描けないが、ピンは使える
+  const [styleFailed, setStyleFailed] = useState(false);
+
+  // 地図は effect の中で作り、後始末で消す。cacheComponents で前のページが <Activity> に隠れると
+  // 後始末が走り、表示に戻ると作り直すので、壊れた地図を再利用しない
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const instance = new MapLibreMap({
+      container,
+      style: STYLE_URL,
+      center: JAPAN_CENTER,
+      zoom: JAPAN_ZOOM,
+      minZoom: MIN_ZOOM,
+      maxZoom: MAX_ZOOM,
+      // 1ページに地図が複数並ぶので、ページのスクロールを奪わない。
+      // ホイールは Ctrl / ⌘ を押したときだけズーム、タッチ端末では1本指でページをスクロールし2本指で地図を動かす
+      cooperativeGestures: true,
+      // 回転・傾きは使わない（北が上のまま）
+      dragRotate: false,
+      pitchWithRotate: false,
+      touchPitch: false,
+      locale: LOCALE,
+    });
+    instance.touchZoomRotate.disableRotation();
+    instance.keyboard.disableRotation();
+    // 地域名のバッジと重ならないよう右上に置く
+    instance.addControl(
+      new NavigationControl({ showCompass: false }),
+      "top-right",
+    );
+    let loaded = false;
+    let collapseTimer: ReturnType<typeof setTimeout> | undefined;
+    instance.once("load", () => {
+      loaded = true;
+      setStyleLoaded(true);
+      collapseTimer = setTimeout(() => {
+        // MapLibre がたたむ対象にしなかった地図（maplibregl-compact なし。幅 640px 超え）は全文のまま
+        container
+          .querySelector(".maplibregl-ctrl-attrib.maplibregl-compact")
+          ?.classList.remove("maplibregl-compact-show");
+      }, ATTRIBUTION_COLLAPSE_MS);
+    });
+    // setData に渡した GeoJSON の読み込みやタイルの取得の失敗は、ここに後から届く
+    instance.on("error", (event) => {
+      console.error("地図でエラーが起きました", event.error);
+      // 読み込みの前で、どのソースにも属さないエラーはスタイルそのものの読み込みの失敗
+      if (!loaded && !("sourceId" in event)) setStyleFailed(true);
+    });
+    setMap(instance);
+    return () => {
+      clearTimeout(collapseTimer);
+      instance.remove();
+      setMap(null);
+      setStyleLoaded(false);
+      setStyleFailed(false);
+    };
+  }, []);
+
+  // 配列は毎回作り直されるので、中身が変わったときだけ描き直す
+  const points = [...highlighted, ...route, ...others].map(
+    (s): [number, number] => [s.lng, s.lat],
+  );
+  const pointsKey = points.map((p) => p.join(",")).join(";");
+  const routeKey = route.map((s) => `${s.lng},${s.lat}`).join(";");
+
+  // 表示範囲を合わせる
+  useEffect(() => {
+    if (!map) return;
+    const box = computeBounds(points, boundary);
+    const boundaryBox = boundary ? computeBounds([], boundary) : null;
+    if (!box) {
+      map.jumpTo({ center: JAPAN_CENTER, zoom: JAPAN_ZOOM });
+    } else if (points.length === 1 && !boundaryBox) {
+      map.jumpTo({ center: points[0], zoom: SINGLE_SPOT_ZOOM });
+    } else {
+      map.fitBounds(box, { padding: FIT_PADDING, maxZoom: 15, animate: false });
+    }
+    // points は pointsKey で比較する
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, pointsKey, boundary]);
+
+  // 境界の塗りつぶしと経路の線を置く場所を用意する
+  useEffect(() => {
+    if (!map || !styleLoaded) return;
+    // 境界は地名の文字より下に敷く
+    const firstLabel = map
+      .getStyle()
+      .layers.find((layer) => layer.type === "symbol")?.id;
+    map.addSource(BOUNDARY_SOURCE, { type: "geojson", data: EMPTY });
+    map.addLayer(
+      {
+        id: `${BOUNDARY_SOURCE}-fill`,
+        type: "fill",
+        source: BOUNDARY_SOURCE,
+        paint: { "fill-color": BOUNDARY_COLOR, "fill-opacity": 0.08 },
+      },
+      firstLabel,
+    );
+    map.addLayer(
+      {
+        id: `${BOUNDARY_SOURCE}-line`,
+        type: "line",
+        source: BOUNDARY_SOURCE,
+        paint: { "line-color": BOUNDARY_COLOR, "line-width": 2 },
+      },
+      firstLabel,
+    );
+    map.addSource(ROUTE_SOURCE, { type: "geojson", data: EMPTY });
+    map.addLayer({
+      id: `${ROUTE_SOURCE}-line`,
+      type: "line",
+      source: ROUTE_SOURCE,
+      layout: { "line-cap": "round", "line-join": "round" },
+      // 破線の長さは線の太さの倍数（8px と 6px の間隔）
+      paint: {
+        "line-color": ROUTE_COLOR,
+        "line-width": 3,
+        "line-dasharray": [8 / 3, 6 / 3],
+      },
+    });
+  }, [map, styleLoaded]);
+
+  useEffect(() => {
+    if (!map || !styleLoaded) return;
+    // DB の値から座標が1つも取れなければ渡さない（読めない GeoJSON で地図ごと落とさない）。
+    // setData は読み込みをワーカーで後から行うので、そこでの失敗は try/catch ではなく error イベントに届く
+    const data =
+      boundary && computeBounds([], boundary) ? (boundary as GeoJSON) : EMPTY;
+    map.getSource<GeoJSONSource>(BOUNDARY_SOURCE)?.setData(data);
+  }, [map, styleLoaded, boundary]);
+
+  useEffect(() => {
+    if (!map || !styleLoaded) return;
+    const line: Feature | null =
+      route.length > 1
+        ? {
+            type: "Feature",
+            properties: {},
+            geometry: {
+              type: "LineString",
+              coordinates: route.map((s) => [s.lng, s.lat]),
+            },
+          }
+        : null;
+    map.getSource<GeoJSONSource>(ROUTE_SOURCE)?.setData(line ?? EMPTY);
+    // route は routeKey で比較する
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, styleLoaded, routeKey]);
+
+  const markerProps = { onSpotClick, onSpotHover };
 
   return (
+    // isolate: 地図の中の z-index がヘッダーやダイアログより前に出ないようにする。
+    // ＋−ボタンと帰属表示はピンより前に出す（ピンに隠れて読めなくならないように）
     <div
       className={cn(
-        "relative overflow-hidden rounded-2xl border border-stone-200 bg-emerald-50/60",
+        "relative isolate overflow-hidden rounded-2xl border border-stone-200 bg-emerald-50/60 [&_.maplibregl-control-container>div]:z-[5]",
         className,
       )}
     >
-      <div
-        className="absolute inset-0 opacity-60"
-        style={{
-          backgroundImage:
-            "linear-gradient(to right, #d6d3d1 1px, transparent 1px), linear-gradient(to bottom, #d6d3d1 1px, transparent 1px)",
-          backgroundSize: "40px 40px",
-        }}
-      />
+      {/* MapLibre が地図の要素に position: relative を付けるので、外側の枠で大きさを決める */}
+      <div className="absolute inset-0">
+        <div ref={containerRef} className="h-full w-full" />
+      </div>
 
-      {all.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center">
+      {map && (
+        <>
+          {others.map((spot) => (
+            <SpotMarker
+              key={`other-${spot.id}`}
+              {...markerProps}
+              map={map}
+              spot={spot}
+              size="sm"
+              title={spot.name}
+              zIndex={1}
+            />
+          ))}
+          {highlighted.map((spot) => (
+            <SpotMarker
+              key={`highlighted-${spot.id}`}
+              {...markerProps}
+              map={map}
+              spot={spot}
+              size="lg"
+              title={spot.name}
+              zIndex={2}
+            />
+          ))}
+          {route.map((spot, i) => (
+            <SpotMarker
+              key={`route-${spot.id}`}
+              {...markerProps}
+              map={map}
+              spot={spot}
+              size="md"
+              label={String(i + 1)}
+              title={`${i + 1}. ${spot.name}`}
+              zIndex={3}
+            />
+          ))}
+        </>
+      )}
+
+      {emptyPlaceholder && points.length === 0 && !boundary && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
           <div className="flex flex-col items-center gap-2 rounded-2xl bg-white/80 px-5 py-4 text-stone-500 shadow-sm backdrop-blur-sm">
             <Map className="h-6 w-6" />
             <span className="text-xs font-semibold">地図</span>
@@ -60,121 +335,98 @@ export function SpotMap({
         </div>
       )}
 
+      {styleFailed && (
+        <p
+          role="status"
+          // 表示範囲の余白で下はピンが少ない。右下の帰属表示（読めないときは「MapLibre」だけ）の左に出す
+          className="pointer-events-none absolute bottom-3 left-3 right-32 z-10 w-fit rounded-2xl bg-white/90 px-3 py-1 text-xs text-stone-600 shadow-sm"
+        >
+          地図を読み込めませんでした
+        </p>
+      )}
+
       {areaName && (
-        <span className="absolute left-3 top-3 z-10 rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-ink shadow-sm">
-          📍 {areaName}
+        <span className="pointer-events-none absolute left-3 top-3 z-10 inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-ink shadow-sm">
+          <MapPin aria-hidden className="h-3.5 w-3.5" />
+          {areaName}
         </span>
       )}
-
-      {route.length > 1 && (
-        <svg
-          className="absolute inset-0 h-full w-full"
-          viewBox="0 0 100 100"
-          preserveAspectRatio="none"
-        >
-          <polyline
-            points={route
-              .map((s) => project(s))
-              .map(({ x, y }) => `${x},${y}`)
-              .join(" ")}
-            fill="none"
-            stroke="#c0432b"
-            strokeWidth="3"
-            strokeDasharray="8 6"
-            strokeLinecap="round"
-            vectorEffect="non-scaling-stroke"
-          />
-        </svg>
-      )}
-
-      {others.map((spot) => (
-        <Pin
-          key={spot.id}
-          spot={spot}
-          position={project(spot)}
-          onClick={onSpotClick}
-          size="sm"
-        />
-      ))}
-      {highlighted.map((spot) => (
-        <Pin
-          key={spot.id}
-          spot={spot}
-          position={project(spot)}
-          onClick={onSpotClick}
-          size="lg"
-        />
-      ))}
-      {route.map((spot, i) => (
-        <Pin
-          key={spot.id}
-          spot={spot}
-          position={project(spot)}
-          onClick={onSpotClick}
-          size="md"
-          label={String(i + 1)}
-        />
-      ))}
     </div>
   );
 }
 
-function Pin({
+const PIN_SIZE = { sm: 20, md: 28, lg: 40 } as const;
+
+/**
+ * スポットのピン。MapLibre の Marker に渡した要素へ、React で button を描く。
+ * button なので Tab で選べて Enter / Space で開ける。フォーカスはマウスオーバーと同じ扱いにする
+ */
+function SpotMarker({
+  map,
   spot,
-  position,
-  onClick,
   size,
   label,
+  title,
+  zIndex,
+  onSpotClick,
+  onSpotHover,
 }: {
+  map: MapLibreMap;
   spot: Spot;
-  position: { x: number; y: number };
-  onClick?: (spot: Spot) => void;
-  size: "sm" | "md" | "lg";
+  size: keyof typeof PIN_SIZE;
+  /** 経路の番号。あればアイコンの代わりに出す */
   label?: string;
+  title: string;
+  /** 重なり順。経路 > ハイライト > そのほか */
+  zIndex: number;
+  onSpotClick?: (spot: Spot) => void;
+  onSpotHover?: (spot: Spot | null) => void;
 }) {
-  const meta = getCategory(spot.category);
+  const [element] = useState(() => {
+    const el = document.createElement("div");
+    el.style.zIndex = String(zIndex);
+    return el;
+  });
 
-  return (
+  useEffect(() => {
+    const marker = new Marker({ element, anchor: "center" })
+      .setLngLat([spot.lng, spot.lat])
+      .addTo(map);
+    return () => {
+      marker.remove();
+    };
+  }, [map, element, spot.lng, spot.lat]);
+
+  const meta = getCategory(spot.category);
+  const px = PIN_SIZE[size];
+  const Icon = meta.icon;
+
+  return createPortal(
     <button
       type="button"
-      title={spot.name}
-      onClick={() => onClick?.(spot)}
-      className={cn(
-        "absolute z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white font-bold text-white shadow-md transition-transform hover:scale-110",
-        size === "sm" && "h-5 w-5 text-[10px] opacity-70",
-        size === "md" && "h-7 w-7 text-xs",
-        size === "lg" &&
-          "h-10 w-10 text-lg ring-4 ring-amber-300/70 motion-safe:animate-pulse",
-      )}
+      title={title}
+      aria-label={title}
+      onClick={() => onSpotClick?.(spot)}
+      onMouseEnter={() => onSpotHover?.(spot)}
+      onMouseLeave={() => onSpotHover?.(null)}
+      onFocus={() => onSpotHover?.(spot)}
+      onBlur={() => onSpotHover?.(null)}
       style={{
-        left: `${position.x}%`,
-        top: `${position.y}%`,
-        background: label ? "#c0432b" : meta.color,
+        width: px,
+        height: px,
+        background: label ? ROUTE_COLOR : meta.color,
       }}
+      className={cn(
+        "flex cursor-pointer items-center justify-center rounded-full border-2 border-white font-bold text-white shadow-md transition-transform hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink",
+        size === "sm" && "text-[10px] opacity-70",
+        size === "md" && "text-xs",
+        size === "lg" &&
+          "text-lg ring-4 ring-amber-300/70 motion-safe:animate-pulse",
+      )}
     >
-      {label ?? (size === "sm" ? "" : meta.emoji)}
-    </button>
+      {label ??
+        (size !== "sm" && <Icon aria-hidden className="h-[1.1em] w-[1.1em]" />)}
+    </button>,
+    element,
   );
-}
-
-/** 緯度経度を、枠内の位置（%）に変換する関数を作る */
-function createProjection(spots: Spot[]) {
-  const PADDING = 12;
-  const lats = spots.map((s) => s.lat);
-  const lngs = spots.map((s) => s.lng);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
-
-  const scale = (value: number, min: number, max: number) =>
-    max === min
-      ? 50
-      : PADDING + ((value - min) / (max - min)) * (100 - PADDING * 2);
-
-  return (spot: Spot) => ({
-    x: scale(spot.lng, minLng, maxLng),
-    // 緯度は北が上なので反転する
-    y: 100 - scale(spot.lat, minLat, maxLat),
-  });
 }

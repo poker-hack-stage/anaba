@@ -79,29 +79,105 @@ export type Database = {
         }
         Relationships: []
       }
-      profiles: {
+      ng_words: {
         Row: {
-          avatar_url: string | null
           created_at: string
-          display_name: string | null
-          id: string
-          updated_at: string
+          word: string
         }
         Insert: {
-          avatar_url?: string | null
           created_at?: string
-          display_name?: string | null
-          id: string
-          updated_at?: string
+          word: string
         }
         Update: {
-          avatar_url?: string | null
           created_at?: string
-          display_name?: string | null
-          id?: string
-          updated_at?: string
+          word?: string
         }
         Relationships: []
+      }
+      rate_limits: {
+        Row: {
+          count: number
+          key: string
+          window_start: string
+        }
+        Insert: {
+          count?: number
+          key: string
+          window_start: string
+        }
+        Update: {
+          count?: number
+          key?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
+      reviews: {
+        Row: {
+          body: string
+          client_hash: string | null
+          created_at: string
+          id: string
+          nickname: string
+          rating: number
+          spot_id: string
+          status: string
+        }
+        Insert: {
+          body: string
+          client_hash?: string | null
+          created_at?: string
+          id?: string
+          nickname: string
+          rating: number
+          spot_id: string
+          status?: string
+        }
+        Update: {
+          body?: string
+          client_hash?: string | null
+          created_at?: string
+          id?: string
+          nickname?: string
+          rating?: number
+          spot_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_spot_id_fkey"
+            columns: ["spot_id"]
+            isOneToOne: false
+            referencedRelation: "spots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      spot_client_hashes: {
+        Row: {
+          client_hash: string
+          created_at: string
+          spot_id: string
+        }
+        Insert: {
+          client_hash: string
+          created_at?: string
+          spot_id: string
+        }
+        Update: {
+          client_hash?: string
+          created_at?: string
+          spot_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spot_client_hashes_spot_id_fkey"
+            columns: ["spot_id"]
+            isOneToOne: true
+            referencedRelation: "spots"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       spots: {
         Row: {
@@ -111,13 +187,17 @@ export type Database = {
           category: string
           created_at: string
           description: string | null
+          hidden_gem_score: number | null
           id: string
           image_path: string | null
           lat: number
           lng: number
           local_tip: string | null
           name: string
+          nickname: string | null
           rating: number | null
+          source: string
+          status: string
           stay_minutes: number | null
           tags: string[]
           updated_at: string
@@ -129,13 +209,17 @@ export type Database = {
           category: string
           created_at?: string
           description?: string | null
+          hidden_gem_score?: number | null
           id?: string
           image_path?: string | null
           lat: number
           lng: number
           local_tip?: string | null
           name: string
+          nickname?: string | null
           rating?: number | null
+          source?: string
+          status?: string
           stay_minutes?: number | null
           tags?: string[]
           updated_at?: string
@@ -147,13 +231,17 @@ export type Database = {
           category?: string
           created_at?: string
           description?: string | null
+          hidden_gem_score?: number | null
           id?: string
           image_path?: string | null
           lat?: number
           lng?: number
           local_tip?: string | null
           name?: string
+          nickname?: string | null
           rating?: number | null
+          source?: string
+          status?: string
           stay_minutes?: number | null
           tags?: string[]
           updated_at?: string
@@ -170,10 +258,71 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      published_reviews: {
+        Row: {
+          body: string | null
+          created_at: string | null
+          id: string | null
+          nickname: string | null
+          rating: number | null
+          spot_id: string | null
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string | null
+          id?: string | null
+          nickname?: string | null
+          rating?: number | null
+          spot_id?: string | null
+        }
+        Update: {
+          body?: string | null
+          created_at?: string | null
+          id?: string | null
+          nickname?: string | null
+          rating?: number | null
+          spot_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_spot_id_fkey"
+            columns: ["spot_id"]
+            isOneToOne: false
+            referencedRelation: "spots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
-      [_ in never]: never
+      assert_no_bidi_control: { Args: { p_text: string }; Returns: undefined }
+      assert_postable_text: { Args: { p_text: string }; Returns: undefined }
+      assert_visible_text: {
+        Args: { p_allow_newline: boolean; p_text: string }
+        Returns: undefined
+      }
+      check_rate_limit: {
+        Args: { p_key: string; p_max: number; p_window_seconds: number }
+        Returns: boolean
+      }
+      geojson_contains_point: {
+        Args: { p_geojson: Json; p_lat: number; p_lng: number }
+        Returns: boolean
+      }
+      normalize_for_moderation: { Args: { p_text: string }; Returns: string }
+      submit_spot: {
+        Args: {
+          p_area_id: string
+          p_category: string
+          p_client_hash?: string
+          p_description: string
+          p_lat: number
+          p_lng: number
+          p_name: string
+          p_nickname: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
