@@ -1,6 +1,7 @@
 import type { Area } from "@/lib/data/areas";
 import type { Spot } from "@/lib/data/spots";
 import type { SpotCategory } from "@/lib/spots/categories";
+import { compareByRating } from "@/lib/spots/score";
 import { calcDayMinutes, DAY_COUNTS, DURATION_LABELS } from "./duration";
 import { findNearbyAreas } from "./nearby";
 import type { PlanCandidate, PlanDay, PlanConditions } from "./types";
@@ -145,7 +146,7 @@ function buildCandidate(
 
 /**
  * 経路に入れる順。興味に合うカテゴリ → 評価の高い順 → 名前の順（DB から返る順に左右されないように）。
- * TODO(#29): 穴場度の列ができたら、興味の次に穴場度の高い順で並べる（docs/spec.md の #19）
+ * TODO(#19): 興味の次に穴場度の高い順で並べる（`compareByHiddenGemScore`（`lib/spots/score.ts`）を使う。docs/spec.md の #19）
  */
 function compareForRoute(
   a: Spot,
@@ -155,7 +156,7 @@ function compareForRoute(
   return (
     Number(wanted.has(b.category as SpotCategory)) -
       Number(wanted.has(a.category as SpotCategory)) ||
-    (b.rating ?? -1) - (a.rating ?? -1) ||
+    compareByRating(a, b) ||
     a.name.localeCompare(b.name, "ja")
   );
 }

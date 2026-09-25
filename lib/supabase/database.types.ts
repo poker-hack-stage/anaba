@@ -84,6 +84,7 @@ export type Database = {
           category: string
           created_at: string
           description: string | null
+          hidden_gem_score: number | null
           id: string
           image_path: string | null
           lat: number
@@ -102,6 +103,7 @@ export type Database = {
           category: string
           created_at?: string
           description?: string | null
+          hidden_gem_score?: number | null
           id?: string
           image_path?: string | null
           lat: number
@@ -120,6 +122,7 @@ export type Database = {
           category?: string
           created_at?: string
           description?: string | null
+          hidden_gem_score?: number | null
           id?: string
           image_path?: string | null
           lat?: number

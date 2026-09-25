@@ -28,6 +28,7 @@ export function spot(
     lat,
     lng,
     rating,
+    hidden_gem_score: null,
     stay_minutes: stay,
     catchphrase: null,
     description: null,

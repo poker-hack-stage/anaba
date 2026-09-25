@@ -44,6 +44,7 @@ function spot(areaId: string, name: string, category: string): Spot {
     lat: 36.2,
     lng: 137.9,
     rating: 4.0,
+    hidden_gem_score: null,
     stay_minutes: 60,
     catchphrase: null,
     description: null,
