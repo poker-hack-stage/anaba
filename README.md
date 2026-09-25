@@ -66,7 +66,7 @@ lib/
   auth.ts             ログイン中ユーザーの取得
   data/               DB 読み取り関数（ページからはここを呼ぶ）
   spots/categories.ts スポットのカテゴリ定義（色・絵文字）。テストは隣の categories.test.ts
-  planner/            旅プランの型と候補の生成（generate.ts が仮実装）
+  planner/            旅プランの型と、Gemini を使わない候補の生成（デモモード: generate.ts。近い地域: nearby.ts、所要時間: duration.ts）
 lib/supabase/         Supabase クライアント
   server.ts           Server Component / Server Action / Route Handler 用
   client.ts           Client Component 用
