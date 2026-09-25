@@ -33,7 +33,7 @@ export function SpotCard({
             {meta.emoji} {meta.label}
           </span>
           {spot.rating !== null && (
-            <span className="ml-auto flex items-center gap-0.5 text-xs font-bold text-amber-600">
+            <span className="ml-auto flex items-center gap-0.5 text-xs font-bold text-amber-700">
               <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
               {spot.rating}
             </span>
@@ -55,7 +55,7 @@ export function SpotCard({
             </span>
           ))}
           {spot.best_time && (
-            <span className="ml-auto flex items-center gap-0.5 text-[10px] text-stone-400">
+            <span className="ml-auto flex items-center gap-0.5 text-[10px] text-stone-500">
               <Clock className="h-3 w-3" />
               {spot.best_time}
             </span>
