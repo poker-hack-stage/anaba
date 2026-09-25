@@ -1,6 +1,6 @@
 "use client";
 
-import { Map } from "lucide-react";
+import { Map, MapPin } from "lucide-react";
 import type { Spot } from "@/lib/data/spots";
 import { getCategory } from "@/lib/spots/categories";
 import { cn } from "@/lib/utils";
@@ -61,8 +61,9 @@ export function SpotMap({
       )}
 
       {areaName && (
-        <span className="absolute left-3 top-3 z-10 rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-ink shadow-sm">
-          📍 {areaName}
+        <span className="absolute left-3 top-3 z-10 inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-ink shadow-sm">
+          <MapPin aria-hidden className="h-3.5 w-3.5" />
+          {areaName}
         </span>
       )}
 
@@ -152,7 +153,10 @@ function Pin({
         background: label ? "#c0432b" : meta.color,
       }}
     >
-      {label ?? (size === "sm" ? "" : meta.emoji)}
+      {label ??
+        (size === "sm" ? null : (
+          <meta.icon aria-hidden className="h-[1.1em] w-[1.1em]" />
+        ))}
     </button>
   );
 }
