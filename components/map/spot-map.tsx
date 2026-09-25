@@ -2,9 +2,10 @@
 
 import "leaflet/dist/leaflet.css";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import L from "leaflet";
 import type { GeoJsonObject } from "geojson";
-import { Map } from "lucide-react";
+import { Map, MapPin } from "lucide-react";
 import {
   MapContainer,
   Marker,
@@ -183,8 +184,9 @@ export function SpotMap({
       )}
 
       {areaName && (
-        <span className="pointer-events-none absolute left-3 top-3 z-[1000] rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-ink shadow-sm">
-          📍 {areaName}
+        <span className="pointer-events-none absolute left-3 top-3 z-[1000] inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-ink shadow-sm">
+          <MapPin aria-hidden className="h-3.5 w-3.5" />
+          {areaName}
         </span>
       )}
     </div>
@@ -320,7 +322,8 @@ function toBoundaryLayer(data: GeoJsonObject) {
 
 /**
  * ピンの見た目。Leaflet 既定のマーカー画像はバンドル後にパスが解決できず表示されないため、
- * カテゴリの色と絵文字を HTML で描く divIcon を使う。
+ * カテゴリの色とアイコンを HTML で描く divIcon を使う。
+ * divIcon は HTML の文字列しか受け取らないので、カテゴリのアイコン（lucide-react）は SVG の文字列にして入れる。
  */
 const PIN_SIZE = { sm: 20, md: 28, lg: 40 } as const;
 
@@ -334,7 +337,13 @@ function pinIcon(spot: Spot, size: keyof typeof PIN_SIZE, label?: string) {
 
   const meta = getCategory(spot.category);
   const px = PIN_SIZE[size];
-  const content = label ?? (size === "sm" ? "" : meta.emoji);
+  const content =
+    label ??
+    (size === "sm"
+      ? ""
+      : renderToStaticMarkup(
+          <meta.icon aria-hidden className="h-[1.1em] w-[1.1em]" />,
+        ));
   const className = cn(
     "flex h-full w-full items-center justify-center rounded-full border-2 border-white font-bold text-white shadow-md transition-transform hover:scale-110",
     size === "sm" && "text-[10px] opacity-70",

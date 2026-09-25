@@ -15,6 +15,7 @@ const SpotMap = dynamic(
 );
 
 /** 旅プランの候補カード。地図に経路と、経路以外のスポットを表示する */
+// TODO(#57): 日ごとの見出し（「1日目 ・ 地域名 ・ 約4時間」）・選ばれた理由・「近くの地域」を出す。今は全日の経路をつなげて出している
 export function CandidateCard({
   candidate,
   index,
@@ -24,10 +25,11 @@ export function CandidateCard({
   index: number;
   onSpotClick: (spot: Spot) => void;
 }) {
+  const route = candidate.days.flatMap((day) => day.route);
   return (
     <article className="flex flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white">
       <SpotMap
-        route={candidate.route}
+        route={route}
         others={candidate.otherSpots}
         onSpotClick={onSpotClick}
         className={MAP_CLASS_NAME}
@@ -51,7 +53,7 @@ export function CandidateCard({
 
         {/* おすすめの経路（めぐる順） */}
         <ol className="relative ml-3 space-y-2 border-l-2 border-dashed border-shu-border">
-          {candidate.route.map((spot, i) => (
+          {route.map((spot, i) => (
             <li key={spot.id} className="ml-4">
               <span className="absolute -left-[11px] flex h-5 w-5 items-center justify-center rounded-full bg-shu text-[10px] font-bold text-white">
                 {i + 1}
@@ -68,7 +70,7 @@ export function CandidateCard({
         </ol>
 
         {candidate.otherSpots.length > 0 && (
-          <p className="text-[11px] text-stone-400">
+          <p className="text-[11px] text-stone-500">
             地図の小さなピンは経路外のスポットです。タップで詳細を見られます。
           </p>
         )}
