@@ -1,23 +1,32 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useEffect, type ReactNode } from "react";
 import { MapPinned } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
-import { SpotCard } from "@/components/spots/spot-card";
+import { SpotCard, preloadSpotCardImages } from "@/components/spots/spot-card";
 import type { AreaWithSpots } from "@/lib/data/areas";
 import type { Spot } from "@/lib/data/spots";
 
 /**
  * 情報パネル。ピックアップ中の地域の見出しと、おすすめ3件のスポットを並べる。
  * `footer` はパネルの下端に置く（前へ／次へ・ドット）。
+ * `nextArea`（次に切り替わる地域）のおすすめ3件の写真は先に読んでおき、切り替えたときに写真の枠が空かないようにする。
  */
 export function SpotPanel({
   area,
+  nextArea,
   onSelectSpot,
   footer,
 }: {
   area?: AreaWithSpots;
+  nextArea?: AreaWithSpots;
   onSelectSpot: (spot: Spot) => void;
   footer?: ReactNode;
 }) {
+  useEffect(() => {
+    if (nextArea) preloadSpotCardImages(nextArea.recommended);
+  }, [nextArea]);
+
   return (
     <div className="flex flex-col gap-4 rounded-2xl border border-stone-200 bg-white p-5">
       <div

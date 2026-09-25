@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Inbox, Plus, Trash2 } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
+import { HiddenGemScore } from "@/components/spots/hidden-gem-score";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -128,6 +129,23 @@ export default function UiCatalogPage() {
           <p className="text-xs text-stone-600">
             value が null のとき:「
             <Rating value={null} />
+            」（何も表示しない）
+          </p>
+        </div>
+      </Section>
+
+      <Section
+        title="穴場度 HiddenGemScore"
+        file="components/spots/hidden-gem-score.tsx"
+        usage="<HiddenGemScore score={getHiddenGemScore(spot)} />  // null なら何も出さない"
+      >
+        <div className="flex flex-col gap-3">
+          {([5, 4, 3, 2, 1] as const).map((v) => (
+            <HiddenGemScore key={v} score={v} />
+          ))}
+          <p className="text-xs text-stone-600">
+            score が null のとき:「
+            <HiddenGemScore score={null} />
             」（何も表示しない）
           </p>
         </div>
