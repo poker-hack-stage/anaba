@@ -131,7 +131,7 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
     [searchParams, areaIds],
   );
   const conditions = queryConditions ?? savedConditions ?? DEFAULT_CONDITIONS;
-  const { status, candidates, mode } = result;
+  const { status, candidates, mode, rateLimited = false } = result;
   // 表示中の候補が今の条件で出したものでないとき（読み込み中や結果が出たあとに条件を変えた、
   // ブラウザの「戻る」で前の条件に戻ったなど）は、そのことを知らせる
   const isStale =
@@ -184,6 +184,17 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
         // 応答が返ってこないと loading のまま抜けられないので、時間切れは error にする
         signal: AbortSignal.timeout(PLAN_TIMEOUT_MS),
       });
+      if (res.status === 429) {
+        // 同じ送信元から短い時間に何度も作った（#25）。ブラウザでデモモードの候補を作り、理由を表示する
+        setResult({
+          status: "done",
+          candidates: generateCandidates(areas, requested),
+          conditions: requested,
+          mode: "demo",
+          rateLimited: true,
+        });
+        return;
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as PlanResponse;
       setResult({
@@ -275,6 +286,7 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
           status={status}
           candidates={candidates}
           mode={mode}
+          rateLimited={rateLimited}
           selectedCandidate={selectedCandidate}
           onSelectCandidate={selectCandidate}
           onSpotClick={setSelectedSpot}
@@ -290,6 +302,7 @@ function Result({
   status,
   candidates,
   mode,
+  rateLimited,
   selectedCandidate,
   onSelectCandidate,
   onSpotClick,
@@ -297,6 +310,7 @@ function Result({
   status: PlannerStatus;
   candidates: PlanCandidate[];
   mode: PlanResponse["mode"] | null;
+  rateLimited: boolean;
   selectedCandidate: number;
   onSelectCandidate: (index: number) => void;
   onSpotClick: (spot: Spot) => void;
@@ -349,8 +363,10 @@ function Result({
         >
           <FlaskConical className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
-            デモモードで作成しました。AI
-            を使わず、興味に合うスポットを評価の高い順に選んでいます。
+            {rateLimited
+              ? "短い時間に何度も作ったため、デモモードで作成しました。しばらくしてから絞り直すと、AI で作れます。"
+              : "デモモードで作成しました。"}
+            AI を使わず、興味に合うスポットを穴場度の高い順に選んでいます。
           </span>
         </p>
       )}

@@ -17,7 +17,7 @@ export function createCommunitySupabaseMock() {
     ratingCounts: [0, 0, 0, 0, 0],
   };
 
-  const rpc = vi.fn(async (name: string) => {
+  const rpcResult = async (name: string) => {
     if (name === "check_rate_limit") {
       return state.rateLimitError
         ? { data: null, error: state.rateLimitError }
@@ -30,6 +30,11 @@ export function createCommunitySupabaseMock() {
       };
     }
     throw new Error(`想定していない rpc: ${name}`);
+  };
+  // 本物と同じく、結果の Promise に .abortSignal()（待つ上限、#25）を付けられるようにする
+  const rpc = vi.fn((name: string) => {
+    const result = rpcResult(name);
+    return Object.assign(result, { abortSignal: () => result });
   });
 
   const insert = vi.fn(async () => ({ error: state.insertError }));
