@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Inbox, Plus, Trash2 } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
+import { HiddenGemScore } from "@/components/spots/hidden-gem-score";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,6 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Rating } from "@/components/ui/rating";
+import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CATEGORIES } from "@/lib/spots/categories";
 import { ChipDemo } from "./chip-demo";
@@ -134,6 +136,23 @@ export default function UiCatalogPage() {
       </Section>
 
       <Section
+        title="穴場度 HiddenGemScore"
+        file="components/spots/hidden-gem-score.tsx"
+        usage="<HiddenGemScore score={getHiddenGemScore(spot)} />  // null なら何も出さない"
+      >
+        <div className="flex flex-col gap-3">
+          {([5, 4, 3, 2, 1] as const).map((v) => (
+            <HiddenGemScore key={v} score={v} />
+          ))}
+          <p className="text-xs text-stone-600">
+            score が null のとき:「
+            <HiddenGemScore score={null} />
+            」（何も表示しない）
+          </p>
+        </div>
+      </Section>
+
+      <Section
         title="チップ Chip"
         file="components/ui/chip.tsx"
         usage="<Chip active={selected} onClick={toggle}>グルメ</Chip>"
@@ -204,6 +223,49 @@ export default function UiCatalogPage() {
             <Checkbox id="demo-check" />
             <Label htmlFor="demo-check">利用規約に同意する</Label>
           </div>
+        </div>
+      </Section>
+
+      <Section
+        title="セレクト Select"
+        file="components/ui/select.tsx"
+        usage='<Select shape="pill" value={v} onChange={…}><optgroup label="長野県"><option>…</option></optgroup></Select>  // ブラウザ標準の select。shape は default（Input と同じ）と pill（Chip と同じ）'
+      >
+        <div className="flex max-w-sm flex-col gap-4">
+          <div className="grid gap-1.5">
+            <Label htmlFor="demo-select">都道府県</Label>
+            <Select id="demo-select" defaultValue="">
+              <option value="">選んでください</option>
+              <option>長野県</option>
+              <option>岐阜県</option>
+              <option>富山県</option>
+            </Select>
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="demo-select-pill">
+              地域（pill・都道府県ごとの optgroup）
+            </Label>
+            <Select id="demo-select-pill" shape="pill" defaultValue="">
+              <option value="">地域を選ぶ</option>
+              <optgroup label="長野県">
+                <option>松本市</option>
+                <option>安曇野市</option>
+              </optgroup>
+              <optgroup label="岐阜県">
+                <option>高山市</option>
+              </optgroup>
+            </Select>
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="demo-select-disabled">無効</Label>
+            <Select id="demo-select-disabled" disabled defaultValue="">
+              <option value="">選べない</option>
+            </Select>
+          </div>
+          <p className="text-xs text-stone-600">
+            キーボード操作はブラウザ標準（Tab でフォーカスし、矢印キーや Space
+            で選ぶ）。スマホでは OS 標準のピッカーが開く。
+          </p>
         </div>
       </Section>
 

@@ -52,6 +52,9 @@ function spot(areaId: string, name: string, category: string): Spot {
     best_time: null,
     image_path: null,
     tags: [],
+    source: "seed",
+    status: "published",
+    nickname: null,
     created_at: "2026-09-25T00:00:00Z",
     updated_at: "2026-09-25T00:00:00Z",
   };
@@ -61,6 +64,7 @@ const areas: PlannableArea[] = [
   {
     id: "matsumoto",
     name: "松本市",
+    prefecture: "長野県",
     catchphrase: null,
     center_lat: 36.238,
     center_lng: 137.972,
@@ -121,6 +125,25 @@ describe("PlannerForm", () => {
 
     // 見つからなければ findByText が失敗する
     await screen.findByText("松本市をめぐる日帰りプラン");
+  });
+
+  test("/api/plan が 429（レート制限）なら、デモモードの候補と理由を出す", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          Response.json({ error: "rate_limited" }, { status: 429 }),
+        ),
+    );
+
+    renderForm();
+
+    // 見つからなければ findByText が失敗する
+    await screen.findByText("松本市をめぐる日帰りプラン");
+    expect(screen.getByRole("status").textContent).toContain(
+      "短い時間に何度も作ったため、デモモードで作成しました",
+    );
   });
 
   test("Gemini で作った候補なら、デモモードの表示を出さない", async () => {
@@ -191,6 +214,17 @@ describe("PlannerForm", () => {
       fireEvent.click(any);
       expect(any.getAttribute("aria-pressed")).toBe("true");
       expect(select.value).toBe("");
+    });
+
+    test("地域は都道府県ごとの optgroup にまとめる", () => {
+      renderForm({ submit: false });
+      const select = screen.getByLabelText<HTMLSelectElement>("エリア");
+
+      const groups = [...select.querySelectorAll("optgroup")];
+      expect(groups.map((g) => g.label)).toEqual(["長野県"]);
+      expect(
+        [...groups[0].querySelectorAll("option")].map((o) => o.textContent),
+      ).toEqual(["松本市（長野県）"]);
     });
 
     test("URL のクエリの条件を読む", () => {

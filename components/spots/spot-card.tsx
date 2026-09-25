@@ -1,11 +1,22 @@
-import { Clock, Star } from "lucide-react";
+import { Clock } from "lucide-react";
+import { Rating } from "@/components/ui/rating";
 import type { Spot } from "@/lib/data/spots";
 import { getCategory } from "@/lib/spots/categories";
-import { formatRating, getRating } from "@/lib/spots/score";
-import { SpotImage } from "./spot-image";
+import { getHiddenGemScore, getRating } from "@/lib/spots/score";
+import { HiddenGemScore } from "./hidden-gem-score";
+import { SpotImage, preloadSpotImage } from "./spot-image";
+
+/** カードの写真の表示幅（h-24 w-24）。next/image の sizes と先読みで同じ値を使う */
+const CARD_IMAGE_SIZES = "96px";
+
+/** カードの写真を先に読み込んでおく（次の地域の3件など） */
+export function preloadSpotCardImages(spots: Pick<Spot, "image_path">[]) {
+  for (const spot of spots) preloadSpotImage(spot.image_path, CARD_IMAGE_SIZES);
+}
 
 /**
- * 情報パネルに並べるスポットカード（名前・タグ・写真・評価）。クリックで詳細を開く
+ * 情報パネルに並べるスポットカード（写真・カテゴリ・名前・評価・穴場度・キャッチコピー・タグ）。クリックで詳細を開く。
+ * 口コミの件数・平均はカードには出さない（詳細の口コミ欄だけ、#53）
  */
 export function SpotCard({
   spot,
@@ -16,6 +27,7 @@ export function SpotCard({
 }) {
   const meta = getCategory(spot.category);
   const rating = getRating(spot);
+  const hiddenGemScore = getHiddenGemScore(spot);
 
   return (
     <button
@@ -25,24 +37,25 @@ export function SpotCard({
     >
       <SpotImage
         category={spot.category}
+        imagePath={spot.image_path}
+        sizes={CARD_IMAGE_SIZES}
         className="h-24 w-24 shrink-0 rounded-xl"
       />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <div className="flex items-center gap-2">
-          <span
-            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${meta.badge}`}
-          >
-            <meta.icon aria-hidden className="h-3 w-3 shrink-0" />
-            {meta.label}
-          </span>
-          {rating !== null && (
-            <span className="ml-auto flex items-center gap-0.5 text-xs font-bold text-amber-700">
-              <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
-              {formatRating(rating)}
-            </span>
-          )}
-        </div>
+        <span
+          className={`inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${meta.badge}`}
+        >
+          <meta.icon aria-hidden className="h-3 w-3 shrink-0" />
+          {meta.label}
+        </span>
         <h3 className="truncate font-extrabold text-stone-900">{spot.name}</h3>
+        {(rating !== null || hiddenGemScore !== null) && (
+          // 狭い幅では穴場度の数でカードごとに折り返しがばらつくので、最初から2行にする
+          <div className="flex flex-col items-start gap-y-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3">
+            <Rating value={rating} />
+            <HiddenGemScore score={hiddenGemScore} />
+          </div>
+        )}
         {spot.catchphrase && (
           <p className="line-clamp-2 text-xs leading-relaxed text-stone-600">
             {spot.catchphrase}
@@ -71,6 +84,8 @@ export function SpotCard({
 
 export function SpotCardSkeleton() {
   return (
-    <div className="h-[122px] animate-pulse rounded-2xl bg-stone-200/60" />
+    // 高さはカードの実測に合わせて幅で分ける。スマホは評価・穴場度が2行になり 204〜242px
+    // （375px の中央値 242px・414px の中央値 204px の間を取る）、sm〜lg は1列で約 146px、lg 以上は約 184px
+    <div className="h-[228px] animate-pulse rounded-2xl bg-stone-200/60 sm:h-[146px] lg:h-[184px]" />
   );
 }

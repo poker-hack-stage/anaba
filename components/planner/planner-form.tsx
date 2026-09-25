@@ -6,7 +6,9 @@ import { FlaskConical, Loader2, Route, Search, SearchX } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { SpotDetailDialog } from "@/components/spots/spot-detail-dialog";
 import { Chip } from "@/components/ui/chip";
+import { Select } from "@/components/ui/select";
 import type { Spot } from "@/lib/data/spots";
+import { groupAreasByPrefecture } from "@/lib/planner/area-groups";
 import { DURATION_LABELS } from "@/lib/planner/duration";
 import {
   ANY_AREA_LABEL,
@@ -23,7 +25,7 @@ import type {
   PlanResponse,
 } from "@/lib/planner/types";
 import { cn } from "@/lib/utils";
-import { CandidateCard } from "./candidate-card";
+import { CandidateTabs } from "./candidate-tabs";
 import { type PlannerStatus, usePlannerState } from "./planner-state";
 
 /**
@@ -114,8 +116,14 @@ function replaceQuery(conditions: PlanConditions) {
 // 結果と最後の条件は app/layout.tsx の PlannerStateProvider に持ち、タブを切り替えても残す
 export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
   const searchParams = useSearchParams();
-  const { savedConditions, saveConditions, result, setResult } =
-    usePlannerState();
+  const {
+    savedConditions,
+    saveConditions,
+    result,
+    setResult,
+    selectedCandidate,
+    selectCandidate,
+  } = usePlannerState();
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
 
   const areaIds = useMemo(() => areas.map((area) => area.id), [areas]);
@@ -124,7 +132,7 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
     [searchParams, areaIds],
   );
   const conditions = queryConditions ?? savedConditions ?? DEFAULT_CONDITIONS;
-  const { status, candidates, mode } = result;
+  const { status, candidates, mode, rateLimited = false } = result;
   // 表示中の候補が今の条件で出したものでないとき（読み込み中や結果が出たあとに条件を変えた、
   // ブラウザの「戻る」で前の条件に戻ったなど）は、そのことを知らせる
   const isStale =
@@ -177,6 +185,17 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
         // 応答が返ってこないと loading のまま抜けられないので、時間切れは error にする
         signal: AbortSignal.timeout(PLAN_TIMEOUT_MS),
       });
+      if (res.status === 429) {
+        // 同じ送信元から短い時間に何度も作った（#25）。ブラウザでデモモードの候補を作り、理由を表示する
+        setResult({
+          status: "done",
+          candidates: generateCandidates(areas, requested),
+          conditions: requested,
+          mode: "demo",
+          rateLimited: true,
+        });
+        return;
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as PlanResponse;
       setResult({
@@ -268,6 +287,9 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
           status={status}
           candidates={candidates}
           mode={mode}
+          rateLimited={rateLimited}
+          selectedCandidate={selectedCandidate}
+          onSelectCandidate={selectCandidate}
           onSpotClick={setSelectedSpot}
         />
       </section>
@@ -281,11 +303,17 @@ function Result({
   status,
   candidates,
   mode,
+  rateLimited,
+  selectedCandidate,
+  onSelectCandidate,
   onSpotClick,
 }: {
   status: PlannerStatus;
   candidates: PlanCandidate[];
   mode: PlanResponse["mode"] | null;
+  rateLimited: boolean;
+  selectedCandidate: number;
+  onSelectCandidate: (index: number) => void;
   onSpotClick: (spot: Spot) => void;
 }) {
   if (status === "idle") {
@@ -299,14 +327,11 @@ function Result({
     );
   }
   if (status === "loading") {
+    // 候補はタブで1件ずつ見せるので、タブと1件ぶんのカードの形にする
     return (
-      <div className="grid gap-4 xl:grid-cols-2">
-        {[0, 1].map((i) => (
-          <div
-            key={i}
-            className="h-96 animate-pulse rounded-2xl bg-stone-200/60"
-          />
-        ))}
+      <div className="flex flex-col gap-3">
+        <div className="h-14 animate-pulse rounded-2xl bg-stone-200/60" />
+        <div className="h-[36rem] animate-pulse rounded-2xl bg-stone-200/60" />
       </div>
     );
   }
@@ -339,21 +364,19 @@ function Result({
         >
           <FlaskConical className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
-            デモモードで作成しました。AI
-            を使わず、興味に合うスポットを評価の高い順に選んでいます。
+            {rateLimited
+              ? "短い時間に何度も作ったため、デモモードで作成しました。しばらくしてから絞り直すと、AI で作れます。"
+              : "デモモードで作成しました。"}
+            AI を使わず、興味に合うスポットを穴場度の高い順に選んでいます。
           </span>
         </p>
       )}
-      <div className="grid gap-4 xl:grid-cols-2">
-        {candidates.map((candidate, i) => (
-          <CandidateCard
-            key={candidate.id}
-            candidate={candidate}
-            index={i}
-            onSpotClick={onSpotClick}
-          />
-        ))}
-      </div>
+      <CandidateTabs
+        candidates={candidates}
+        selectedIndex={selectedCandidate}
+        onSelect={onSelectCandidate}
+        onSpotClick={onSpotClick}
+      />
     </>
   );
 }
@@ -364,8 +387,8 @@ function toDuration(label: string): PlanDuration {
 }
 
 /**
- * エリア: 「おまかせ」のチップと、地域の select（docs/spec.md の画面-1）。送る値は地域の id（同じ名前の市町村がありうるため）
- * TODO(#11): prefecture 列ができたら、地域を都道府県ごとの optgroup にまとめる
+ * エリア: 「おまかせ」のチップと、都道府県ごとの optgroup にまとめた地域の select（docs/spec.md の画面-1）。
+ * 送る値は地域の id（同じ名前の市町村がありうるため）
  */
 function AreaField({
   areas,
@@ -389,24 +412,31 @@ function AreaField({
         <Chip active={areaId === null} onClick={() => onChange(null)}>
           {ANY_AREA_LABEL}
         </Chip>
-        <select
+        <Select
           id={selectId}
+          shape="pill"
           value={areaId ?? ""}
           onChange={(e) => onChange(e.target.value || null)}
+          containerClassName="min-w-0 flex-1"
+          // 地域を選んでいるときは、選択中の Chip と同じ濃い枠にする
           className={cn(
-            "min-w-0 flex-1 rounded-full border bg-white px-3 py-1.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
             areaId === null
-              ? "border-stone-200 text-stone-600"
-              : "border-stone-900 text-stone-900",
+              ? "text-stone-600"
+              : "border-stone-900 hover:border-stone-900",
           )}
         >
           <option value="">地域を選ぶ</option>
-          {areas.map((area) => (
-            <option key={area.id} value={area.id}>
-              {area.name}
-            </option>
+          {groupAreasByPrefecture(areas).map((group) => (
+            <optgroup key={group.prefecture} label={group.prefecture}>
+              {group.areas.map((area) => (
+                // 選択肢の一覧で都道府県の見出しが見えないブラウザがあり、選んだ後の欄にも出ないので、名前に添える
+                <option key={area.id} value={area.id}>
+                  {area.name}（{group.prefecture}）
+                </option>
+              ))}
+            </optgroup>
           ))}
-        </select>
+        </Select>
       </div>
     </div>
   );

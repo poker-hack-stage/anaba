@@ -3,3 +3,4 @@ node_modules
 package-lock.json
 supabase/.temp
 lib/supabase/database.types.ts
+public/maplibre

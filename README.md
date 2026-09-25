@@ -37,6 +37,12 @@ Gemini API のキーの決まり:
 | `GEMINI_API_KEY` | Gemini API のキー。サーバー側だけで使う（`NEXT_PUBLIC_` を付けない）                                                                                                 |
 | `GEMINI_MODEL`   | 使うモデル。空なら既定の `gemini-3.5-flash-lite`（無料枠は1分15回・1日500回）。質を比べたいときは `gemini-3.8-flash`（無料枠は1日20回）。上限は AI Studio で確かめる |
 
+口コミ・スポットの投稿（#52）のレート制限に使う値:
+
+| 環境変数          | 内容                                                                                                                                                                                                                                 |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `RATE_LIMIT_SALT` | 送信元の IP と一緒にハッシュにする秘密の値。サーバー側だけで使う（`NEXT_PUBLIC_` を付けない）。開発では空でよい（固定の開発用の値を使う）。本番では必須で、空だと投稿を受け付けず（503）、旅プランは Gemini を使わずデモモードになる |
+
 ```bash
 npm run dev             # http://localhost:3000
 ```
@@ -67,11 +73,13 @@ app/                  ルーティング（ページ・Route Handler）
   page.tsx            穴場を探す（トップ）
   planner/            AI旅プラン
   api/plan/           旅プランの候補を返す API（Gemini で作り、作れなければデモモード）
+  api/spots/[id]/reviews/  口コミの一覧（GET）と投稿（POST）の API
+  api/spot-submissions/    スポットの投稿（穴場を教える）の API
   dev/ui/             UI 部品の見本（開発者向け。Vercel の Production では 404）
 components/           共通コンポーネント
   layout/             ヘッダー・タブ・下部ナビ・フッター（タブは nav-items.ts で管理）
   discover/           穴場を探す：地域の自動切り替え（地図＋情報パネル）
-  map/                地図（spot-map.tsx。Leaflet ＋ 地理院タイル。使う側は next/dynamic の ssr: false で読み込む）
+  map/                地図（spot-map.tsx。MapLibre ＋ OpenFreeMap。使う側は next/dynamic の ssr: false で読み込む）
   spots/              スポットカード・スポット詳細（両タブ共通）
   planner/            旅プランの条件フォーム・候補カード
   ui/                 shadcn/ui（`npx shadcn@latest add <name>` で追加。生成された `import { cn } from "cn"` は
@@ -80,6 +88,8 @@ lib/
   ai/gemini.ts        Gemini API の呼び出し（サーバー専用。Gemini を呼ぶのはここだけ）
   data/               DB 読み取り関数（ページからはここを呼ぶ）
   spots/categories.ts スポットのカテゴリ定義（色・絵文字）。テストは隣の categories.test.ts
+  community/          口コミ・スポットの投稿の API の中身（入力の検証: schema.ts、DB のエラーの変換: errors.ts、
+                      送信元のハッシュ: client-hash.ts、レート制限: write.ts、口コミの読み出し: reviews.ts）
   planner/            旅プランの型と候補の生成。create-plan.ts が入口（Gemini: ai-prompt.ts・ai-candidates.ts、デモモード: generate.ts、入力の検証: schema.ts）
 lib/supabase/         Supabase クライアント
   server.ts           Server Component / Server Action / Route Handler 用
@@ -167,23 +177,22 @@ Vitest + React Testing Library（`jsdom`）。設定は `vitest.config.mts`、�
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
    - `GEMINI_API_KEY`・`GEMINI_MODEL`（任意。空なら既定の `gemini-3.5-flash-lite`）
+   - `RATE_LIMIT_SALT`（必須。Production と Preview の両方に入れる。空だと口コミ・スポットの投稿が 503 になり、旅プランは Gemini を使わずデモモードになる。`openssl rand -hex 32` などで作り、変えると同じ送信元の数え直しになる）
+3. Install Command と Build Command は既定（`npm install` / `npm run build`）のまま使う。地図のワーカーを install のあと（`postinstall`）に写すため、`--ignore-scripts` を付けない（詳しくは「地図タイル」）
 
 ## 地図タイル
 
-地図（`components/map/spot-map.tsx`）は [Leaflet](https://leafletjs.com/)（react-leaflet）で描き、背景に**国土地理院の地理院タイル（淡色地図）**を使っている。
+地図（`components/map/spot-map.tsx`）は [MapLibre GL JS](https://maplibre.org/)（ベクトル地図）で描き、背景に **[OpenFreeMap](https://openfreemap.org/) の Bright スタイル**を使っている。
 
-| 項目       | 内容                                                                                                                                                                                                                        |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| URL        | `https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png`（ズーム 5〜18、日本国内のみ）                                                                                                                                   |
-| 申請       | 不要。ウェブ上でタイルをその場で読み込んで表示する使い方は、出典を明示すれば申請なしで使える（[地理院タイル一覧](https://maps.gsi.go.jp/development/ichiran.html)）                                                         |
-| 本番・商用 | [国土地理院コンテンツ利用規約](https://www.gsi.go.jp/kikakuchousei/kikakuchousei40182.html)（公共データ利用規約 PDL1.0 準拠）に従い、出典を記載すれば商用でも使える。アクセス数の上限は書かれていない（2026-09 時点で確認） |
-| 帰属表示   | 「地理院タイル」と書き、地理院タイル一覧ページへリンクする。地図の右下に Leaflet の帰属表示として常に出している（消さない・隠さない）                                                                                       |
-| 控えること | 規約に明記はないが、国の無償サービスで SLA もないため、タイルの一括ダウンロードや事前の大量取得はしない                                                                                                                     |
+| 項目       | 内容                                                                                                                                                                                                                                   |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| スタイル   | `https://tiles.openfreemap.org/styles/bright`（地図のデータは OpenStreetMap。世界中を表示できる）                                                                                                                                      |
+| 申請・料金 | 不要。登録・API キー・cookie なし。公開インスタンスは表示回数・リクエスト数の上限なしで無料、商用利用も可（[公式サイト](https://openfreemap.org/)。2026-09 時点で確認）                                                                |
+| 利用規約   | [Terms of Service](https://openfreemap.org/tos/)。**サイトやアプリに組み込む人（開発者）は 18 歳以上**であること（地図を見るだけの利用者には年齢の条件はない）。保証なし・予告なく終了することがある                                   |
+| 帰属表示   | 「OpenFreeMap © OpenMapTiles Data from OpenStreetMap」。スタイルに含まれていて、MapLibre が地図の右下に自動で出す（消さない・隠さない）。幅の狭い地図では、読み込みの数秒後か地図を動かすと「i」ボタンにたたまれる（押すと全文が出る） |
+| 控えること | SLA がなく寄付で運営されているため、タイルの一括ダウンロードや事前の大量取得はしない（規約でも許可なく自動で集めることを禁止している）。本番で利用者が増えるなら自前のタイルサーバーも検討する                                         |
 
-OpenStreetMap の標準タイル（`tile.openstreetmap.org`）に替える場合の注意:
-
-- 帰属表示「© OpenStreetMap contributors」を地図上に常に出す
-- [タイル利用ポリシー](https://operations.osmfoundation.org/policies/tiles/)で、大量のアクセスや一括ダウンロードは禁止。SLA はなく、使いすぎると予告なく遮断されることがある。本番で利用者が増えるなら、有料のタイル配信サービスか自前のタイルサーバーを使う
+MapLibre の Web Worker（`maplibre-gl-worker.mjs`）はバンドラーが出力に含めないので、`scripts/copy-maplibre-worker.mjs` が `public/maplibre/` へ写す（コミットしない）。写すのは `npm ci` / `npm install` のあと（`postinstall`）と、念のため `npm run dev` / `npm run build` の前。Build Command を `next build` に変えても、install のあとにできたファイルが使われる。ファイルがないと、ビルドは通るのに地図の背景だけが描かれない（エラーにならず気づきにくい）。
 
 ## 注意
 
@@ -196,3 +205,9 @@ OpenStreetMap の標準タイル（`tile.openstreetmap.org`）に替える場合
 - `next.config.ts` で Cache Components が有効。cookie や DB を読むコンポーネントは `<Suspense>` の内側に置く（外に置くとビルドエラーになる）
 - 未実装の箇所には `TODO(#番号)` コメントを付けている（番号は GitHub の Issue）
 - ログイン機能はない（#3 で決定、#37 で削除）。投稿・口コミはログインなしの匿名（ニックネームだけ）で受け付ける。DB の読み取りは匿名キー（publishable key）で行う
+
+## データの出典
+
+| データ                         | 出典・ライセンス                   | 詳細                                     |
+| ------------------------------ | ---------------------------------- | ---------------------------------------- |
+| 地域の境界（`areas.boundary`） | © OpenStreetMap contributors。ODbL | [docs/boundaries.md](docs/boundaries.md) |

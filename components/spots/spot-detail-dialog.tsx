@@ -2,12 +2,21 @@
 
 import { useRef, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { Clock, Lightbulb, Star, Timer, X } from "lucide-react";
+import { Clock, Lightbulb, Timer, X } from "lucide-react";
 import { Dialog, DialogOverlay, DialogPortal } from "@/components/ui/dialog";
+import { Rating } from "@/components/ui/rating";
 import type { Spot } from "@/lib/data/spots";
 import { getCategory } from "@/lib/spots/categories";
-import { formatRating, getRating } from "@/lib/spots/score";
+import { getHiddenGemScore, getRating } from "@/lib/spots/score";
+import { HiddenGemScore } from "./hidden-gem-score";
 import { SpotImage } from "./spot-image";
+import { SpotReviewsSection } from "./spot-reviews";
+
+/**
+ * 詳細の写真の表示幅。sm 以上はモーダル（max-w-2xl = 672px、画面の左右に 1rem ずつ余白）、
+ * sm 未満は画面幅いっぱいのシート。704px（672px + 2rem）以上で 672px になる
+ */
+const DETAIL_IMAGE_SIZES = "(min-width: 704px) 672px, 100vw";
 
 /**
  * スポット詳細。「穴場を探す」と「AI旅プラン」の両方で使う（#24）
@@ -29,6 +38,7 @@ export function SpotDetailDialog({
   if (!shown) return null;
   const meta = getCategory(shown.category);
   const rating = getRating(shown);
+  const hiddenGemScore = getHiddenGemScore(shown);
 
   return (
     <Dialog open={spot !== null} onOpenChange={(open) => !open && onClose()}>
@@ -55,6 +65,8 @@ export function SpotDetailDialog({
           <div className="relative">
             <SpotImage
               category={shown.category}
+              imagePath={shown.image_path}
+              sizes={DETAIL_IMAGE_SIZES}
               className="h-56 w-full text-6xl sm:h-72"
             />
             <DialogPrimitive.Close
@@ -73,17 +85,16 @@ export function SpotDetailDialog({
 
           <div className="flex flex-col gap-4 p-5 sm:p-6">
             <div>
-              <div className="flex items-start justify-between gap-3">
-                <DialogPrimitive.Title className="text-xl font-extrabold text-stone-900">
-                  {shown.name}
-                </DialogPrimitive.Title>
-                {rating !== null && (
-                  <span className="flex shrink-0 items-center gap-1 font-bold text-amber-700">
-                    <Star className="h-4 w-4 fill-amber-500 text-amber-500" />
-                    {formatRating(rating)}
-                  </span>
-                )}
-              </div>
+              <DialogPrimitive.Title className="text-xl font-extrabold text-stone-900">
+                {shown.name}
+              </DialogPrimitive.Title>
+              {(rating !== null || hiddenGemScore !== null) && (
+                // 名前の右に置くと長い名前とぶつかるので、名前の下にまとめて置く
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <Rating value={rating} size="md" />
+                  <HiddenGemScore score={hiddenGemScore} size="md" />
+                </div>
+              )}
               {shown.catchphrase && (
                 <DialogPrimitive.Description className="mt-1 text-sm text-stone-600">
                   {shown.catchphrase}
@@ -148,6 +159,8 @@ export function SpotDetailDialog({
                 )}
               </dl>
             )}
+
+            <SpotReviewsSection key={shown.id} spotId={shown.id} />
           </div>
         </DialogPrimitive.Content>
       </DialogPortal>

@@ -9,7 +9,7 @@ import type { PlanCandidate, PlanDay, PlanConditions } from "./types";
 /** 候補を作るのに使う地域の列（テストのフィクスチャを短く書けるように、使う列だけにする） */
 export type PlannableArea = Pick<
   Area,
-  "id" | "name" | "catchphrase" | "center_lat" | "center_lng"
+  "id" | "name" | "prefecture" | "catchphrase" | "center_lat" | "center_lng"
 > & { spots: Spot[] };
 
 /** 興味の選択肢とカテゴリの対応（1対1） */

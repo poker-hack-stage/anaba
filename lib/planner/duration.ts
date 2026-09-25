@@ -46,3 +46,14 @@ export function calcDayMinutes(
   const move = MOVE_MINUTES[transport] ?? UNKNOWN_MOVE_MINUTES;
   return stay + move * (route.length - 1);
 }
+
+/**
+ * 時間の目安を「約4時間」「約4時間半」「約45分」のように表す（docs/spec.md の 6.2）。
+ * 目安なので、1時間以上は30分単位に丸める
+ */
+export function formatMinutes(minutes: number): string {
+  if (minutes < 60) return `約${Math.max(0, Math.round(minutes))}分`;
+  const halfHours = Math.round(minutes / 30);
+  const hours = Math.floor(halfHours / 2);
+  return `約${hours}時間${halfHours % 2 === 1 ? "半" : ""}`;
+}
