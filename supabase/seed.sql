@@ -1,5 +1,11 @@
--- `npm run db:reset` 時にローカル DB へ投入される開発用データ。
--- 本番には反映されない。ここに書いたデータはチーム全員のローカル環境で共有される。
+-- 地域とスポットの初期データ。ローカルでも本番でも、このファイルを正とする。
+-- ここに書いたデータはチーム全員のローカル環境と本番で共有される。
+-- - ローカル: `npm run db:reset` で流れる。
+-- - 本番: 空のプロジェクトに作るときは `npx supabase db push --include-seed`。
+--   `--include-seed` は初回しか流さないので、データを足した・直したときは
+--   このファイルの中身を SQL Editor に貼って Run する（README「本番の Supabase」）。
+-- - 何度流しても壊れないよう、insert には必ず `on conflict (id) do update` を付ける。
+--   行を消しても本番からは消えないので、消すときは本番でも delete を流す。
 -- 地域は #11、スポットは #30（北アルプス山麓）・#58（全国）で作る。
 
 -- ============================================================
@@ -55,7 +61,16 @@ values
    34.791592, 133.616699, 11, null, 11),
   ('10000000-0000-4000-8000-000000000012', '竹田市', '大分県',
    '岡城跡と炭酸泉、湧き水の城下町',
-   32.975739, 131.396973, 11, null, 12);
+   32.975739, 131.396973, 11, null, 12)
+on conflict (id) do update set
+  name = excluded.name,
+  prefecture = excluded.prefecture,
+  catchphrase = excluded.catchphrase,
+  center_lat = excluded.center_lat,
+  center_lng = excluded.center_lng,
+  zoom = excluded.zoom,
+  image_path = excluded.image_path,
+  display_order = excluded.display_order;
 
 -- ============================================================
 -- スポット（spots）: 北アルプス山麓の5地域（#30）
@@ -318,7 +333,22 @@ values
    '城下町と北アルプスを見下ろす、市民の丘',
    '天保13年（1842年）に松本城主が犬甘城の跡に桜や楓を植えて領民に開いたのが始まりで、明治8年に県内で最初に指定された公園のひとつ。令和2年には市の特別名勝になった。展望台から松本の市街地、安曇野、北アルプス、美ケ原まで見渡せ、地元ゆかりの歌碑も多い。',
    '春は桜の名所。晴れた日は松本城と市街地の向こうに北アルプスが並ぶ',
-   '春（桜）、晴れた日', 30, array['展望台', '公園', '桜', '北アルプスの眺め'], 4.0, 4, null);
+   '春（桜）、晴れた日', 30, array['展望台', '公園', '桜', '北アルプスの眺め'], 4.0, 4, null)
+on conflict (id) do update set
+  area_id = excluded.area_id,
+  name = excluded.name,
+  category = excluded.category,
+  lat = excluded.lat,
+  lng = excluded.lng,
+  catchphrase = excluded.catchphrase,
+  description = excluded.description,
+  local_tip = excluded.local_tip,
+  best_time = excluded.best_time,
+  stay_minutes = excluded.stay_minutes,
+  tags = excluded.tags,
+  rating = excluded.rating,
+  hidden_gem_score = excluded.hidden_gem_score,
+  image_path = excluded.image_path;
 
 -- ============================================================
 -- スポット（spots）: 全国のほかの地域（#58）
