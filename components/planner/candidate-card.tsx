@@ -14,15 +14,13 @@ const SpotMap = dynamic(
   { ssr: false, loading: () => <SpotMapSkeleton className={MAP_CLASS_NAME} /> },
 );
 
-/** 旅プランの候補カード。地図に経路と、経路以外のスポットを表示する */
+/** 旅プランの候補カード。地図に経路と、経路以外のスポットを表示する（何件目の候補かは、包むタブ（candidate-tabs.tsx）に出す） */
 // TODO(#57): 日ごとの見出し（「1日目 ・ 地域名 ・ 約4時間」）・選ばれた理由・「近くの地域」を出す。今は全日の経路をつなげて出している
 export function CandidateCard({
   candidate,
-  index,
   onSpotClick,
 }: {
   candidate: PlanCandidate;
-  index: number;
   onSpotClick: (spot: Spot) => void;
 }) {
   const route = candidate.days.flatMap((day) => day.route);
@@ -36,7 +34,6 @@ export function CandidateCard({
       />
       <div className="flex flex-col gap-3 p-4">
         <div>
-          <p className="text-xs font-bold text-shu">候補 {index + 1}</p>
           <h3 className="font-extrabold leading-snug text-stone-900">
             {candidate.title}
           </h3>
