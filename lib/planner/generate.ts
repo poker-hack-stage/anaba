@@ -34,7 +34,8 @@ export const MAX_DAY_SPOTS = 4;
  * - 地域の選び方: 「おまかせ」なら、興味に合うスポットの多い地域から最大3つ。
  *   地域を選んだら、1件目はその地域、2・3件目は中心どうしが 80km 以内の地域から近い順に
  * - 1日の経路: 1つの地域のスポット2〜4件。興味に合うカテゴリ → 評価の順で選び、近い順につなぐ
- * - 2日目以降: 候補の地域に未使用のスポットが2件以上あればその地域、なければ近い地域（80km 以内、近い順）
+ * - 2日目以降: 候補の地域に未使用のスポットが2件以上あればその地域、なければ近い地域（80km 以内、近い順）。
+ *   近い地域で残りの日をまかなえないときは、残りの日のぶんを候補の地域に残しておく
  * - 1つの候補の中で同じスポットを2回使わない。組めない候補は捨てる
  */
 export function generateCandidates(
@@ -92,9 +93,25 @@ function buildCandidate(
         : nearbyAreas.find((a) => unused(a).length >= MIN_DAY_SPOTS);
     if (!area || unused(area).length < MIN_DAY_SPOTS) return null;
 
+    // 残りの日を近い地域でまかなえないぶんは、候補の地域に1日2件ずつ残しておく
+    // （例: 4件しかなく近い地域もない町の1泊2日を、4件＋0件ではなく2件＋2件で組む）
+    const nearbyDays = nearbyAreas.reduce(
+      (sum, a) => sum + Math.floor(unused(a).length / MIN_DAY_SPOTS),
+      0,
+    );
+    const reservedDays =
+      area === base
+        ? Math.max(0, DAY_COUNTS[request.duration] - day - nearbyDays)
+        : 0;
+    const limit = Math.min(
+      MAX_DAY_SPOTS,
+      unused(area).length - reservedDays * MIN_DAY_SPOTS,
+    );
+    if (limit < MIN_DAY_SPOTS) return null;
+
     const picked = [...unused(area)]
       .sort((a, b) => compareForRoute(a, b, wanted))
-      .slice(0, MAX_DAY_SPOTS);
+      .slice(0, limit);
     const route = orderByProximity(picked);
     for (const spot of route) used.add(spot.id);
 
