@@ -1,4 +1,5 @@
-// MapLibre の Web Worker を public/maplibre/ に写す（npm run dev / build の前に自動で動く）。
+// MapLibre の Web Worker を public/maplibre/ に写す（npm ci / npm install のあとと、npm run dev / build の前に自動で動く）。
+// install のあとにも写すので、Vercel の Build Command を next build に変えてもファイルはできている
 // MapLibre v6 はワーカーの URL を実行時に組み立てるため、バンドラー（Turbopack）がワーカーのファイルを出力に含めない。
 // そのままだと地図の背景が描かれないので、ここで写したファイルを spot-map.tsx の setWorkerUrl で指す。
 // 写したファイルはコミットしない（.gitignore）

@@ -80,8 +80,14 @@ const BOUNDARY_SOURCE = "area-boundary";
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 
 /**
+ * 幅の狭い地図では帰属表示が最初は全文で出て、地図の下を覆う。MapLibre がたたむのは地図を動かしたときだけで、
+ * スマホでは1本指のスクロールが地図の操作にならず、ずっと出たままになる。読み込みの後この時間が経ったら「i」ボタンにたたむ
+ */
+const ATTRIBUTION_COLLAPSE_MS = 4000;
+
+/**
  * MapLibre の Web Worker。バンドラーが出力に含めないので、scripts/copy-maplibre-worker.mjs が
- * npm run dev / build の前に public/maplibre/ へ写したものを使う。地図を作る前に1回だけ設定する
+ * npm install のあと（と npm run dev / build の前）に public/maplibre/ へ写したものを使う。地図を作る前に1回だけ設定する
  */
 setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
 
@@ -112,6 +118,8 @@ export function SpotMap({
   const [map, setMap] = useState<MapLibreMap | null>(null);
   // 線や塗りつぶし（source / layer）はスタイルを読み込んでからでないと足せない
   const [styleLoaded, setStyleLoaded] = useState(false);
+  // スタイルを読めなかった（OpenFreeMap が落ちている、オフラインなど）。背景は描けないが、ピンは使える
+  const [styleFailed, setStyleFailed] = useState(false);
 
   // 地図は effect の中で作り、後始末で消す。cacheComponents で前のページが <Activity> に隠れると
   // 後始末が走り、表示に戻ると作り直すので、壊れた地図を再利用しない
@@ -141,12 +149,31 @@ export function SpotMap({
       new NavigationControl({ showCompass: false }),
       "top-right",
     );
-    instance.once("load", () => setStyleLoaded(true));
+    let loaded = false;
+    let collapseTimer: ReturnType<typeof setTimeout> | undefined;
+    instance.once("load", () => {
+      loaded = true;
+      setStyleLoaded(true);
+      collapseTimer = setTimeout(() => {
+        // MapLibre がたたむ対象にしなかった地図（maplibregl-compact なし。幅 640px 超え）は全文のまま
+        container
+          .querySelector(".maplibregl-ctrl-attrib.maplibregl-compact")
+          ?.classList.remove("maplibregl-compact-show");
+      }, ATTRIBUTION_COLLAPSE_MS);
+    });
+    // setData に渡した GeoJSON の読み込みやタイルの取得の失敗は、ここに後から届く
+    instance.on("error", (event) => {
+      console.error("地図でエラーが起きました", event.error);
+      // 読み込みの前で、どのソースにも属さないエラーはスタイルそのものの読み込みの失敗
+      if (!loaded && !("sourceId" in event)) setStyleFailed(true);
+    });
     setMap(instance);
     return () => {
+      clearTimeout(collapseTimer);
       instance.remove();
       setMap(null);
       setStyleLoaded(false);
+      setStyleFailed(false);
     };
   }, []);
 
@@ -216,14 +243,11 @@ export function SpotMap({
 
   useEffect(() => {
     if (!map || !styleLoaded) return;
-    // DB の値が GeoJSON として読めなければ描かない（地図ごと落とさない）
+    // DB の値から座標が1つも取れなければ渡さない（読めない GeoJSON で地図ごと落とさない）。
+    // setData は読み込みをワーカーで後から行うので、そこでの失敗は try/catch ではなく error イベントに届く
     const data =
       boundary && computeBounds([], boundary) ? (boundary as GeoJSON) : EMPTY;
-    try {
-      map.getSource<GeoJSONSource>(BOUNDARY_SOURCE)?.setData(data);
-    } catch (error) {
-      console.error("地域の境界（GeoJSON）を読めませんでした", error);
-    }
+    map.getSource<GeoJSONSource>(BOUNDARY_SOURCE)?.setData(data);
   }, [map, styleLoaded, boundary]);
 
   useEffect(() => {
@@ -306,6 +330,16 @@ export function SpotMap({
             <span className="text-xs font-semibold">地図</span>
           </div>
         </div>
+      )}
+
+      {styleFailed && (
+        <p
+          role="status"
+          // 表示範囲の余白で下はピンが少ない。右下の帰属表示（読めないときは「MapLibre」だけ）の左に出す
+          className="pointer-events-none absolute bottom-3 left-3 right-32 z-10 w-fit rounded-2xl bg-white/90 px-3 py-1 text-xs text-stone-600 shadow-sm"
+        >
+          地図を読み込めませんでした
+        </p>
       )}
 
       {areaName && (
