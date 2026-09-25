@@ -556,6 +556,8 @@
 - <https://harie-syozu.jp/about/>: かばた・生水・比良山系の伏流水・110戸あまり
 - <https://harie-syozu.jp/guide/>: ガイド付きの予約制・時間・所要時間・料金・生活の場であること
 - <https://harie-syozu.jp/access/>: 事務所の住所・休み
+- <https://harie-syozu.jp/2026/07/05/%e3%80%90%e9%87%8d%e8%a6%81%e3%80%91%e3%80%8c%e3%81%8b%e3%81%b0%e3%81%9f%e8%a6%8b%e5%ad%a6%e6%96%99%e3%80%8d%e6%94%b9%e5%ae%9a%e3%81%ae%e3%81%8a%e7%9f%a5%e3%82%89%e3%81%9b-2027-1-5%e3%81%8b%e3%82%89/>: 見学料の改定（2027年1月5日から大人1,500円）
+- <https://harie-syozu.jp/2026/08/27/2026%e5%b9%b49%e6%9c%88%ef%bd%9e12%e6%9c%88%e3%81%ae%e3%83%84%e3%82%a2%e3%83%bc%e4%bc%91%e6%a5%ad%e6%97%a5%e3%81%ab%e3%81%a4%e3%81%84%e3%81%a6/>: 月曜以外の休業日（団体対応・地域行事など）
 - <https://www.city.takashima.lg.jp/soshiki/shokokankobu/kankoshinkoka/2/2/1158.html>: かばたの仕組み（壺池・端池・鯉・琵琶湖へ）・事前申込
 
 ##### 道の駅 くつき新本陣（`20000000-0000-4000-8000-000000001004`）
@@ -583,7 +585,8 @@
 ##### 備中松山城（`20000000-0000-4000-8000-000000001101`）
 
 - 座標の取り方: 公式の住所（内山下1）を国土地理院のジオコーダーで引いた値（番地まで当たった）
-- <https://takahasikanko.or.jp/modules/spot/index.php?content_id=1>: 住所・現存12天守・唯一の山城・標高・重要文化財・雲海の時期・登城料と時間・駐車場
+- <https://takahasikanko.or.jp/modules/spot/index.php?content_id=1>: 住所・現存12天守・唯一の山城・標高・重要文化財・雲海の時期・登城の時間
+- <https://takahasikanko.or.jp/modules/event/index.php?content_id=490>: ふいご峠駐車場の有料化（2026年9月4日から普通車1,000円）・城見橋公園駐車場は無料
 
 ##### 吹屋ふるさと村（`20000000-0000-4000-8000-000000001102`）
 
