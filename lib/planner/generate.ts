@@ -1,7 +1,7 @@
 import type { Area } from "@/lib/data/areas";
 import type { Spot } from "@/lib/data/spots";
 import type { SpotCategory } from "@/lib/spots/categories";
-import { compareByRating } from "@/lib/spots/score";
+import { compareByHiddenGemScore, compareByRating } from "@/lib/spots/score";
 import { calcDayMinutes, DAY_COUNTS, DURATION_LABELS } from "./duration";
 import { findNearbyAreas } from "./nearby";
 import type { PlanCandidate, PlanDay, PlanConditions } from "./types";
@@ -34,7 +34,7 @@ export const MAX_DAY_SPOTS = 4;
  *
  * - 地域の選び方: 「おまかせ」なら、興味に合うスポットの多い地域から最大3つ。
  *   地域を選んだら、1件目はその地域、2・3件目は中心どうしが 80km 以内の地域から近い順に
- * - 1日の経路: 1つの地域のスポット2〜4件。興味に合うカテゴリ → 評価の順で選び、近い順につなぐ
+ * - 1日の経路: 1つの地域のスポット2〜4件。興味に合うカテゴリ → 穴場度 → 評価の順で選び、近い順につなぐ
  * - 2日目以降: 候補の地域に未使用のスポットが2件以上あればその地域、なければ近い地域（80km 以内、近い順）。
  *   近い地域で残りの日をまかなえないときは、残りの日のぶんを候補の地域に残しておく
  * - 1つの候補の中で同じスポットを2回使わない。組めない候補は捨てる
@@ -145,8 +145,8 @@ function buildCandidate(
 }
 
 /**
- * 経路に入れる順。興味に合うカテゴリ → 評価の高い順 → 名前の順（DB から返る順に左右されないように）。
- * TODO(#19): 興味の次に穴場度の高い順で並べる（`compareByHiddenGemScore`（`lib/spots/score.ts`）を使う。docs/spec.md の #19）
+ * 経路に入れる順。興味に合うカテゴリ → 穴場度の高い順 → 評価の高い順 → 名前の順（DB から返る順に左右されないように）。
+ * 穴場度・評価がないスポットは後ろ（docs/spot-scores.md）
  */
 function compareForRoute(
   a: Spot,
@@ -156,6 +156,7 @@ function compareForRoute(
   return (
     Number(wanted.has(b.category as SpotCategory)) -
       Number(wanted.has(a.category as SpotCategory)) ||
+    compareByHiddenGemScore(a, b) ||
     compareByRating(a, b) ||
     a.name.localeCompare(b.name, "ja")
   );
@@ -209,8 +210,8 @@ function buildReason(
   const sentences = [
     nearbyOf ? `${nearbyOf.name}の近くの地域から選びました。` : "",
     interests.length > 0
-      ? `興味の「${interests.join("・")}」に合うスポットを、評価の高い順に選びました。`
-      : "評価の高いスポットを選びました。",
+      ? `興味の「${interests.join("・")}」に合うスポットを、穴場度の高い順に選びました。`
+      : "穴場度の高いスポットを選びました。",
     ...days
       .filter((d) => d.areaId !== base.id)
       .map((d) => `${d.day}日目は近くの${d.areaName}をめぐります。`),

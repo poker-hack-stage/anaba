@@ -10,11 +10,14 @@ export function spot(
   category: string,
   {
     rating = 4.0,
+    gem = null,
     stay = 60,
     lat = 0,
     lng = 0,
   }: {
     rating?: number | null;
+    /** 穴場度（hidden_gem_score） */
+    gem?: number | null;
     stay?: number | null;
     lat?: number;
     lng?: number;
@@ -28,7 +31,7 @@ export function spot(
     lat,
     lng,
     rating,
-    hidden_gem_score: null,
+    hidden_gem_score: gem,
     stay_minutes: stay,
     catchphrase: null,
     description: null,

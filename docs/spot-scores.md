@@ -52,8 +52,8 @@
 | ------------------------------- | ------------------------------------------- | ----------------------------------------------------- |
 | `getRating(spot)`               | 0〜5 の数、値がない・範囲外なら `null`      | 表示（`null` なら出さない）                           |
 | `formatRating(rating)`          | 「4.5」のような小数1桁の文字列              | 表示                                                  |
-| `getHiddenGemScore(spot)`       | 1〜5 の整数、値がない・範囲外なら `null`    | 表示（`null` なら出さない）・Claude に渡す情報（#18） |
+| `getHiddenGemScore(spot)`       | 1〜5 の整数、値がない・範囲外なら `null`    | 表示（`null` なら出さない）・Gemini に渡す情報（#18） |
 | `compareByRating(a, b)`         | 評価の高い順。値がないものは評価 0 より後ろ | おすすめ選定・デモの候補生成                          |
 | `compareByHiddenGemScore(a, b)` | 穴場度の高い順。値がないものは後ろ          | 穴場度で並べるとき（#12・#18・#19）                   |
 
-今これを通しているのは、情報パネルのカード（`components/spots/spot-card.tsx`）・詳細（`components/spots/spot-detail-dialog.tsx`）・おすすめ選定（`lib/spots/recommend.ts`）・デモの候補生成（`lib/planner/generate.ts`）の4か所。穴場度の表示（💎）はカード（#15）と詳細（#22）で、穴場度を使った並べ方はおすすめ選定（#12）とデモモード（#19）で足す。
+今これを通しているのは、情報パネルのカード（`components/spots/spot-card.tsx`）・詳細（`components/spots/spot-detail-dialog.tsx`）・おすすめ選定（`lib/spots/recommend.ts`）・デモの候補生成（`lib/planner/generate.ts`）・Gemini へのプロンプト（`lib/planner/ai-prompt.ts`）の5か所。穴場度の表示（💎）はカード（#15）と詳細（#22）で、穴場度を使った並べ方は、デモの候補生成とプロンプト（`lib/planner/ai-prompt.ts`）では #79 で入れた。おすすめ選定（#12）はこれから。
