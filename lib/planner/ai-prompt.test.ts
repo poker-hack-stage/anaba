@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 
-import { area, areas, far, request } from "@/test/fixtures/planner";
+import { area, areas, far, request, spot } from "@/test/fixtures/planner";
+import type { PlannableArea } from "./generate";
 import { buildPlanPrompt, getPlanScope } from "./ai-prompt";
 
 const ids = (list: { id: string }[]) => list.map((a) => a.id);
@@ -42,6 +43,30 @@ describe("buildPlanPrompt", () => {
     const spotKey = keyOf(prompt.spotIdByKey, "松本市/松本市のonsen3");
     expect(spotKey).toMatch(/^S\d+$/);
     expect(prompt.contents).toContain(`${spotKey} ${areaKey} 松本市のonsen3`);
+  });
+
+  test("スポットの穴場度と評価を渡し、値がない・範囲外なら書かない", () => {
+    const town: PlannableArea = {
+      ...area("穴場の町", 36.238, 137.972, []),
+      spots: [
+        spot("穴場の町", "穴場", "nature", { rating: 4, gem: 5 }),
+        spot("穴場の町", "値なし", "nature", { rating: null, gem: null }),
+        spot("穴場の町", "範囲外", "nature", { rating: 9, gem: 7 }),
+      ],
+    };
+
+    const prompt = buildPlanPrompt([town], request({ areaId: "穴場の町" }));
+    const line = (name: string) =>
+      prompt.contents.split("\n").find((l) => l.includes(` ${name}｜`)) ?? "";
+
+    expect(line("値なし")).not.toBe("");
+    expect(line("範囲外")).not.toBe("");
+    expect(line("穴場")).toContain("｜穴場度5｜評価4.0｜");
+    expect(line("値なし")).not.toMatch(/穴場度|評価/);
+    expect(line("範囲外")).not.toMatch(/穴場度|評価/);
+    expect(prompt.systemInstruction).toContain(
+      "穴場度の高いスポットを優先する",
+    );
   });
 
   test("地域を選ぶと、1件目の1日目をその地域にするよう頼む", () => {
