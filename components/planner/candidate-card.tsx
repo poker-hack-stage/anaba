@@ -59,7 +59,7 @@ export function CandidateCard({
         </ol>
 
         {candidate.otherSpots.length > 0 && (
-          <p className="text-[11px] text-stone-400">
+          <p className="text-[11px] text-stone-500">
             地図の小さなピンは経路外のスポットです。タップで詳細を見られます。
           </p>
         )}

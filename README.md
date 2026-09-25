@@ -69,13 +69,15 @@ app/                  ルーティング（ページ・Route Handler）
   planner/            AI旅プラン
   api/plan/           旅プランの候補を返す API（今は仮実装。Gemini API に差し替える）
   auth/               ログイン・サインアップ等（スターター由来）
+  dev/ui/             UI 部品の見本（開発者向け。Vercel の Production では 404）
 components/           共通コンポーネント
   layout/             ヘッダー・タブ・下部ナビ・フッター（タブは nav-items.ts で管理）
   discover/           穴場を探す：地域の自動切り替え（地図＋情報パネル）
   map/                地図（spot-map.tsx。今は簡易表示で、Leaflet に差し替える）
   spots/              スポットカード・スポット詳細（両タブ共通）
   planner/            旅プランの条件フォーム・候補カード
-  ui/                 shadcn/ui（`npx shadcn@latest add <name>` で追加）
+  ui/                 shadcn/ui（`npx shadcn@latest add <name>` で追加。生成された `import { cn } from "cn"` は
+                      `@/lib/utils` に直し、package.json に入った `cn` は消す）
 lib/
   ai/gemini.ts        Gemini API の呼び出し（サーバー専用。Gemini を呼ぶのはここだけ）
   auth.ts             ログイン中ユーザーの取得
