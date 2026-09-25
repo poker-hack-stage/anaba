@@ -12,8 +12,8 @@ const defaultUrl = process.env.VERCEL_URL
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
   title: {
-    default: "めぐりまち - 地元の穴場とAI旅プラン",
-    template: "%s | めぐりまち",
+    default: "anaba - 地元の穴場とAI旅プラン",
+    template: "%s | anaba",
   },
   description:
     "地元の人が教える穴場スポットと、AIがつくる旅プランで、まだ知らない地域をめぐろう。",

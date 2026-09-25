@@ -29,7 +29,6 @@ export function AreaRotator({ areas }: { areas: AreaWithSpots[] }) {
       {...hoverHandlers}
       {...focusHandlers}
     >
-      {/* TODO(#1): 地図と情報パネルの左右（スマホでは上下）の配置を決める */}
       <AreaMap area={area} onSpotClick={setSelectedSpot} />
 
       <SpotPanel
