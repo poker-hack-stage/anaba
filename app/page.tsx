@@ -17,9 +17,11 @@ export default function DiscoverPage() {
   );
 }
 
+// スマホ（sm 未満）では画面を検索欄と地図に使うため、ヒーローは見せずに読み上げ用の見出しだけ残す（#93）。
+// 「旅プランをつくる」の代わりは下部ナビの「AI旅プラン」
 function Hero() {
   return (
-    <section className="flex flex-col gap-4 rounded-3xl bg-gradient-to-br from-hero-from via-hero-via to-hero-to p-5 sm:flex-row sm:items-center sm:justify-between sm:p-7">
+    <section className="flex flex-col gap-4 rounded-3xl bg-gradient-to-br from-hero-from via-hero-via to-hero-to p-5 max-sm:sr-only sm:flex-row sm:items-center sm:justify-between sm:p-7">
       <div>
         <h1 className="font-brand text-xl font-bold leading-snug text-white sm:text-2xl">
           地元の人の「いつもの場所」へ。
@@ -30,7 +32,7 @@ function Hero() {
       </div>
       <Link
         href="/planner"
-        className="inline-flex w-fit shrink-0 items-center gap-1.5 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-ink hover:bg-ink-light"
+        className="inline-flex w-fit shrink-0 items-center gap-1.5 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-ink hover:bg-ink-light max-sm:hidden"
       >
         <Route className="h-4 w-4" />
         旅プランをつくる
