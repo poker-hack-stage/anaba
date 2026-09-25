@@ -3,8 +3,8 @@ import { describe, expect, test } from "vitest";
 import { aiPlanSchema, planConditionsSchema } from "./schema";
 
 const valid = {
-  area: "松本市",
-  duration: "1泊2日",
+  areaId: "10000000-0000-4000-8000-000000000005",
+  duration: "1n2d",
   interests: ["温泉", "食"],
   companion: "家族（子連れ）",
   transport: "電車・バス",
@@ -14,8 +14,8 @@ describe("planConditionsSchema", () => {
   test("選択肢どおりの条件を受け付ける", () => {
     expect(planConditionsSchema.parse(valid)).toEqual(valid);
     expect(
-      planConditionsSchema.parse({ ...valid, area: "おまかせ", interests: [] }),
-    ).toMatchObject({ area: "おまかせ", interests: [] });
+      planConditionsSchema.parse({ ...valid, areaId: null, interests: [] }),
+    ).toMatchObject({ areaId: null, interests: [] });
   });
 
   test("興味の重なりは1つにまとめる", () => {
@@ -26,13 +26,15 @@ describe("planConditionsSchema", () => {
   });
 
   test.each([
-    ["日程が選択肢にない", { duration: "3泊4日" }],
+    ["日程が選択肢にない", { duration: "3n4d" }],
+    ["日程が表示の文言", { duration: "1泊2日" }],
     ["興味が選択肢にない", { interests: ["買い物"] }],
     ["興味が多すぎる", { interests: Array(7).fill("食") }],
     ["だれとが選択肢にない", { companion: "ペット" }],
     ["移動手段が選択肢にない", { transport: "飛行機" }],
-    ["エリアが空", { area: " " }],
-    ["エリアが長すぎる", { area: "あ".repeat(41) }],
+    ["地域の id が空", { areaId: " " }],
+    ["地域の id が長すぎる", { areaId: "a".repeat(65) }],
+    ["地域名で送っている（古い形）", { areaId: undefined, area: "松本市" }],
     ["余計な項目がある", { note: "よろしく" }],
     ["型が違う", { interests: "温泉" }],
   ])("%s なら受け付けない", (_, overrides) => {

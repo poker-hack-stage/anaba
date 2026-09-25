@@ -12,7 +12,7 @@ import { toPlanCandidates } from "./ai-candidates";
 import { buildPlanPrompt } from "./ai-prompt";
 import type { PlannableArea } from "./generate";
 import type { AiPlan } from "./schema";
-import type { PlanRequest } from "./types";
+import type { PlanConditions } from "./types";
 
 type AiCandidate = AiPlan["candidates"][number];
 
@@ -21,7 +21,7 @@ type AiCandidate = AiPlan["candidates"][number];
  * spots はその日の地域のスポットの添字（ほかの地域のスポットは [地域, 添字]）。-1 は存在しないスポット
  */
 function run(
-  req: PlanRequest,
+  req: PlanConditions,
   candidates: {
     days: {
       area: PlannableArea;

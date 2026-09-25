@@ -1,6 +1,6 @@
 import type { Spot } from "@/lib/data/spots";
 import type { PlannableArea } from "@/lib/planner/generate";
-import type { PlanRequest } from "@/lib/planner/types";
+import type { PlanConditions } from "@/lib/planner/types";
 
 // AI旅プランのテストで使う地域・スポット・条件（Supabase は読まない）
 
@@ -87,7 +87,9 @@ export const far = area("遠い町", 43.06, 141.35, [
 /** display_order の順（北から） */
 export const areas = [hakuba, omachi, azumino, matsumoto, far];
 
-export function request(overrides: Partial<PlanRequest> = {}): PlanRequest {
+export function request(
+  overrides: Partial<PlanConditions> = {},
+): PlanConditions {
   return {
     areaId: null,
     duration: "day",

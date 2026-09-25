@@ -3,7 +3,7 @@ import type { Spot } from "@/lib/data/spots";
 import type { SpotCategory } from "@/lib/spots/categories";
 import { calcDayMinutes, DAY_COUNTS, DURATION_LABELS } from "./duration";
 import { findNearbyAreas } from "./nearby";
-import type { PlanCandidate, PlanDay, PlanRequest } from "./types";
+import type { PlanCandidate, PlanDay, PlanConditions } from "./types";
 
 /** 候補を作るのに使う地域の列（テストのフィクスチャを短く書けるように、使う列だけにする） */
 export type PlannableArea = Pick<
@@ -40,7 +40,7 @@ export const MAX_DAY_SPOTS = 4;
  */
 export function generateCandidates(
   areas: readonly PlannableArea[],
-  request: PlanRequest,
+  request: PlanConditions,
 ): PlanCandidate[] {
   const wanted = new Set(
     request.interests.map((i) => INTEREST_TO_CATEGORY[i]).filter(Boolean),
@@ -75,7 +75,7 @@ export function generateCandidates(
 function buildCandidate(
   base: PlannableArea,
   areas: readonly PlannableArea[],
-  request: PlanRequest,
+  request: PlanConditions,
   wanted: ReadonlySet<SpotCategory>,
   { nearbyOf }: { nearbyOf?: PlannableArea },
 ): PlanCandidate | null {
@@ -199,7 +199,7 @@ function countWanted(
 
 /** 選ばれた理由の定型文（Gemini を使うときは Gemini が書く） */
 function buildReason(
-  request: PlanRequest,
+  request: PlanConditions,
   days: readonly PlanDay[],
   base: PlannableArea,
   nearbyOf: PlannableArea | undefined,

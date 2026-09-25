@@ -5,7 +5,7 @@ import { toPlanCandidates } from "./ai-candidates";
 import { buildPlanPrompt } from "./ai-prompt";
 import { generateCandidates, type PlannableArea } from "./generate";
 import { AI_PLAN_JSON_SCHEMA, aiPlanSchema } from "./schema";
-import type { PlanCandidate, PlanRequest, PlanResponse } from "./types";
+import type { PlanCandidate, PlanConditions, PlanResponse } from "./types";
 
 /**
  * 旅プランの候補を作る。Gemini で作れなければ（キーなし・時間切れ・無料枠の上限・形の崩れ・使える候補が0件）、
@@ -13,7 +13,7 @@ import type { PlanCandidate, PlanRequest, PlanResponse } from "./types";
  */
 export async function createPlan(
   areas: readonly PlannableArea[],
-  request: PlanRequest,
+  request: PlanConditions,
 ): Promise<PlanResponse> {
   const candidates = await generateAiCandidates(areas, request);
   if (candidates) return { candidates, mode: "ai" };
@@ -22,7 +22,7 @@ export async function createPlan(
 
 async function generateAiCandidates(
   areas: readonly PlannableArea[],
-  request: PlanRequest,
+  request: PlanConditions,
 ): Promise<PlanCandidate[] | null> {
   const prompt = buildPlanPrompt(areas, request);
   if (prompt.spotIdByKey.size === 0) return null;
