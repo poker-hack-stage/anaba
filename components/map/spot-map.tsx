@@ -39,6 +39,8 @@ export type SpotMapProps = {
   route?: Spot[];
   /** そのほかのスポット。小さく表示 */
   others?: Spot[];
+  /** ハイライトのピンに 1 からの番号を付ける（`highlighted` の並び順。情報パネルの並びと合わせる） */
+  numberHighlighted?: boolean;
   /** ハイライトする地域名（地図の左上に出す） */
   areaName?: string;
   /**
@@ -49,6 +51,11 @@ export type SpotMapProps = {
   onSpotClick?: (spot: Spot) => void;
   /** ピンにマウスが乗ったらそのスポット、離れたら null を渡す */
   onSpotHover?: (spot: Spot | null) => void;
+  /**
+   * 表示範囲が変わったら、なめらかに移動する（既定は即時）。最初の表示は即時。
+   * OS の「視差効果を減らす」が有効なら即時（MapLibre が切り替える）
+   */
+  animateMove?: boolean;
   /** スポットも境界もないときに「地図」のプレースホルダーを出すか（既定は出す） */
   emptyPlaceholder?: boolean;
   className?: string;
@@ -75,7 +82,10 @@ const SINGLE_SPOT_ZOOM = 14;
 const FIT_PADDING = { top: 40, right: 56, bottom: 64, left: 40 };
 
 const ROUTE_COLOR = "#c0432b";
-const BOUNDARY_COLOR = "#24463d"; // ink
+const INK_COLOR = "#24463d";
+const BOUNDARY_COLOR = INK_COLOR;
+/** 移動にかける時間。自動の切り替え（6秒ごと）より十分短くする */
+const MOVE_DURATION_MS = 1200;
 
 const ROUTE_SOURCE = "spot-route";
 const BOUNDARY_SOURCE = "area-boundary";
@@ -83,15 +93,29 @@ const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 
 /**
  * 幅の狭い地図では帰属表示が最初は全文で出て、地図の下を覆う。MapLibre がたたむのは地図を動かしたときだけで、
- * スマホでは1本指のスクロールが地図の操作にならず、ずっと出たままになる。読み込みの後この時間が経ったら「i」ボタンにたたむ
+ * スマホでは1本指のスクロールが地図の操作にならず、ずっと出たままになる。読み込みの後この時間が経ったら「i」ボタンにたたむ。
+ * OpenStreetMap の帰属のガイドライン（https://osmfoundation.org/wiki/Licence/Attribution_Guidelines）で
+ * 自動でたたんでよいのは5秒後からなので、それより短くしない
  */
-const ATTRIBUTION_COLLAPSE_MS = 4000;
+const ATTRIBUTION_COLLAPSE_MS = 5000;
 
 /**
  * MapLibre の Web Worker。バンドラーが出力に含めないので、scripts/copy-maplibre-worker.mjs が
  * npm install のあと（と npm run dev / build の前）に public/maplibre/ へ写したものを使う。地図を作る前に1回だけ設定する
  */
 setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
+
+/**
+ * 帰属表示。OpenFreeMap のスタイルが出すのは「Data from OpenStreetMap」だけなので、地域の境界（OpenStreetMap。ODbL）の
+ * 帰属に求められる「© OpenStreetMap contributors」を足す（docs/boundaries.md）。MapLibre の既定の表示も残す
+ */
+const ATTRIBUTION = {
+  compact: true,
+  customAttribution: [
+    '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">&copy; OpenStreetMap contributors</a>',
+    '<a href="https://maplibre.org/" target="_blank" rel="noopener">MapLibre</a>',
+  ],
+};
 
 /** 地図の操作の案内（cooperativeGestures で出る）とボタンの読み上げを日本語にする */
 const LOCALE = {
@@ -110,10 +134,12 @@ export function SpotMap({
   highlighted = [],
   route = [],
   others = [],
+  numberHighlighted = false,
   areaName,
   boundary,
   onSpotClick,
   onSpotHover,
+  animateMove = false,
   emptyPlaceholder = true,
   className,
 }: SpotMapProps) {
@@ -144,6 +170,7 @@ export function SpotMap({
       pitchWithRotate: false,
       touchPitch: false,
       locale: LOCALE,
+      attributionControl: ATTRIBUTION,
     });
     instance.touchZoomRotate.disableRotation();
     instance.keyboard.disableRotation();
@@ -187,21 +214,28 @@ export function SpotMap({
   const pointsKey = points.map((p) => p.join(",")).join(";");
   const routeKey = route.map((s) => `${s.lng},${s.lat}`).join(";");
 
+  // 範囲を合わせたことのある地図。作り直した地図の最初の表示は即時にする
+  const fittedMap = useRef<MapLibreMap | null>(null);
+
   // 表示範囲を合わせる
   useEffect(() => {
     if (!map) return;
+    const animate = animateMove && fittedMap.current === map;
+    fittedMap.current = map;
     const box = computeBounds(points, boundary);
     const boundaryBox = boundary ? computeBounds([], boundary) : null;
+    // essential を付けないので、「視差効果を減らす」なら MapLibre が即時に切り替える
+    const move = { animate, duration: MOVE_DURATION_MS };
     if (!box) {
-      map.jumpTo({ center: JAPAN_CENTER, zoom: JAPAN_ZOOM });
+      map.easeTo({ ...move, center: JAPAN_CENTER, zoom: JAPAN_ZOOM });
     } else if (points.length === 1 && !boundaryBox) {
-      map.jumpTo({ center: points[0], zoom: SINGLE_SPOT_ZOOM });
+      map.easeTo({ ...move, center: points[0], zoom: SINGLE_SPOT_ZOOM });
     } else {
-      map.fitBounds(box, { padding: FIT_PADDING, maxZoom: 15, animate: false });
+      map.fitBounds(box, { ...move, padding: FIT_PADDING, maxZoom: 15 });
     }
     // points は pointsKey で比較する
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, pointsKey, boundary]);
+  }, [map, pointsKey, boundary, animateMove]);
 
   // 境界の塗りつぶしと経路の線を置く場所を用意する
   useEffect(() => {
@@ -300,14 +334,15 @@ export function SpotMap({
               zIndex={1}
             />
           ))}
-          {highlighted.map((spot) => (
+          {highlighted.map((spot, i) => (
             <SpotMarker
               key={`highlighted-${spot.id}`}
               {...markerProps}
               map={map}
               spot={spot}
               size="lg"
-              title={spot.name}
+              label={numberHighlighted ? String(i + 1) : undefined}
+              title={numberHighlighted ? `${i + 1}. ${spot.name}` : spot.name}
               zIndex={2}
             />
           ))}
@@ -374,7 +409,7 @@ function SpotMarker({
   map: MapLibreMap;
   spot: Spot;
   size: keyof typeof PIN_SIZE;
-  /** 経路の番号。あればアイコンの代わりに出す */
+  /** 経路・ハイライトの番号。あればアイコンの代わりに出す */
   label?: string;
   title: string;
   /** 重なり順。経路 > ハイライト > そのほか */
@@ -407,14 +442,23 @@ function SpotMarker({
       title={title}
       aria-label={title}
       onClick={() => onSpotClick?.(spot)}
-      onMouseEnter={() => onSpotHover?.(spot)}
-      onMouseLeave={() => onSpotHover?.(null)}
-      onFocus={() => onSpotHover?.(spot)}
+      // マウスだけを「乗せた」に数える。タッチのタップは詳細を開くだけにする（離れたことが分からず、強調が残るため）
+      onPointerEnter={(e) => e.pointerType === "mouse" && onSpotHover?.(spot)}
+      onPointerLeave={(e) => e.pointerType === "mouse" && onSpotHover?.(null)}
+      // キーボードで選んだときだけ。タップやクリックで付いたフォーカスでは強調しない
+      onFocus={(e) =>
+        e.currentTarget.matches(":focus-visible") && onSpotHover?.(spot)
+      }
       onBlur={() => onSpotHover?.(null)}
       style={{
         width: px,
         height: px,
-        background: label ? ROUTE_COLOR : meta.color,
+        // 番号付きのハイライト（おすすめ）は ink、経路は朱
+        background: label
+          ? size === "lg"
+            ? INK_COLOR
+            : ROUTE_COLOR
+          : meta.color,
       }}
       className={cn(
         "flex cursor-pointer items-center justify-center rounded-full border-2 border-white font-bold text-white shadow-md transition-transform hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink",

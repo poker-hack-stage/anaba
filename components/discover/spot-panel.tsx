@@ -10,16 +10,19 @@ import type { Spot } from "@/lib/data/spots";
 /**
  * 情報パネル。ピックアップ中の地域の見出しと、おすすめ3件のスポットを並べる。
  * `footer` はパネルの下端に置く（前へ／次へ・ドット）。
+ * カードには地図のピンと同じ番号（並び順）を付け、`activeSpotId` のカード（地図でピンにマウスが乗っているスポット）を強調する。
  * `nextArea`（次に切り替わる地域）のおすすめ3件の写真は先に読んでおき、切り替えたときに写真の枠が空かないようにする。
  */
 export function SpotPanel({
   area,
   nextArea,
+  activeSpotId,
   onSelectSpot,
   footer,
 }: {
   area?: AreaWithSpots;
   nextArea?: AreaWithSpots;
+  activeSpotId?: string | null;
   onSelectSpot: (spot: Spot) => void;
   footer?: ReactNode;
 }) {
@@ -54,9 +57,20 @@ export function SpotPanel({
           key={`spots-${area.id}`}
           className="flex flex-col gap-3 animate-in fade-in"
         >
-          {area.recommended.map((spot) => (
-            <li key={spot.id}>
+          {area.recommended.map((spot, i) => (
+            <li
+              key={spot.id}
+              data-active={spot.id === activeSpotId || undefined}
+              className="relative rounded-2xl transition-shadow data-[active]:ring-2 data-[active]:ring-ink data-[active]:ring-offset-2"
+            >
               <SpotCard spot={spot} onSelect={onSelectSpot} />
+              {/* 地図のピンの番号（spot-map.tsx の numberHighlighted と同じ見た目）。写真の左上に重ねる */}
+              <span
+                aria-hidden
+                className="pointer-events-none absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-ink text-xs font-bold text-white shadow-md"
+              >
+                {i + 1}
+              </span>
             </li>
           ))}
         </ul>

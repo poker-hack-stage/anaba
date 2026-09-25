@@ -22,6 +22,7 @@ import { useDiscoverFilter } from "./use-discover-filter";
 /**
  * 「穴場を探す」のメイン部分。
  * 地図で1つの地域とおすすめ3件をハイライトし、情報パネルにその3件を出す。数秒ごとに次の地域へ切り替わる。
+ * 地図のおすすめのピンと情報パネルのカードには同じ番号を付け、ピンにマウスを乗せると同じカードを強調する（#14）。
  * 検索欄・カテゴリで絞り込むと、条件に合うスポットがある地域だけを巡回する（docs/spec.md 画面-3）。
  * 地図は area-map.tsx、情報パネルは spot-panel.tsx、切り替えは use-auto-rotate.ts と area-nav.tsx、
  * 検索欄は discover-search.tsx と use-discover-filter.ts。
@@ -53,6 +54,20 @@ export function AreaRotator({ areas }: { areas: AreaWithSpots[] }) {
   }
 
   const area = filteredAreas[index];
+
+  // 地図のピンにマウスが乗っているスポット。情報パネルの同じカードを強調する。
+  // 地域が変わったら消す（ピンが消えると、マウスが離れた知らせが来ないため）
+  const [hoveredSpotId, setHoveredSpotId] = useState<string | null>(null);
+  const [prevAreaId, setPrevAreaId] = useState(area?.id);
+  if (prevAreaId !== area?.id) {
+    setPrevAreaId(area?.id);
+    setHoveredSpotId(null);
+  }
+  const hoverSpot = useCallback(
+    (spot: Spot | null) => setHoveredSpotId(spot?.id ?? null),
+    [],
+  );
+
   const closeDetail = useCallback(() => setSelectedSpot(null), []);
 
   return (
@@ -83,7 +98,11 @@ export function AreaRotator({ areas }: { areas: AreaWithSpots[] }) {
         {...hoverHandlers}
         {...focusHandlers}
       >
-        <AreaMap area={area} onSpotClick={setSelectedSpot} />
+        <AreaMap
+          area={area}
+          onSpotClick={setSelectedSpot}
+          onSpotHover={hoverSpot}
+        />
 
         {filtering && !area ? (
           <NoMatchPanel onClear={search.clear} />
@@ -91,6 +110,7 @@ export function AreaRotator({ areas }: { areas: AreaWithSpots[] }) {
           <SpotPanel
             area={area}
             nextArea={filteredAreas[(index + 1) % filteredAreas.length]}
+            activeSpotId={hoveredSpotId}
             onSelectSpot={setSelectedSpot}
             footer={
               <AreaNav
