@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { AreaWithSpots } from "@/lib/data/areas";
 import { cn } from "@/lib/utils";
 
@@ -10,7 +10,7 @@ const iconButton = cn(
 );
 
 /**
- * 前へ／次へボタン、今何番目かがわかるドット、自動切り替えの一時停止／再生ボタン。
+ * 前へ／次へボタンと、今何番目かがわかるドット。
  * 地域が1件以下なら何も出さない。
  */
 export function AreaNav({
@@ -19,31 +19,17 @@ export function AreaNav({
   onPrev,
   onNext,
   onSelect,
-  paused,
-  onTogglePause,
 }: {
   areas: AreaWithSpots[];
   index: number;
   onPrev: () => void;
   onNext: () => void;
   onSelect: (index: number) => void;
-  paused: boolean;
-  onTogglePause: () => void;
 }) {
   if (areas.length < 2) return null;
 
   return (
-    // タブ順は一時停止ボタンを最初にする（WAI-ARIA APG のカルーセル）。見た目の並びもそろえる
-    <div className="mt-auto flex items-center justify-between pt-2">
-      {/* タッチ端末ではマウスを乗せて止められないので、止める手段をボタンで用意する（WCAG 2.2.2） */}
-      <button
-        type="button"
-        onClick={onTogglePause}
-        aria-label={paused ? "自動切り替えを再開" : "自動切り替えを一時停止"}
-        className={iconButton}
-      >
-        {paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
-      </button>
+    <div className="mt-auto flex items-center justify-center pt-2">
       <div className="flex items-center gap-3">
         <button
           type="button"
