@@ -114,8 +114,14 @@ function replaceQuery(conditions: PlanConditions) {
 // 結果と最後の条件は app/layout.tsx の PlannerStateProvider に持ち、タブを切り替えても残す
 export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
   const searchParams = useSearchParams();
-  const { savedConditions, saveConditions, result, setResult } =
-    usePlannerState();
+  const {
+    savedConditions,
+    saveConditions,
+    result,
+    setResult,
+    selectedCandidate,
+    selectCandidate,
+  } = usePlannerState();
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
 
   const areaIds = useMemo(() => areas.map((area) => area.id), [areas]);
@@ -268,6 +274,8 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
           status={status}
           candidates={candidates}
           mode={mode}
+          selectedCandidate={selectedCandidate}
+          onSelectCandidate={selectCandidate}
           onSpotClick={setSelectedSpot}
         />
       </section>
@@ -281,11 +289,15 @@ function Result({
   status,
   candidates,
   mode,
+  selectedCandidate,
+  onSelectCandidate,
   onSpotClick,
 }: {
   status: PlannerStatus;
   candidates: PlanCandidate[];
   mode: PlanResponse["mode"] | null;
+  selectedCandidate: number;
+  onSelectCandidate: (index: number) => void;
   onSpotClick: (spot: Spot) => void;
 }) {
   if (status === "idle") {
@@ -341,7 +353,12 @@ function Result({
           </span>
         </p>
       )}
-      <CandidateTabs candidates={candidates} onSpotClick={onSpotClick} />
+      <CandidateTabs
+        candidates={candidates}
+        selectedIndex={selectedCandidate}
+        onSelect={onSelectCandidate}
+        onSpotClick={onSpotClick}
+      />
     </>
   );
 }

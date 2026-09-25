@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, test, vi } from "vitest";
 
 import type { Spot } from "@/lib/data/spots";
@@ -51,6 +52,25 @@ function candidate(areaName: string): PlanCandidate {
 
 const three = [candidate("松本市"), candidate("安曇野市"), candidate("大町市")];
 
+/** 選んだ番号を持つ親の代わり（アプリでは PlannerStateProvider が持つ） */
+function Tabs({
+  candidates,
+  onSpotClick = vi.fn(),
+}: {
+  candidates: PlanCandidate[];
+  onSpotClick?: (spot: Spot) => void;
+}) {
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  return (
+    <CandidateTabs
+      candidates={candidates}
+      selectedIndex={selectedIndex}
+      onSelect={setSelectedIndex}
+      onSpotClick={onSpotClick}
+    />
+  );
+}
+
 function tabs() {
   return screen.getAllByRole("tab");
 }
@@ -62,12 +82,12 @@ function shownTitles() {
 
 describe("CandidateTabs", () => {
   test("候補が3件なら、タブを3つ出し、1件目のカードだけを描く", () => {
-    render(<CandidateTabs candidates={three} onSpotClick={vi.fn()} />);
+    render(<Tabs candidates={three} />);
 
     expect(tabs().map((t) => t.textContent)).toEqual([
-      "候補1松本市",
-      "候補2安曇野市",
-      "候補3大町市",
+      "候補1：松本市",
+      "候補2：安曇野市",
+      "候補3：大町市",
     ]);
     expect(tabs().map((t) => t.getAttribute("aria-selected"))).toEqual([
       "true",
@@ -82,7 +102,7 @@ describe("CandidateTabs", () => {
   });
 
   test("タブを押すと、その候補に切り替わる", () => {
-    render(<CandidateTabs candidates={three} onSpotClick={vi.fn()} />);
+    render(<Tabs candidates={three} />);
 
     fireEvent.click(screen.getByRole("tab", { name: /安曇野市/ }));
 
@@ -93,13 +113,13 @@ describe("CandidateTabs", () => {
   });
 
   test("選んだタブだけを Tab で移動できる（ほかのタブは tabIndex -1）", () => {
-    render(<CandidateTabs candidates={three} onSpotClick={vi.fn()} />);
+    render(<Tabs candidates={three} />);
 
     expect(tabs().map((t) => t.tabIndex)).toEqual([0, -1, -1]);
   });
 
   test("←→ で隣の候補に切り替わり、端ではもう一方の端に回る", () => {
-    render(<CandidateTabs candidates={three} onSpotClick={vi.fn()} />);
+    render(<Tabs candidates={three} />);
 
     fireEvent.keyDown(tabs()[0], { key: "ArrowRight" });
     expect(shownTitles()).toEqual(["安曇野市をめぐる日帰りプラン"]);
@@ -116,7 +136,7 @@ describe("CandidateTabs", () => {
   });
 
   test("Home・End で先頭・末尾の候補に切り替わる", () => {
-    render(<CandidateTabs candidates={three} onSpotClick={vi.fn()} />);
+    render(<Tabs candidates={three} />);
 
     fireEvent.keyDown(tabs()[0], { key: "End" });
     expect(shownTitles()).toEqual(["大町市をめぐる日帰りプラン"]);
@@ -131,6 +151,8 @@ describe("CandidateTabs", () => {
     render(
       <CandidateTabs
         candidates={[candidate("松本市")]}
+        selectedIndex={0}
+        onSelect={vi.fn()}
         onSpotClick={vi.fn()}
       />,
     );
@@ -140,29 +162,32 @@ describe("CandidateTabs", () => {
     expect(shownTitles()).toEqual(["松本市をめぐる日帰りプラン"]);
   });
 
-  test("絞り直して候補が変わったら、1件目のタブに戻る", () => {
-    const { rerender } = render(
-      <CandidateTabs candidates={three} onSpotClick={vi.fn()} />,
-    );
-    fireEvent.click(tabs()[2]);
-
-    rerender(
+  test("選んだ番号が候補の数より大きければ、最後の候補を出す", () => {
+    render(
       <CandidateTabs
         candidates={[candidate("白馬村"), candidate("池田町")]}
+        selectedIndex={2}
+        onSelect={vi.fn()}
         onSpotClick={vi.fn()}
       />,
     );
 
     expect(tabs().map((t) => t.getAttribute("aria-selected"))).toEqual([
-      "true",
       "false",
+      "true",
     ]);
-    expect(shownTitles()).toEqual(["白馬村をめぐる日帰りプラン"]);
+    expect(shownTitles()).toEqual(["池田町をめぐる日帰りプラン"]);
+  });
+
+  test("カードには「候補 n」を出さない（タブに出している）", () => {
+    render(<Tabs candidates={three} />);
+
+    expect(screen.getByRole("tabpanel").textContent).not.toContain("候補");
   });
 
   test("カードのスポット名を押すと、そのスポットを渡す", () => {
     const onSpotClick = vi.fn();
-    render(<CandidateTabs candidates={three} onSpotClick={onSpotClick} />);
+    render(<Tabs candidates={three} onSpotClick={onSpotClick} />);
 
     fireEvent.click(screen.getAllByRole("button", { name: "B" })[0]);
 

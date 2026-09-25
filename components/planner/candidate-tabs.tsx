@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState, type KeyboardEvent } from "react";
+import { useId, useRef, type KeyboardEvent } from "react";
 import type { Spot } from "@/lib/data/spots";
 import type { PlanCandidate } from "@/lib/planner/types";
 import { cn } from "@/lib/utils";
@@ -8,33 +8,33 @@ import { CandidateCard } from "./candidate-card";
 
 /**
  * カードの地図を、一覧で並べていたときより高くする（候補を1件ずつ大きく見せるため、#80）。
- * 地図の部品は PR #41（Leaflet）などで差し替え中なので、カードの中は触らずに、包む要素から地図（カードの先頭の子）の高さを変える
+ * 包む要素から、カードの先頭の子（地図。読み込み中は SpotMapSkeleton）の高さを上書きする。
+ * カードの先頭の子が地図でなくなると黙って効かなくなる（jsdom では CSS が効かず、テストでも気づけない）
  */
+// TODO(#78): 地図を MapLibre に替えたら、CandidateCard に地図の className の props（mapClassName）を足し、この上書きを置き換える
 const LARGE_MAP_CLASS_NAME =
   "[&>article>:first-child]:h-72 sm:[&>article>:first-child]:h-96 lg:[&>article>:first-child]:h-[28rem]";
 
 /**
  * 旅プランの候補を、タブで1件ずつ切り替えて見せる（WAI-ARIA の tabs。←→・Home・End で移動する）。
- * 描くのは選んだ候補のカードだけ。候補が1件ならタブは出さない
+ * 描くのは選んだ候補のカードだけ。候補が1件ならタブは出さない。
+ * 選んでいる番号は持たずに受け取る（画面を移って戻っても残るよう、PlannerStateProvider に持つ）
  */
 export function CandidateTabs({
   candidates,
+  selectedIndex,
+  onSelect,
   onSpotClick,
 }: {
   candidates: PlanCandidate[];
+  selectedIndex: number;
+  onSelect: (index: number) => void;
   onSpotClick: (spot: Spot) => void;
 }) {
   const baseId = useId();
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [prevCandidates, setPrevCandidates] = useState(candidates);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  // 絞り直して候補が変わったら、1件目に戻す
-  if (prevCandidates !== candidates) {
-    setPrevCandidates(candidates);
-    setSelectedIndex(0);
-  }
-
+  // 候補が減っても範囲外を読まないよう、件数で丸める
   const index = Math.min(selectedIndex, candidates.length - 1);
   const candidate = candidates[index];
   if (!candidate) return null;
@@ -47,7 +47,6 @@ export function CandidateTabs({
       <CandidateCard
         key={candidate.id}
         candidate={candidate}
-        index={index}
         onSpotClick={onSpotClick}
       />
     </div>
@@ -56,7 +55,7 @@ export function CandidateTabs({
   if (candidates.length === 1) return card;
 
   const select = (i: number) => {
-    setSelectedIndex(i);
+    onSelect(i);
     tabRefs.current[i]?.focus();
   };
 
@@ -111,6 +110,8 @@ export function CandidateTabs({
               >
                 候補{i + 1}
               </span>
+              {/* 読み上げで「候補1白馬村」とつながらないよう区切る */}
+              <span className="sr-only">：</span>
               <span className="w-full truncate text-sm font-extrabold">
                 {c.areaName}
               </span>
