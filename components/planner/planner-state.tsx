@@ -16,6 +16,8 @@ export type PlannerResult = {
   conditions: PlanConditions | null;
   /** 候補の作り方（Gemini か、Gemini を使わないデモモードか）。結果がないときは null */
   mode: PlanResponse["mode"] | null;
+  /** /api/plan が 429（レート制限、#25）を返し、ブラウザでデモモードの候補を作ったとき true */
+  rateLimited?: boolean;
 };
 
 type PlannerState = {

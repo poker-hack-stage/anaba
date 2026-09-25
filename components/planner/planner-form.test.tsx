@@ -127,6 +127,25 @@ describe("PlannerForm", () => {
     await screen.findByText("松本市をめぐる日帰りプラン");
   });
 
+  test("/api/plan が 429（レート制限）なら、デモモードの候補と理由を出す", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          Response.json({ error: "rate_limited" }, { status: 429 }),
+        ),
+    );
+
+    renderForm();
+
+    // 見つからなければ findByText が失敗する
+    await screen.findByText("松本市をめぐる日帰りプラン");
+    expect(screen.getByRole("status").textContent).toContain(
+      "短い時間に何度も作ったため、デモモードで作成しました",
+    );
+  });
+
   test("Gemini で作った候補なら、デモモードの表示を出さない", async () => {
     const body: PlanResponse = { candidates: [], mode: "ai" };
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(body)));

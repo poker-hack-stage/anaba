@@ -1,7 +1,8 @@
 import { getAreasWithSpots } from "@/lib/data/areas";
 import { readLimitedText } from "@/lib/http/read-limited-text";
 import { createPlan } from "@/lib/planner/create-plan";
-import { allowGeminiForPlan } from "@/lib/planner/rate-limit";
+import { secondsUntilWindowEnd } from "@/lib/community/write";
+import { checkPlanRateLimit, PLAN_RATE_LIMIT } from "@/lib/planner/rate-limit";
 import { MAX_REQUEST_BYTES, planConditionsSchema } from "@/lib/planner/schema";
 import { createClient } from "@/lib/supabase/server";
 
@@ -13,6 +14,22 @@ export const maxDuration = 60;
 
 // 旅プランの候補を返す API。Gemini で作り、作れなければデモモードで返す（#18・#19）
 export async function POST(request: Request) {
+  // 入力を読む前に数える（#25）。上限を超えたら 429。数えられないときは、Gemini を使わずデモモードで返す
+  const rateLimit = await checkPlanRateLimit(request, await createClient());
+  if (rateLimit === "limited") {
+    return Response.json(
+      { error: "rate_limited" },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(
+            secondsUntilWindowEnd(PLAN_RATE_LIMIT.windowSeconds, Date.now()),
+          ),
+        },
+      },
+    );
+  }
+
   // 大きな本文を全部メモリに読まないよう、上限を超えた時点で読むのをやめる
   const text = await readLimitedText(request, MAX_REQUEST_BYTES);
   if (text === null) {
@@ -23,10 +40,10 @@ export async function POST(request: Request) {
     return Response.json({ error: "invalid_request" }, { status: 400 });
   }
 
-  // 形の正しい依頼だけを数える。上限を超えたら Gemini を呼ばず、デモモードで返す（#25）
-  const useAi = await allowGeminiForPlan(request, await createClient());
   const areas = await getAreasWithSpots();
-  return Response.json(await createPlan(areas, parsed.data, { useAi }));
+  return Response.json(
+    await createPlan(areas, parsed.data, { useAi: rateLimit === "allowed" }),
+  );
 }
 
 function parseJson(text: string): unknown {

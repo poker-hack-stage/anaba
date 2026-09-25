@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { hashClient } from "@/lib/community/client-hash";
-import { allowGeminiForPlan, PLAN_RATE_LIMIT } from "./rate-limit";
+import { checkPlanRateLimit, PLAN_RATE_LIMIT } from "./rate-limit";
 
 const SALT = "test-salt";
 
@@ -35,11 +35,11 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("allowGeminiForPlan", () => {
-  test("送信元の IP のハッシュで回数を数え、上限を超えていなければ呼んでよい", async () => {
+describe("checkPlanRateLimit", () => {
+  test("送信元の IP のハッシュで回数を数え、上限を超えていなければ allowed", async () => {
     const { rpc, client } = supabaseReturning(ok);
 
-    expect(await allowGeminiForPlan(planRequest(), client)).toBe(true);
+    expect(await checkPlanRateLimit(planRequest(), client)).toBe("allowed");
     expect(rpc).toHaveBeenCalledExactlyOnceWith("check_rate_limit", {
       p_key: `plan:${hashClient("203.0.113.7", SALT)}`,
       p_window_seconds: PLAN_RATE_LIMIT.windowSeconds,
@@ -47,27 +47,27 @@ describe("allowGeminiForPlan", () => {
     });
   });
 
-  test("上限を超えたら呼ばない", async () => {
+  test("上限を超えたら limited", async () => {
     expect(
-      await allowGeminiForPlan(planRequest(), supabaseReturning(denied).client),
-    ).toBe(false);
+      await checkPlanRateLimit(planRequest(), supabaseReturning(denied).client),
+    ).toBe("limited");
   });
 
-  test("回数を数えられない（DB のエラー）なら呼ばない", async () => {
+  test("回数を数えられない（DB のエラー）なら unavailable", async () => {
     const { client } = supabaseReturning({
       data: null,
       error: { code: "PGRST000", message: "connection refused" },
     });
 
-    expect(await allowGeminiForPlan(planRequest(), client)).toBe(false);
+    expect(await checkPlanRateLimit(planRequest(), client)).toBe("unavailable");
   });
 
-  test("本番で RATE_LIMIT_SALT がなければ、DB を呼ばずに呼ばない", async () => {
+  test("本番で RATE_LIMIT_SALT がなければ、DB を呼ばずに unavailable", async () => {
     vi.stubEnv("RATE_LIMIT_SALT", "");
     vi.stubEnv("NODE_ENV", "production");
     const { rpc, client } = supabaseReturning(ok);
 
-    expect(await allowGeminiForPlan(planRequest(), client)).toBe(false);
+    expect(await checkPlanRateLimit(planRequest(), client)).toBe("unavailable");
     expect(rpc).not.toHaveBeenCalled();
   });
 
@@ -75,8 +75,8 @@ describe("allowGeminiForPlan", () => {
     const a = supabaseReturning(ok);
     const b = supabaseReturning(ok);
 
-    await allowGeminiForPlan(planRequest("203.0.113.7"), a.client);
-    await allowGeminiForPlan(planRequest("198.51.100.2"), b.client);
+    await checkPlanRateLimit(planRequest("203.0.113.7"), a.client);
+    await checkPlanRateLimit(planRequest("198.51.100.2"), b.client);
 
     expect(a.rpc.mock.calls[0][1].p_key).not.toBe(b.rpc.mock.calls[0][1].p_key);
   });

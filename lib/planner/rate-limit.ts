@@ -6,7 +6,7 @@ import {
 } from "@/lib/community/client-hash";
 import type { createClient } from "@/lib/supabase/server";
 
-// /api/plan で Gemini を呼ぶ回数の、送信元（IP）ごとの制限（#25）。上限を超えたら Gemini を呼ばず、デモモードで返す。
+// /api/plan の送信元（IP）ごとの回数の制限（#25）。上限を超えたら 429 を返す（画面はブラウザでデモモードの候補を作る）。
 // 回数は DB の check_rate_limit()（#51、キーの種類は plan）で数える。Vercel の関数は複数のインスタンスで動くので、
 // メモリの中では数えられない。
 // 全員の合計の上限は持たない。無料枠（1分15回・1日500回）を超えると Gemini が 429 を返し、
@@ -22,19 +22,25 @@ type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 export const PLAN_RATE_LIMIT = { windowSeconds: 10 * 60, max: 100 } as const;
 
 /**
- * この依頼で Gemini を呼んでよいか。
- * DB に接続できない・本番で RATE_LIMIT_SALT がないときは、呼ばない（無料枠を守る側に倒す）
+ * レート制限の結果。
+ * - allowed: Gemini を使ってよい
+ * - limited: 上限を超えた（429 を返す）
+ * - unavailable: 回数を数えられない（DB に接続できない・本番で RATE_LIMIT_SALT がない）。
+ *   利用者のせいではないので 429 にはせず、Gemini を使わずにデモモードで返す（無料枠を守る側に倒す）
  */
-export async function allowGeminiForPlan(
+export type PlanRateLimitResult = "allowed" | "limited" | "unavailable";
+
+/** この依頼を数え、Gemini を使ってよいかを返す */
+export async function checkPlanRateLimit(
   request: Request,
   supabase: SupabaseClient,
-): Promise<boolean> {
+): Promise<PlanRateLimitResult> {
   const salt = getRateLimitSalt();
   if (salt === null) {
     console.error(
       "[plan] RATE_LIMIT_SALT が未設定なので、Gemini を使わずデモモードで返します",
     );
-    return false;
+    return "unavailable";
   }
 
   const clientHash = hashClient(getClientIp(request.headers), salt);
@@ -48,11 +54,7 @@ export async function allowGeminiForPlan(
       code: error.code,
       message: error.message,
     });
-    return false;
+    return "unavailable";
   }
-  if (!allowed) {
-    console.warn("[plan] レート制限にかかったので、デモモードで返します");
-    return false;
-  }
-  return true;
+  return allowed ? "allowed" : "limited";
 }

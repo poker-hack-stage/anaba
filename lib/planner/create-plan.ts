@@ -10,7 +10,7 @@ import type { PlanCandidate, PlanConditions, PlanResponse } from "./types";
 /**
  * 旅プランの候補を作る。Gemini で作れなければ（キーなし・時間切れ・無料枠の上限・形の崩れ・使える候補が0件）、
  * デモモード（generateCandidates()、#19）で作る。無料枠の回数を使わないよう、Gemini はやり直さない。
- * useAi が false（レート制限にかかった、#25）なら、Gemini を呼ばずにデモモードで作る
+ * useAi が false（レート制限の回数を数えられなかった、#25）なら、Gemini を呼ばずにデモモードで作る
  */
 export async function createPlan(
   areas: readonly PlannableArea[],
