@@ -11,23 +11,22 @@ import { getDayColor } from "./day-colors";
 
 const MAP_CLASS_NAME = "h-56 rounded-none border-0 border-b";
 
-// Leaflet は window を使うので、サーバーでは描画しない
+// 地図（MapLibre）は window と WebGL を使うので、サーバーでは描画しない
 const SpotMap = dynamic(
   () => import("@/components/map/spot-map").then((m) => m.SpotMap),
   { ssr: false, loading: () => <SpotMapSkeleton className={MAP_CLASS_NAME} /> },
 );
 
 /**
- * 旅プランの候補カード。地図と、日ごとの経路・所要時間・選ばれた理由を出す（docs/spec.md の 6.2・#57）
- * TODO(#57): 地図で日ごとに線とマーカーの色を変え、凡例を出す（地図の部品の作業。#78 の MapLibre 版のあと）。今は全日の経路を1本で出している
+ * 旅プランの候補カード。地図と、日ごとの経路・所要時間・選ばれた理由を出す（docs/spec.md の 6.2・#57）。
+ * 何件目の候補かは、包むタブ（candidate-tabs.tsx）に出す
+ * TODO(#57): 地図で日ごとに線とマーカーの色を変え、凡例を出す（地図の部品の作業で、担当は未定）。今は全日の経路を1本で出している
  */
 export function CandidateCard({
   candidate,
-  index,
   onSpotClick,
 }: {
   candidate: PlanCandidate;
-  index: number;
   onSpotClick: (spot: Spot) => void;
 }) {
   const multiDay = candidate.days.length > 1;
@@ -41,15 +40,14 @@ export function CandidateCard({
       />
       <div className="flex flex-col gap-4 p-4">
         <div>
-          <p className="flex flex-wrap items-center gap-2 text-xs font-bold text-shu">
-            候補 {index + 1}
-            {candidate.nearby && (
+          {candidate.nearby && (
+            <p className="mb-1">
               <span className="rounded-full border border-ink/20 bg-ink-light px-2 py-0.5 text-[11px] font-bold text-ink">
                 近くの地域
               </span>
-            )}
-          </p>
-          <h3 className="mt-0.5 font-extrabold leading-snug text-stone-900">
+            </p>
+          )}
+          <h3 className="font-extrabold leading-snug text-stone-900">
             {candidate.title}
           </h3>
           {candidate.summary && (

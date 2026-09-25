@@ -2,29 +2,13 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 
 import type { Spot } from "@/lib/data/spots";
+import { spot as fixtureSpot } from "@/test/fixtures/planner";
 import type { PlanCandidate, PlanDay } from "@/lib/planner/types";
 import { CandidateCard } from "./candidate-card";
 
-function spot(name: string, stay_minutes: number | null = 60): Spot {
-  return {
-    id: name,
-    area_id: "area",
-    name,
-    category: "nature",
-    lat: 36.2,
-    lng: 137.9,
-    rating: 4.0,
-    hidden_gem_score: null,
-    stay_minutes,
-    catchphrase: null,
-    description: null,
-    local_tip: null,
-    best_time: null,
-    image_path: null,
-    tags: [],
-    created_at: "2026-09-25T00:00:00Z",
-    updated_at: "2026-09-25T00:00:00Z",
-  };
+/** 名前を id に使うスポット（地域は使わないので固定） */
+function spot(name: string, stay: number | null = 60): Spot {
+  return fixtureSpot("area", name, "nature", { stay });
 }
 
 function day(
@@ -58,7 +42,7 @@ function candidate(overrides: Partial<PlanCandidate> = {}): PlanCandidate {
 }
 
 function renderCard(c: PlanCandidate, onSpotClick = vi.fn()) {
-  render(<CandidateCard candidate={c} index={0} onSpotClick={onSpotClick} />);
+  render(<CandidateCard candidate={c} onSpotClick={onSpotClick} />);
   return onSpotClick;
 }
 

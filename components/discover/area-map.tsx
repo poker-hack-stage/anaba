@@ -7,14 +7,14 @@ import type { Spot } from "@/lib/data/spots";
 
 const MAP_CLASS_NAME = "h-72 sm:h-96 lg:h-auto lg:min-h-[520px]";
 
-// Leaflet は window を使うので、サーバーでは描画しない
+// 地図（MapLibre）は window と WebGL を使うので、サーバーでは描画しない
 const SpotMap = dynamic(
   () => import("@/components/map/spot-map").then((m) => m.SpotMap),
   { ssr: false, loading: () => <SpotMapSkeleton className={MAP_CLASS_NAME} /> },
 );
 
 /**
- * 「穴場を探す」の地図部分。表示中の地域とおすすめ3件をハイライトする。
+ * 「穴場を探す」の地図部分。表示中の地域とおすすめ3件をハイライトする。area がないときは日本全体を出す。
  * 地図コンポーネントの読み込みはこのファイルだけで行う。
  */
 export function AreaMap({
@@ -31,6 +31,8 @@ export function AreaMap({
       highlighted={area?.recommended}
       others={area?.spots.filter((s) => !area.recommended.includes(s))}
       onSpotClick={onSpotClick}
+      // 絞り込みで0件のとき（area がない）は、読み込みに失敗したように見えないようプレースホルダーを出さない
+      emptyPlaceholder={area !== undefined}
       className={`${MAP_CLASS_NAME} animate-in fade-in`}
     />
   );
