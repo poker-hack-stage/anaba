@@ -45,6 +45,7 @@ export type Database = {
           id: string
           image_path: string | null
           name: string
+          prefecture: string
           updated_at: string
           zoom: number
         }
@@ -58,6 +59,7 @@ export type Database = {
           id?: string
           image_path?: string | null
           name: string
+          prefecture: string
           updated_at?: string
           zoom?: number
         }
@@ -71,6 +73,7 @@ export type Database = {
           id?: string
           image_path?: string | null
           name?: string
+          prefecture?: string
           updated_at?: string
           zoom?: number
         }
