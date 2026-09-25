@@ -91,30 +91,6 @@ export type Database = {
         }
         Relationships: []
       }
-      profiles: {
-        Row: {
-          avatar_url: string | null
-          created_at: string
-          display_name: string | null
-          id: string
-          updated_at: string
-        }
-        Insert: {
-          avatar_url?: string | null
-          created_at?: string
-          display_name?: string | null
-          id: string
-          updated_at?: string
-        }
-        Update: {
-          avatar_url?: string | null
-          created_at?: string
-          display_name?: string | null
-          id?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       rate_limits: {
         Row: {
           count: number
@@ -232,6 +208,7 @@ export type Database = {
           category: string
           created_at: string
           description: string | null
+          hidden_gem_score: number | null
           id: string
           image_path: string | null
           lat: number
@@ -251,6 +228,7 @@ export type Database = {
           category: string
           created_at?: string
           description?: string | null
+          hidden_gem_score?: number | null
           id?: string
           image_path?: string | null
           lat: number
@@ -270,6 +248,7 @@ export type Database = {
           category?: string
           created_at?: string
           description?: string | null
+          hidden_gem_score?: number | null
           id?: string
           image_path?: string | null
           lat?: number

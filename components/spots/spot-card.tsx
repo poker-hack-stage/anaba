@@ -1,6 +1,7 @@
 import { Clock, Star } from "lucide-react";
 import type { Spot } from "@/lib/data/spots";
 import { getCategory } from "@/lib/spots/categories";
+import { formatRating, getRating } from "@/lib/spots/score";
 import { SpotImage } from "./spot-image";
 
 /**
@@ -14,12 +15,13 @@ export function SpotCard({
   onSelect?: (spot: Spot) => void;
 }) {
   const meta = getCategory(spot.category);
+  const rating = getRating(spot);
 
   return (
     <button
       type="button"
       onClick={() => onSelect?.(spot)}
-      className="flex w-full gap-3 overflow-hidden rounded-2xl border border-stone-200 bg-white p-3 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg"
+      className="flex w-full gap-3 overflow-hidden rounded-2xl border border-stone-200 bg-white p-3 text-left transition-colors hover:border-stone-300 hover:bg-stone-50"
     >
       <SpotImage
         category={spot.category}
@@ -28,14 +30,15 @@ export function SpotCard({
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex items-center gap-2">
           <span
-            className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${meta.badge}`}
+            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${meta.badge}`}
           >
-            {meta.emoji} {meta.label}
+            <meta.icon aria-hidden className="h-3 w-3 shrink-0" />
+            {meta.label}
           </span>
-          {spot.rating !== null && (
-            <span className="ml-auto flex items-center gap-0.5 text-xs font-bold text-amber-600">
+          {rating !== null && (
+            <span className="ml-auto flex items-center gap-0.5 text-xs font-bold text-amber-700">
               <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
-              {spot.rating}
+              {formatRating(rating)}
             </span>
           )}
         </div>
@@ -55,7 +58,7 @@ export function SpotCard({
             </span>
           ))}
           {spot.best_time && (
-            <span className="ml-auto flex items-center gap-0.5 text-[10px] text-stone-400">
+            <span className="ml-auto flex items-center gap-0.5 text-[10px] text-stone-500">
               <Clock className="h-3 w-3" />
               {spot.best_time}
             </span>
