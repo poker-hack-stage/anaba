@@ -19,7 +19,6 @@ import type {
 } from "geojson";
 import { Map, MapPin } from "lucide-react";
 import type { Spot } from "@/lib/data/spots";
-import { outsideOf, toAreaBoundary } from "@/lib/map/boundary";
 import { computeBounds } from "@/lib/map/bounds";
 import { getCategory } from "@/lib/spots/categories";
 import { cn } from "@/lib/utils";
@@ -107,16 +106,19 @@ const SINGLE_SPOT_ZOOM = 14;
 const FIT_PADDING = { top: 40, right: 56, bottom: 64, left: 40 };
 
 const ROUTE_COLOR = "#c0432b";
-const BOUNDARY_COLOR = "#24463d"; // ink
-/** 地域の外側を暗くする色と濃さ。表示中の地域だけが見えるよう、外はほとんど見えなくする */
-const OUTSIDE_COLOR = "#1c1917"; // stone-900
-const OUTSIDE_OPACITY = 0.85;
+/**
+ * 地域の境界の線。黒の太い線の下に白い縁を敷き、背景の道路・川・県境と紛れないようにする。
+ * 外側は暗くしない（#99 で暗くしたが、見にくいので 2026-09-26 に kosei が黒い枠に変えた）
+ */
+const BOUNDARY_COLOR = "#1c1917"; // stone-900
+const BOUNDARY_WIDTH = 2.5;
+const BOUNDARY_HALO_COLOR = "#ffffff";
+const BOUNDARY_HALO_WIDTH = BOUNDARY_WIDTH + 2;
 /** 移動にかける時間。自動の切り替え（6秒ごと）より十分短くする */
 const MOVE_DURATION_MS = 1200;
 
 const ROUTE_SOURCE = "spot-route";
 const BOUNDARY_SOURCE = "area-boundary";
-const OUTSIDE_SOURCE = "area-outside";
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 
 /**
@@ -276,23 +278,27 @@ export function SpotMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, pointsKey, boundary, animateMove]);
 
-  // 境界の塗りつぶしと経路の線を置く場所を用意する
+  // 境界と経路の線を置く場所を用意する
   useEffect(() => {
     if (!map || !styleLoaded) return;
-    // 地域の外側を暗くする。外の地名も暗くするので、地名の文字より上に重ねる
-    map.addSource(OUTSIDE_SOURCE, { type: "geojson", data: EMPTY });
-    map.addLayer({
-      id: `${OUTSIDE_SOURCE}-fill`,
-      type: "fill",
-      source: OUTSIDE_SOURCE,
-      paint: { "fill-color": OUTSIDE_COLOR, "fill-opacity": OUTSIDE_OPACITY },
-    });
+    // 地域の境界。白い縁を先に敷き、その上に黒い線を重ねる
     map.addSource(BOUNDARY_SOURCE, { type: "geojson", data: EMPTY });
+    map.addLayer({
+      id: `${BOUNDARY_SOURCE}-halo`,
+      type: "line",
+      source: BOUNDARY_SOURCE,
+      layout: { "line-join": "round" },
+      paint: {
+        "line-color": BOUNDARY_HALO_COLOR,
+        "line-width": BOUNDARY_HALO_WIDTH,
+      },
+    });
     map.addLayer({
       id: `${BOUNDARY_SOURCE}-line`,
       type: "line",
       source: BOUNDARY_SOURCE,
-      paint: { "line-color": BOUNDARY_COLOR, "line-width": 2.5 },
+      layout: { "line-join": "round" },
+      paint: { "line-color": BOUNDARY_COLOR, "line-width": BOUNDARY_WIDTH },
     });
     map.addSource(ROUTE_SOURCE, { type: "geojson", data: EMPTY });
     map.addLayer({
@@ -317,10 +323,6 @@ export function SpotMap({
     const data =
       boundary && computeBounds([], boundary) ? (boundary as GeoJSON) : EMPTY;
     map.getSource<GeoJSONSource>(BOUNDARY_SOURCE)?.setData(data);
-    const area = toAreaBoundary(boundary);
-    map
-      .getSource<GeoJSONSource>(OUTSIDE_SOURCE)
-      ?.setData(area ? outsideOf(area) : EMPTY);
   }, [map, styleLoaded, boundary]);
 
   useEffect(() => {
