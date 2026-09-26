@@ -42,9 +42,24 @@ describe("PHOTO_CREDITS", () => {
         expect(credit.licenseUrl, credit.path).toBeNull();
       }
       expect(credit.author, credit.path).not.toBe("");
-      expect(credit.sourceUrl, credit.path).toMatch(
-        /^https:\/\/commons\.wikimedia\.org\/wiki\/File:/,
-      );
+    }
+  });
+
+  test("元の写真の URL が、出典のサイトのもの", () => {
+    const prefix = {
+      "Wikimedia Commons": /^https:\/\/commons\.wikimedia\.org\/wiki\/File:/,
+      Flickr: /^https:\/\/www\.flickr\.com\/photos\/[^/]+\/\d+$/,
+    };
+    for (const credit of PHOTO_CREDITS) {
+      expect(credit.sourceUrl, credit.path).toMatch(prefix[credit.sourceName]);
+    }
+  });
+
+  test("Flickr の写真は CC BY か CC BY-SA だけ（NC・ND は使わない）", () => {
+    for (const credit of PHOTO_CREDITS.filter(
+      (c) => c.sourceName === "Flickr",
+    )) {
+      expect(credit.license, credit.path).toMatch(/^CC BY(-SA)? \d\.\d$/);
     }
   });
 });
