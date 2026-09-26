@@ -17,6 +17,7 @@ import {
   Route,
   SearchX,
   Sparkles,
+  type LucideIcon,
 } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { SpotDetailDialog } from "@/components/spots/spot-detail-dialog";
@@ -47,6 +48,13 @@ import type {
 } from "@/lib/planner/types";
 import { cn } from "@/lib/utils";
 import { CandidateTabs } from "./candidate-tabs";
+import {
+  ANY_AREA_ICON,
+  COMPANION_ICONS,
+  DURATION_ICONS,
+  INTEREST_ICONS,
+  TRANSPORT_ICONS,
+} from "./condition-icons";
 import {
   type PlannerResult,
   type PlannerStatus,
@@ -390,24 +398,28 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
         <Choice
           label="日程"
           options={DURATIONS.map((d) => DURATION_LABELS[d])}
+          icons={DURATION_LABEL_ICONS}
           selected={[DURATION_LABELS[conditions.duration]]}
           onSelect={(label) => set("duration", toDuration(label))}
         />
         <Choice
           label="興味のあること（複数選べます）"
           options={INTERESTS}
+          icons={INTEREST_ICONS}
           selected={conditions.interests}
           onSelect={toggleInterest}
         />
         <Choice
           label="だれと"
           options={COMPANIONS}
+          icons={COMPANION_ICONS}
           selected={[conditions.companion]}
           onSelect={(v) => set("companion", v)}
         />
         <Choice
           label="移動手段"
           options={TRANSPORTS}
+          icons={TRANSPORT_ICONS}
           selected={[conditions.transport]}
           onSelect={(v) => set("transport", v)}
         />
@@ -610,8 +622,21 @@ function Result({
   );
 }
 
-/** スマホでは指で押しやすいよう、チップを縦に広げる（点検 B-12） */
-const CHIP_TOUCH_CLASS = "max-sm:py-2.5";
+/**
+ * 条件のチップ。アイコンと文字を横に並べる（#148。「穴場を探す」のカテゴリのチップと同じ形）。
+ * スマホでは指で押しやすいよう、チップを縦に広げる（点検 B-12）
+ */
+const CHIP_CLASS = "inline-flex items-center gap-1 max-sm:py-2.5";
+
+/** チップのアイコン。飾りなので読み上げない（読み上げはチップの文字のまま） */
+function ChipIcon({ icon: Icon }: { icon: LucideIcon }) {
+  return <Icon aria-hidden className="h-3.5 w-3.5 shrink-0" />;
+}
+
+/** 日程の表示の文言 → アイコン（チップは表示の文言で選ぶため） */
+const DURATION_LABEL_ICONS = Object.fromEntries(
+  DURATIONS.map((d) => [DURATION_LABELS[d], DURATION_ICONS[d]]),
+);
 
 /** 日程の表示の文言から、日程のコードに戻す */
 function toDuration(label: string): PlanDuration {
@@ -646,8 +671,9 @@ function AreaField({
         <Chip
           active={areaId === null}
           onClick={() => onChange(null)}
-          className={CHIP_TOUCH_CLASS}
+          className={CHIP_CLASS}
         >
+          <ChipIcon icon={ANY_AREA_ICON} />
           {ANY_AREA_LABEL}
         </Chip>
         <Select
@@ -717,16 +743,19 @@ function NoteField({
   );
 }
 
-function Choice({
+function Choice<T extends string>({
   label,
   options,
+  icons,
   selected,
   onSelect,
 }: {
   label: string;
-  options: readonly string[];
-  selected: string[];
-  onSelect: (value: string) => void;
+  options: readonly T[];
+  /** 選択肢ごとのアイコン */
+  icons: Record<T, LucideIcon>;
+  selected: readonly string[];
+  onSelect: (value: T) => void;
 }) {
   const labelId = useId();
   return (
@@ -740,8 +769,9 @@ function Choice({
             key={option}
             active={selected.includes(option)}
             onClick={() => onSelect(option)}
-            className={CHIP_TOUCH_CLASS}
+            className={CHIP_CLASS}
           >
+            <ChipIcon icon={icons[option]} />
             {option}
           </Chip>
         ))}

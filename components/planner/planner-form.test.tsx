@@ -291,6 +291,64 @@ describe("PlannerForm", () => {
     });
   });
 
+  describe("条件のチップのアイコン（#148）", () => {
+    const groups = [
+      { name: "日程", labels: ["日帰り", "1泊2日", "2泊3日"] },
+      {
+        name: "興味のあること（複数選べます）",
+        labels: ["食", "自然", "絶景", "温泉", "体験", "歴史"],
+      },
+      {
+        name: "だれと",
+        labels: ["ひとり", "友人", "カップル", "家族（子連れ）"],
+      },
+      { name: "移動手段", labels: ["車", "電車・バス", "自転車"] },
+    ];
+
+    test.each(groups)(
+      "「$name」のすべての選択肢に、読み上げないアイコンが付き、読み上げは文字のまま",
+      ({ name, labels }) => {
+        renderForm({ submit: false });
+        const group = screen.getByRole("group", { name });
+        const chips = within(group).getAllByRole("button");
+
+        expect(chips.map((chip) => chip.textContent)).toEqual(labels);
+        for (const [i, chip] of chips.entries()) {
+          // アクセシブルな名前は文字だけ（アイコンは名前に入らない）
+          expect(within(group).getByRole("button", { name: labels[i] })).toBe(
+            chip,
+          );
+          const icons = chip.querySelectorAll("svg");
+          expect(icons).toHaveLength(1);
+          expect(icons[0].getAttribute("aria-hidden")).toBe("true");
+        }
+      },
+    );
+
+    test("エリアの「おまかせ」にも読み上げないアイコンが付く", () => {
+      renderForm({ submit: false });
+      const any = screen.getByRole("button", { name: "おまかせ" });
+      expect(any.querySelector("svg")?.getAttribute("aria-hidden")).toBe(
+        "true",
+      );
+    });
+
+    test("アイコンを付けても、チップは Tab で移れるボタンで、押すと選択が切り替わる", () => {
+      renderForm({ submit: false });
+      const onsen = screen.getByRole("button", { name: "温泉" });
+      onsen.focus();
+      expect(document.activeElement).toBe(onsen);
+      expect(onsen.getAttribute("aria-pressed")).toBe("false");
+
+      fireEvent.click(onsen);
+      expect(
+        screen
+          .getByRole("button", { name: "温泉" })
+          .getAttribute("aria-pressed"),
+      ).toBe("true");
+    });
+  });
+
   describe("自由記述の希望（#114）", () => {
     function stubFetch() {
       const body: PlanResponse = { candidates: [], mode: "ai" };

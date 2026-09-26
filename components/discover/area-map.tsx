@@ -52,6 +52,7 @@ export function AreaMap({
   activeSpotId,
   onSpotClick,
   onSpotHover,
+  onUserMove,
 }: {
   /** 表示中の地域。絞り込み中は `matchedSpots`（条件に合うスポット）が付く */
   area?: AreaWithSpots & { matchedSpots?: Spot[] };
@@ -69,6 +70,8 @@ export function AreaMap({
   onSpotClick: (spot: Spot) => void;
   /** ピンにマウスが乗ったら（キーボードで選んだら）そのスポット、離れたら null */
   onSpotHover?: (spot: Spot | null) => void;
+  /** 利用者が地図を拡大・移動し始めた（地域が変わって地図が動くときは呼ばない） */
+  onUserMove?: () => void;
 }) {
   // 同じ地域なら同じオブジェクトが返るので、絞り込みで地域を作り直しても境界は描き直さない
   const boundary = useMemo(
@@ -134,6 +137,7 @@ export function AreaMap({
       labelClassName="max-lg:hidden lg:left-[332px] xl:left-[372px]"
       onSpotClick={onSpotClick}
       onSpotHover={onSpotHover}
+      onUserMove={onUserMove}
       animateMove
       // 絞り込みで0件のとき（area がない）は、読み込みに失敗したように見えないようプレースホルダーを出さない
       emptyPlaceholder={area !== undefined}
