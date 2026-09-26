@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import {
   NETWORK_ERROR_MESSAGE,
   loadNickname,
@@ -181,25 +182,25 @@ export function SpotSubmissionForm({
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={`${id}-areaId`}>地域</Label>
-        <select
+        <Select
           id={`${id}-areaId`}
           value={areaId}
           onChange={(e) => changeArea(e.target.value)}
           aria-invalid={fieldErrors.areaId ? true : undefined}
           aria-describedby={describedBy("areaId")}
-          className="h-9 w-full rounded-md border border-input bg-white px-3 text-base shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:text-sm"
         >
           <option value="">地域を選んでください</option>
           {groups.map((group) => (
             <optgroup key={group.prefecture} label={group.prefecture}>
               {group.areas.map((a) => (
+                // 旅プランのエリア欄と同じく、都道府県の見出しが見えないブラウザのために名前に添える
                 <option key={a.id} value={a.id}>
-                  {a.name}
+                  {a.name}（{group.prefecture}）
                 </option>
               ))}
             </optgroup>
           ))}
-        </select>
+        </Select>
         <FieldError id={`${id}-areaId-error`} message={fieldErrors.areaId} />
       </div>
 

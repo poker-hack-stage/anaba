@@ -151,7 +151,7 @@ describe("穴場を教えるフォーム", () => {
     const nagano = form.querySelector('optgroup[label="長野県"]')!;
     expect(
       [...nagano.querySelectorAll("option")].map((o) => o.textContent),
-    ).toEqual(["白馬村", "安曇野市"]);
+    ).toEqual(["白馬村（長野県）", "安曇野市（長野県）"]);
     expect(form.textContent).toContain(
       "ログインは不要です。スポット名・ひとこと・ニックネームはすぐ公開されます。管理者が非表示にすることがあります。",
     );
