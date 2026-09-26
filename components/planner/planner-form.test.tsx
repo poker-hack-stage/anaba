@@ -640,7 +640,10 @@ describe("PlannerForm", () => {
 
       // 差し替わると、そのスポットが経路（番号付きのリスト）に入り、経路外のピンから消える
       const list = await screen.findByRole("list");
-      await within(list).findByRole("button", { name });
+      // 経路のカードは全体が1つのボタンで、名前はスポット名から始まる（#138）
+      await within(list).findByRole("button", {
+        name: (accessibleName) => accessibleName.startsWith(name),
+      });
       expect(
         screen.queryByRole("button", { name: `経路外のピン: ${name}` }),
       ).toBeNull();

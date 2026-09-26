@@ -1,9 +1,9 @@
 import { Clock } from "lucide-react";
 import { Rating } from "@/components/ui/rating";
 import type { Spot } from "@/lib/data/spots";
-import { getCategory } from "@/lib/spots/categories";
 import { getHiddenGemScore, getRating } from "@/lib/spots/score";
 import { cn } from "@/lib/utils";
+import { CategoryBadge } from "./category-badge";
 import { HiddenGemScore } from "./hidden-gem-score";
 import { SpotImage, preloadSpotImage } from "./spot-image";
 
@@ -45,7 +45,6 @@ export function SpotCard({
   variant?: SpotCardVariant;
 }) {
   const panel = variant === "panel";
-  const meta = getCategory(spot.category);
   const rating = getRating(spot);
   const hiddenGemScore = getHiddenGemScore(spot);
 
@@ -68,12 +67,7 @@ export function SpotCard({
         )}
       />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <span
-          className={`inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${meta.badge}`}
-        >
-          <meta.icon aria-hidden className="h-3 w-3 shrink-0" />
-          {meta.label}
-        </span>
+        <CategoryBadge category={spot.category} />
         <h3
           className={cn(
             "truncate font-extrabold text-stone-900",

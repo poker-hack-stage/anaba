@@ -4,9 +4,14 @@ import dynamic from "next/dynamic";
 import { BedDouble, Clock, Lightbulb, MapPin } from "lucide-react";
 import { SpotMapSkeleton } from "@/components/map/spot-map-skeleton";
 import type { SpotRoute } from "@/components/map/spot-map";
+import { CategoryBadge } from "@/components/spots/category-badge";
+import { HiddenGemScore } from "@/components/spots/hidden-gem-score";
+import { SpotImage } from "@/components/spots/spot-image";
+import { Rating } from "@/components/ui/rating";
 import type { Spot } from "@/lib/data/spots";
 import { formatMinutes } from "@/lib/planner/duration";
 import type { PlanCandidate, PlanDay } from "@/lib/planner/types";
+import { getHiddenGemScore, getRating } from "@/lib/spots/score";
 import { cn } from "@/lib/utils";
 import { CandidateMapDialog } from "./candidate-map-dialog";
 import { getDayColor } from "./day-colors";
@@ -88,7 +93,9 @@ export function CandidateCard({
           </div>
         )}
 
-        <div className="flex flex-col gap-4">
+        {/* 結果の欄が広いときは日ごとの経路を横に並べ、2泊3日でも縦に長くなりすぎないようにする（#138）。
+            列の数は画面の幅ではなく欄の幅で決まる（1列が 20rem より狭くなるなら折り返す） */}
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,20rem),1fr))] items-start gap-4">
           {candidate.days.map((day) => (
             <DayRoute
               key={day.day}
@@ -136,7 +143,7 @@ function candidateRoutes(candidate: PlanCandidate): SpotRoute[] {
   );
 }
 
-/** 1日ぶんの経路。見出し（何日目・地域・所要時間）の下に、めぐる順の番号付きのリスト */
+/** 1日ぶんの経路。見出し（何日目・地域・所要時間）の下に、めぐる順の番号付きのカードのリスト。番号と点線は日ごとの色 */
 function DayRoute({
   day,
   multiDay,
@@ -179,31 +186,76 @@ function DayRoute({
         )}
       >
         {day.route.map((spot, i) => (
-          <li key={spot.id} className="ml-4 flex items-baseline gap-2">
+          <li key={spot.id} className="relative pl-4">
             <span
               className={cn(
-                "absolute -left-[11px] flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white",
+                "absolute -left-[11px] top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-[10px] font-bold text-white",
                 color.dot,
               )}
             >
               {i + 1}
             </span>
-            <button
-              type="button"
-              onClick={() => onSpotClick(spot)}
-              className="text-left text-sm font-bold text-stone-800 hover:text-shu"
-            >
-              {spot.name}
-            </button>
-            {spot.stay_minutes !== null && (
-              <span className="shrink-0 text-[11px] text-stone-500">
-                <span className="sr-only">滞在の目安 </span>
-                {formatMinutes(spot.stay_minutes)}
-              </span>
-            )}
+            <RouteSpotCard spot={spot} onSelect={onSpotClick} />
           </li>
         ))}
       </ol>
     </section>
+  );
+}
+
+/** 経路のカードの写真の表示幅（h-16 w-16）。next/image の sizes に使う */
+const ROUTE_IMAGE_SIZES = "64px";
+
+/**
+ * 経路の1件のカード（#138）。写真（なければカテゴリのイラスト）・名前・滞在の目安・カテゴリ・評価・穴場度・キャッチコピー。
+ * 見た目は「穴場を探す」のスポットのカード（components/spots/spot-card.tsx）と部品をそろえ、2泊3日・1日4件でも
+ * 縦に長くなりすぎないよう写真を小さく、キャッチコピーを1行にする。カード全体を押すと詳細を開く
+ */
+function RouteSpotCard({
+  spot,
+  onSelect,
+}: {
+  spot: Spot;
+  onSelect: (spot: Spot) => void;
+}) {
+  const rating = getRating(spot);
+  const hiddenGemScore = getHiddenGemScore(spot);
+  return (
+    // button の中は phrasing content だけにする（見出しや p を入れない）
+    <button
+      type="button"
+      onClick={() => onSelect(spot)}
+      className="flex w-full items-center gap-3 rounded-xl border border-stone-200 bg-white p-2 text-left transition-colors hover:border-stone-300 hover:bg-stone-50"
+    >
+      <SpotImage
+        category={spot.category}
+        imagePath={spot.image_path}
+        sizes={ROUTE_IMAGE_SIZES}
+        className="h-16 w-16 shrink-0 rounded-lg text-2xl"
+      />
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className="flex items-baseline gap-2">
+          <span className="min-w-0 truncate text-sm font-extrabold text-stone-900">
+            {spot.name}
+          </span>
+          {spot.stay_minutes !== null && (
+            <span className="ml-auto shrink-0 text-[11px] text-stone-500">
+              <span className="sr-only">滞在の目安 </span>
+              {formatMinutes(spot.stay_minutes)}
+            </span>
+          )}
+        </span>
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <CategoryBadge category={spot.category} />
+          <Rating value={rating} />
+          <HiddenGemScore score={hiddenGemScore} />
+        </span>
+        {spot.catchphrase && (
+          <span className="line-clamp-1 text-xs text-stone-600">
+            {spot.catchphrase}
+          </span>
+        )}
+      </span>
+    </button>
   );
 }

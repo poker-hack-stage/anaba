@@ -107,8 +107,8 @@ describe("CandidateCard", () => {
 
     const items = screen.getAllByRole("listitem");
     expect(items.map((li) => li.textContent)).toEqual([
-      "1わさび田滞在の目安 約1時間",
-      "2湧き水滞在の目安 約1時間",
+      expect.stringMatching(/^1わさび田滞在の目安 約1時間/),
+      expect.stringMatching(/^2湧き水滞在の目安 約1時間/),
     ]);
     expect(screen.queryByText(/宿は含みません/)).toBeNull();
   });
@@ -181,9 +181,10 @@ describe("CandidateCard", () => {
       }),
     );
 
-    expect(screen.getAllByRole("listitem").map((li) => li.textContent)).toEqual(
-      ["1わさび田", "2湧き水滞在の目安 約45分"],
-    );
+    const [first, second] = screen.getAllByRole("listitem");
+    expect(first.textContent).toMatch(/^1わさび田/);
+    expect(first.textContent).not.toContain("滞在の目安");
+    expect(second.textContent).toMatch(/^2湧き水滞在の目安 約45分/);
   });
 
   test("近くの地域の候補には「近くの地域」のバッジを出す", () => {
@@ -196,14 +197,67 @@ describe("CandidateCard", () => {
     expect(screen.queryByText("近くの地域")).toBeNull();
   });
 
-  test("スポット名を押すと、そのスポットを渡す", () => {
-    const onSpotClick = renderCard(candidate());
+  describe("経路のスポットのカード", () => {
+    function richSpot(overrides: Partial<Spot> = {}): Spot {
+      return {
+        ...fixtureSpot("area", "湯小屋", "onsen", { rating: 4.5, gem: 4 }),
+        catchphrase: "地元の人が通う小さな湯",
+        image_path: "/images/spots/yu.jpg",
+        ...overrides,
+      };
+    }
 
-    fireEvent.click(screen.getByRole("button", { name: "湧き水" }));
+    function routeCard(s: Spot) {
+      renderCard(candidate({ days: [day(1, "安曇野市", [s], 60)] }));
+      return within(screen.getByRole("listitem"));
+    }
 
-    expect(onSpotClick).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "湧き水" }),
-    );
+    test("写真・名前・カテゴリ・評価・穴場度・キャッチコピー・滞在の目安を出す", () => {
+      const card = routeCard(richSpot());
+
+      card.getByText("湯小屋");
+      card.getByText("温泉・銭湯");
+      card.getByRole("img", { name: "評価 5段階中 4.5" });
+      card.getByRole("img", { name: "穴場度 5段階中 4" });
+      card.getByText("地元の人が通う小さな湯");
+      card.getByText("約1時間");
+
+      // 写真は小さく読み込む（next/image の sizes を表示幅にする）
+      const img = screen.getByRole("listitem").querySelector("img");
+      expect(img?.getAttribute("src")).toContain(
+        encodeURIComponent("/images/spots/yu.jpg"),
+      );
+      expect(img?.getAttribute("sizes")).toBe("64px");
+    });
+
+    test("写真がなければ写真を出さない（カテゴリのイラストだけ）", () => {
+      routeCard(richSpot({ image_path: null }));
+      expect(screen.getByRole("listitem").querySelector("img")).toBeNull();
+      // イラストは lucide のアイコン（svg）
+      expect(screen.getByRole("listitem").querySelector("svg")).not.toBeNull();
+    });
+
+    test("評価・穴場度・キャッチコピーがなければ出さない", () => {
+      const card = routeCard(
+        richSpot({ rating: null, hidden_gem_score: null, catchphrase: null }),
+      );
+      expect(card.queryByRole("img", { name: /5段階中/ })).toBeNull();
+      expect(card.queryByText("地元の人が通う小さな湯")).toBeNull();
+    });
+
+    test("カード全体が1つのボタンで、押すとそのスポットを渡す", () => {
+      const onSpotClick = renderCard(candidate());
+
+      const button = screen.getByRole("button", { name: /^湧き水/ });
+      // キーボードで押せるよう、ネイティブの button にする
+      expect(button.tagName).toBe("BUTTON");
+      expect(button.textContent).toContain("自然・散策");
+      fireEvent.click(button);
+
+      expect(onSpotClick).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "湧き水" }),
+      );
+    });
   });
 
   describe("大きな地図", () => {

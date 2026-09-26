@@ -192,7 +192,8 @@ describe("CandidateTabs", () => {
     const onSpotClick = vi.fn();
     render(<Tabs candidates={three} onSpotClick={onSpotClick} />);
 
-    fireEvent.click(screen.getAllByRole("button", { name: "B" })[0]);
+    // 経路のカードは全体が1つのボタンで、名前はスポット名から始まる（#138）
+    fireEvent.click(screen.getAllByRole("button", { name: /^B/ })[0]);
 
     expect(onSpotClick).toHaveBeenCalledWith(
       expect.objectContaining({ id: "松本市/B" }),
