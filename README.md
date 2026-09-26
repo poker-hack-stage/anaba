@@ -2,6 +2,8 @@
 
 Next.js (App Router) + Supabase + Vercel
 
+発表のデモの台本・当日の代替・スライドの構成案は [docs/demo.md](docs/demo.md)。
+
 ## 技術スタック
 
 | 用途           | 技術                                          |
