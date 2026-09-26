@@ -11,11 +11,13 @@ export const MAX_REQUEST_BYTES = 8_000;
 
 /**
  * 「旅プランをつくる」で送られてくる条件（PlanConditions）。選択肢にない値や、余計な項目は受け付けない。
- * 地域とスポットの id は、ここでは長さだけを確かめる（知らない地域の id は「おまかせ」として扱う、generate.ts・ai-prompt.ts。
+ * 地域とスポットの id・都道府県名は、ここでは長さだけを確かめる（知らない地域の id・県は「おまかせ」として扱う、generate.ts・ai-prompt.ts。
  * 知らないスポットの id は、どの候補にも入れられないので候補を0件にする、include-spot.ts）
  */
 export const planConditionsSchema = z.strictObject({
   areaId: z.string().trim().min(1).max(64).nullable(),
+  // 県だけ選んだとき（#147）の都道府県名。知らない県は「おまかせ」として扱う（area-groups.ts の findPrefectureAreas()）
+  prefecture: z.string().trim().min(1).max(16).optional(),
   duration: z.enum(DURATIONS),
   interests: z
     .array(z.enum(INTERESTS))

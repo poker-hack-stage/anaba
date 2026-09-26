@@ -1,6 +1,10 @@
 import { describe, expect, test } from "vitest";
 
-import { groupAreasByPrefecture, type PrefectureGroup } from "./area-groups";
+import {
+  findPrefectureAreas,
+  groupAreasByPrefecture,
+  type PrefectureGroup,
+} from "./area-groups";
 
 const area = (name: string, prefecture: string) => ({ name, prefecture });
 type TestArea = ReturnType<typeof area>;
@@ -35,5 +39,25 @@ describe("groupAreasByPrefecture", () => {
     groupAreasByPrefecture(areas);
 
     expect(areas).toEqual(copy);
+  });
+});
+
+describe("findPrefectureAreas", () => {
+  const areas = [
+    area("白馬村", "長野県"),
+    area("東川町", "北海道"),
+    area("松本市", "長野県"),
+  ];
+
+  test("県の地域を渡した順のまま返す", () => {
+    expect(findPrefectureAreas(areas, "長野県")?.map((a) => a.name)).toEqual([
+      "白馬村",
+      "松本市",
+    ]);
+  });
+
+  test("県を選んでいない・地域がない県なら undefined", () => {
+    expect(findPrefectureAreas(areas, undefined)).toBeUndefined();
+    expect(findPrefectureAreas(areas, "大阪府")).toBeUndefined();
   });
 });
