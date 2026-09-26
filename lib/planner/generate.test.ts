@@ -17,7 +17,7 @@ import {
   MIN_DAY_SPOTS,
   type PlannableArea,
 } from "./generate";
-import type { PlanCandidate, PlanDuration } from "./types";
+import type { PlanCandidate, PlanConditions, PlanDuration } from "./types";
 
 const allRouteSpots = (candidate: PlanCandidate) =>
   candidate.days.flatMap((day) => day.route);
@@ -308,5 +308,77 @@ describe("generateCandidates", () => {
     const [candidate] = generateCandidates(areas, request());
 
     expect(candidate.reason).toBe("穴場度の高いスポットを選びました。");
+  });
+});
+
+describe("generateCandidates: 必ず入れるスポット（#32）", () => {
+  /** 条件で作った1件目の候補の、経路外のスポット（詳細の「経路に加えて作り直す」を押すスポット） */
+  const offRouteSpot = (req: PlanConditions, index = 0) =>
+    generateCandidates(areas, req)[index].otherSpots[0];
+
+  test("日帰りなら、そのスポットの地域の候補だけになり、経路にそのスポットが入る", () => {
+    const req = request({ areaId: "松本市" });
+    const target = offRouteSpot(req);
+
+    const candidates = generateCandidates(areas, {
+      ...req,
+      includeSpotId: target.id,
+    });
+
+    expect(candidates.map((c) => c.id)).toEqual(["松本市"]);
+    const route = allRouteSpots(candidates[0]);
+    expect(route.map((s) => s.id)).toContain(target.id);
+    expect(route.length).toBeLessThanOrEqual(MAX_DAY_SPOTS);
+    expect(candidates[0].otherSpots.map((s) => s.id)).not.toContain(target.id);
+    expect(candidates[0].reason).toContain(
+      `「${target.name}」を経路に加えました。`,
+    );
+  });
+
+  test.each<PlanDuration>(["1n2d", "2n3d"])(
+    "%s なら、近い地域の候補も2日目以降にそのスポットをめぐる",
+    (duration) => {
+      const target = matsumoto.spots[7];
+
+      const candidates = generateCandidates(
+        areas,
+        request({ duration, includeSpotId: target.id }),
+      );
+
+      expect(candidates).toHaveLength(MAX_CANDIDATES);
+      expect(candidates.map((c) => c.id)).not.toContain(far.id);
+      for (const candidate of candidates) {
+        const route = allRouteSpots(candidate);
+        expect(route.map((s) => s.id)).toContain(target.id);
+        expect(new Set(route.map((s) => s.id)).size).toBe(route.length);
+        const day = candidate.days.find((d) =>
+          d.route.some((s) => s.id === target.id),
+        );
+        expect(day?.areaId).toBe(matsumoto.id);
+        if (candidate.id !== matsumoto.id) expect(day?.day).toBeGreaterThan(1);
+      }
+    },
+  );
+
+  test("日帰りで近い地域のスポットを指定したら、選んだ地域の候補は捨て、近い地域の候補を返す", () => {
+    const req = request({ areaId: "松本市" });
+    const target = offRouteSpot(req, 1);
+    expect(target.area_id).toBe(azumino.id);
+
+    const candidates = generateCandidates(areas, {
+      ...req,
+      includeSpotId: target.id,
+    });
+
+    expect(candidates.map((c) => [c.id, c.nearby])).toEqual([
+      ["安曇野市", true],
+    ]);
+    expect(allRouteSpots(candidates[0]).map((s) => s.id)).toContain(target.id);
+  });
+
+  test("見つからないスポットなら、候補は0件", () => {
+    expect(
+      generateCandidates(areas, request({ includeSpotId: "ない/スポット" })),
+    ).toEqual([]);
   });
 });

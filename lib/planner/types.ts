@@ -13,6 +13,8 @@ export type PlanConditions = {
   interests: string[];
   companion: string;
   transport: string;
+  /** どの候補にも必ず経路に入れるスポットの id（「このスポットを経路に加えて作り直す」、#32）。URL のクエリには持たない */
+  includeSpotId?: string;
 };
 
 /** 1日ぶんの経路 */

@@ -7,6 +7,11 @@ import {
   MIN_DAY_SPOTS,
   type PlannableArea,
 } from "./generate";
+import {
+  canInclude,
+  findIncludedSpot,
+  type IncludedSpot,
+} from "./include-spot";
 import { findNearbyAreas } from "./nearby";
 import type { PlanConditions } from "./types";
 
@@ -16,8 +21,13 @@ import type { PlanConditions } from "./types";
 export type PlanScope = {
   /** 選ばれた地域。「おまかせ」なら undefined */
   selected?: PlannableArea;
-  /** 候補の1日目にできる地域。選ばれた地域があれば、その地域と 80km 以内の近い地域（近い順） */
+  /**
+   * 候補の1日目にできる地域。選ばれた地域があれば、その地域と 80km 以内の近い地域（近い順）。
+   * 必ず入れるスポット（#32）があれば、そのスポットを経路に入れられる地域だけ
+   */
   bases: PlannableArea[];
+  /** 必ず経路に入れるスポット（#32）。指定がなければ undefined */
+  included?: IncludedSpot;
 };
 
 export function getPlanScope(
@@ -25,12 +35,20 @@ export function getPlanScope(
   request: PlanConditions,
 ): PlanScope {
   const selected = areas.find((area) => area.id === request.areaId);
+  const included = findIncludedSpot(areas, request);
   const bases = selected
     ? [selected, ...findNearbyAreas(selected, areas)]
     : [...areas];
   return {
     selected,
-    bases: bases.filter((area) => area.spots.length >= MIN_DAY_SPOTS),
+    bases: bases.filter(
+      (area) =>
+        area.spots.length >= MIN_DAY_SPOTS &&
+        // 見つからないスポット（undefined）は、どの地域でも入れられない
+        included !== undefined &&
+        (included === null || canInclude(area, included, areas, request)),
+    ),
+    included: included ?? undefined,
   };
 }
 
@@ -73,7 +91,11 @@ export function buildPlanPrompt(
   areas: readonly PlannableArea[],
   request: PlanConditions,
 ): PlanPrompt {
-  const { selected, bases } = getPlanScope(areas, request);
+  const {
+    selected,
+    bases,
+    included: includedSpot,
+  } = getPlanScope(areas, request);
   const dayCount = DAY_COUNTS[request.duration];
 
   // 候補の地域と、2日目以降に使えるその近い地域だけを渡す
@@ -134,17 +156,30 @@ export function buildPlanPrompt(
   const baseKeys = bases.map((area) => areaKey.get(area.id)).join("・");
   // 「最大3件」と書くと1件しか返さないことがあるので、作れる件数をはっきり伝える
   const expected = Math.min(MAX_CANDIDATES, bases.length);
-  const candidateRules = selected
-    ? [
-        `- 1件目の1日目は、必ず ${areaKey.get(selected.id)}（${selected.name}）にする`,
-        `- 2件目以降の1日目は、${areaKey.get(selected.id)} の近い地域（${
-          bases
-            .slice(1)
-            .map((area) => areaKey.get(area.id))
-            .join("・") || "なし"
-        }）から、近い順を優先して選ぶ`,
-      ]
-    : [`- 1日目の地域は、条件に合うスポットが多い地域から選ぶ（${baseKeys}）`];
+  // 必ず入れるスポット（#32）が選んだ地域では入れられないときは、選んだ地域を1件目にしない
+  const candidateRules =
+    selected && bases[0] === selected
+      ? [
+          `- 1件目の1日目は、必ず ${areaKey.get(selected.id)}（${selected.name}）にする`,
+          `- 2件目以降の1日目は、${areaKey.get(selected.id)} の近い地域（${
+            bases
+              .slice(1)
+              .map((area) => areaKey.get(area.id))
+              .join("・") || "なし"
+          }）から、近い順を優先して選ぶ`,
+        ]
+      : [
+          `- 1日目の地域は、条件に合うスポットが多い地域から選ぶ（${baseKeys}）`,
+        ];
+  if (includedSpot) {
+    // スポットは記号だけで指す（名前を書くと、利用者の投稿を区切りの外に出すことになる）
+    const spotKey = [...spotIdByKey].find(
+      ([, id]) => id === includedSpot.spot.id,
+    )?.[0];
+    candidateRules.push(
+      `- どの候補にも、どこかの日の経路に必ず ${spotKey}（${areaKey.get(includedSpot.area.id)} のスポット）を入れる。${spotKey} をめぐる日の areaId は ${areaKey.get(includedSpot.area.id)} にする`,
+    );
+  }
 
   const contents = `# 旅の条件
 - エリア: ${selected ? `${selected.name}（${areaKey.get(selected.id)}）` : "おまかせ"}

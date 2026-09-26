@@ -2,7 +2,14 @@
 
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { FlaskConical, Loader2, Route, Search, SearchX } from "lucide-react";
+import {
+  AlertCircle,
+  FlaskConical,
+  Loader2,
+  Route,
+  Search,
+  SearchX,
+} from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { SpotDetailDialog } from "@/components/spots/spot-detail-dialog";
 import { Chip } from "@/components/ui/chip";
@@ -26,7 +33,11 @@ import type {
 } from "@/lib/planner/types";
 import { cn } from "@/lib/utils";
 import { CandidateTabs } from "./candidate-tabs";
-import { type PlannerStatus, usePlannerState } from "./planner-state";
+import {
+  type PlannerResult,
+  type PlannerStatus,
+  usePlannerState,
+} from "./planner-state";
 
 /**
  * /api/plan の応答を待つ上限。サーバーは Gemini を最大45秒待ち、だめならデモモードで返す（maxDuration は60秒）ので、
@@ -172,38 +183,46 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
         : [...conditions.interests, interest],
     );
 
+  /**
+   * /api/plan を呼んで、表示する結果を返す。429（同じ送信元から短い時間に何度も作った、#25）なら、
+   * ブラウザでデモモードの候補を作り、理由を表示する。エラー・時間切れは例外にする
+   */
+  const fetchPlan = async (
+    requested: PlanConditions,
+  ): Promise<PlannerResult> => {
+    const res = await fetch("/api/plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(requested),
+      // 応答が返ってこないと loading のまま抜けられないので、時間切れは error にする
+      signal: AbortSignal.timeout(PLAN_TIMEOUT_MS),
+    });
+    if (res.status === 429) {
+      return {
+        status: "done",
+        candidates: generateCandidates(areas, requested),
+        conditions: requested,
+        mode: "demo",
+        rateLimited: true,
+      };
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = (await res.json()) as PlanResponse;
+    return {
+      status: "done",
+      candidates: data.candidates,
+      conditions: requested,
+      mode: data.mode,
+    };
+  };
+
   const submit = async () => {
     // 結果は Context に入れるので、読み込み中に別のタブへ移動しても戻ると表示される
     // 結果には、送ったときの条件を付けておく（あとで条件が変わってもずれが分かるように）
     const requested = conditions;
     setResult({ status: "loading", candidates, conditions: requested, mode });
     try {
-      const res = await fetch("/api/plan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requested),
-        // 応答が返ってこないと loading のまま抜けられないので、時間切れは error にする
-        signal: AbortSignal.timeout(PLAN_TIMEOUT_MS),
-      });
-      if (res.status === 429) {
-        // 同じ送信元から短い時間に何度も作った（#25）。ブラウザでデモモードの候補を作り、理由を表示する
-        setResult({
-          status: "done",
-          candidates: generateCandidates(areas, requested),
-          conditions: requested,
-          mode: "demo",
-          rateLimited: true,
-        });
-        return;
-      }
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = (await res.json()) as PlanResponse;
-      setResult({
-        status: "done",
-        candidates: data.candidates,
-        conditions: requested,
-        mode: data.mode,
-      });
+      setResult(await fetchPlan(requested));
     } catch {
       // API がエラー・時間切れでもデモが止まらないよう、ブラウザでデモモードの候補を作る（#19）
       try {
@@ -223,6 +242,51 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
       }
     }
   };
+
+  /**
+   * 経路外のスポットを経路に加えて作り直す（#32）。今の候補を出したときの条件（フォームで変えた条件ではなく）に
+   * スポットの id を足して呼び直す。失敗したら（候補が0件も）、元の候補と選んでいたタブに戻してエラーを出す
+   */
+  const rebuildWithSpot = async (spot: Spot) => {
+    const previous = result;
+    const previousIndex = selectedCandidate;
+    const previousId = candidates[previousIndex]?.id;
+    const requested: PlanConditions = {
+      ...(previous.conditions ?? conditions),
+      includeSpotId: spot.id,
+    };
+    setSelectedSpot(null);
+    setResult({
+      status: "loading",
+      candidates,
+      conditions: requested,
+      mode,
+    });
+    let rebuilt: PlannerResult | null = null;
+    let error: string;
+    try {
+      rebuilt = await fetchPlan(requested);
+      error = `「${spot.name}」を経路に入れた候補を組めませんでした。元の候補のままです。`;
+    } catch {
+      error =
+        "候補を作り直せませんでした。元の候補のままです。時間をおいて、もう一度お試しください。";
+    }
+    if (rebuilt && rebuilt.candidates.length > 0) {
+      // 元と同じ地域の候補があれば、そのタブを選んだままにする
+      const index = rebuilt.candidates.findIndex((c) => c.id === previousId);
+      setResult(rebuilt, Math.max(index, 0));
+      return;
+    }
+    setResult({ ...previous, rebuildError: error }, previousIndex);
+  };
+
+  // 詳細の「経路に加えて作り直す」は、表示中の候補の経路外のスポットを開いたときだけ出す
+  const shownCandidate =
+    candidates[Math.min(selectedCandidate, candidates.length - 1)];
+  const canRebuildWithSpot =
+    status === "done" &&
+    selectedSpot !== null &&
+    shownCandidate?.otherSpots.some((s) => s.id === selectedSpot.id) === true;
 
   const closeDetail = useCallback(() => setSelectedSpot(null), []);
 
@@ -288,13 +352,18 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
           candidates={candidates}
           mode={mode}
           rateLimited={rateLimited}
+          rebuildError={result.rebuildError}
           selectedCandidate={selectedCandidate}
           onSelectCandidate={selectCandidate}
           onSpotClick={setSelectedSpot}
         />
       </section>
 
-      <SpotDetailDialog spot={selectedSpot} onClose={closeDetail} />
+      <SpotDetailDialog
+        spot={selectedSpot}
+        onClose={closeDetail}
+        onIncludeInRoute={canRebuildWithSpot ? rebuildWithSpot : undefined}
+      />
     </div>
   );
 }
@@ -304,6 +373,7 @@ function Result({
   candidates,
   mode,
   rateLimited,
+  rebuildError,
   selectedCandidate,
   onSelectCandidate,
   onSpotClick,
@@ -312,6 +382,7 @@ function Result({
   candidates: PlanCandidate[];
   mode: PlanResponse["mode"] | null;
   rateLimited: boolean;
+  rebuildError?: string;
   selectedCandidate: number;
   onSelectCandidate: (index: number) => void;
   onSpotClick: (spot: Spot) => void;
@@ -357,6 +428,15 @@ function Result({
   }
   return (
     <>
+      {rebuildError && (
+        <p
+          role="alert"
+          className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{rebuildError}</span>
+        </p>
+      )}
       {mode === "demo" && (
         <p
           role="status"

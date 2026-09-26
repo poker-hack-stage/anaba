@@ -24,7 +24,9 @@ const MAX_TEXT_LENGTH = 200;
  * - 存在しないスポット・その日の地域にないスポット・候補の中で重なったスポットは取り除く。
  *   その結果スポットが2件未満の日ができたら、候補ごと捨てる。5件目以降は切る
  * - 日数が日程より少なければ捨てる。多ければ切る
- * - 地域が選ばれているのに、その地域の候補がなければ、全部を捨てる（1件目は必ず選んだ地域にするため）
+ * - 必ず入れるスポット（#32）が、どの日の経路にも入っていない候補は捨てる（サーバーで足すと、Gemini の組んだ順や所要時間が崩れるため）
+ * - 地域が選ばれているのに、その地域の候補がなければ、全部を捨てる（1件目は必ず選んだ地域にするため）。
+ *   ただし必ず入れるスポットが選んだ地域では入れられないとき（近い地域のスポットで日帰り）は、捨てずに近い地域の候補を返す
  *
  * 所要時間・経路外のスポット・「近くの地域」は、Gemini ではなくここで決める
  */
@@ -34,7 +36,7 @@ export function toPlanCandidates(
   request: PlanConditions,
   { areaIdByKey, spotIdByKey }: Pick<PlanPrompt, "areaIdByKey" | "spotIdByKey">,
 ): PlanCandidate[] {
-  const { selected, bases } = getPlanScope(areas, request);
+  const { selected, bases, included } = getPlanScope(areas, request);
   const baseIds = new Set(bases.map((area) => area.id));
   const areaById = new Map(areas.map((area) => [area.id, area]));
   const findArea = (key: string) => {
@@ -80,6 +82,7 @@ export function toPlanCandidates(
       });
     }
     if (days.length < dayCount) continue;
+    if (included && !used.has(included.spot.id)) continue;
 
     const dayAreaIds = new Set(days.map((d) => d.areaId));
     candidates.push({
@@ -101,7 +104,7 @@ export function toPlanCandidates(
     });
   }
 
-  if (selected) {
+  if (selected && (!included || baseIds.has(selected.id))) {
     const first = candidates.find((c) => c.id === selected.id);
     if (!first) return [];
     return [first, ...candidates.filter((c) => c !== first)].slice(

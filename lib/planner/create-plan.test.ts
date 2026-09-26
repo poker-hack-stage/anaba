@@ -20,8 +20,8 @@ function geminiText(text: string): GeminiResult {
 }
 
 /** 松本市の最初の2件で日帰りの候補を1件返す、Gemini の出力 */
-function validOutput() {
-  const prompt = buildPlanPrompt(areas, request({ areaId: "松本市" }));
+function validOutput(req = request({ areaId: "松本市" })) {
+  const prompt = buildPlanPrompt(areas, req);
   const keyOf = (map: Map<string, string>, id: string) =>
     [...map].find(([, value]) => value === id)?.[0];
   return JSON.stringify({
@@ -61,6 +61,24 @@ describe("createPlan", () => {
 
     expect(plan.mode).toBe("ai");
     expect(plan.candidates.map((c) => c.title)).toEqual(["松本の旅"]);
+  });
+
+  test("必ず入れるスポット（#32）が Gemini の候補になければ、デモモードで作り、そのスポットを経路に入れる", async () => {
+    const req = request({
+      areaId: "松本市",
+      includeSpotId: matsumoto.spots[7].id,
+    });
+    callGemini.mockResolvedValue(geminiText(validOutput(req)));
+
+    const plan = await createPlan(areas, req);
+
+    expect(plan.mode).toBe("demo");
+    expect(plan.candidates.length).toBeGreaterThan(0);
+    for (const candidate of plan.candidates) {
+      expect(candidate.days.flatMap((d) => d.route).map((s) => s.id)).toContain(
+        matsumoto.spots[7].id,
+      );
+    }
   });
 
   test("useAi が false（レート制限）なら、Gemini を呼ばずにデモモードで返す", async () => {

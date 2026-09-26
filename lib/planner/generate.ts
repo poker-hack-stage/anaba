@@ -3,6 +3,11 @@ import type { Spot } from "@/lib/data/spots";
 import type { SpotCategory } from "@/lib/spots/categories";
 import { compareByHiddenGemScore, compareByRating } from "@/lib/spots/score";
 import { calcDayMinutes, DAY_COUNTS, DURATION_LABELS } from "./duration";
+import {
+  canInclude,
+  findIncludedSpot,
+  type IncludedSpot,
+} from "./include-spot";
 import { findNearbyAreas } from "./nearby";
 import type { PlanCandidate, PlanDay, PlanConditions } from "./types";
 
@@ -38,6 +43,8 @@ export const MAX_DAY_SPOTS = 4;
  * - 2日目以降: 候補の地域に未使用のスポットが2件以上あればその地域、なければ近い地域（80km 以内、近い順）。
  *   近い地域で残りの日をまかなえないときは、残りの日のぶんを候補の地域に残しておく
  * - 1つの候補の中で同じスポットを2回使わない。組めない候補は捨てる
+ * - 必ず入れるスポット（includeSpotId、#32）があれば、そのスポットの地域をめぐる日に必ず入れる。
+ *   候補の地域と別の地域なら、2日目以降にその地域を優先する。入れられない候補は捨てる
  */
 export function generateCandidates(
   areas: readonly PlannableArea[],
@@ -47,6 +54,9 @@ export function generateCandidates(
     request.interests.map((i) => INTEREST_TO_CATEGORY[i]).filter(Boolean),
   );
   const selected = areas.find((area) => area.id === request.areaId);
+  const included = findIncludedSpot(areas, request);
+  // 見つからないスポットは、どの候補にも入れられない
+  if (included === undefined) return [];
 
   // 候補にする地域の順番。前から組んでいき、組めた順に最大3件
   const bases: { area: PlannableArea; nearby: boolean }[] = selected
@@ -65,8 +75,10 @@ export function generateCandidates(
   const candidates: PlanCandidate[] = [];
   for (const { area, nearby } of bases) {
     if (candidates.length >= MAX_CANDIDATES) break;
+    if (included && !canInclude(area, included, areas, request)) continue;
     const candidate = buildCandidate(area, areas, request, wanted, {
       nearbyOf: nearby ? selected : undefined,
+      included: included ?? undefined,
     });
     if (candidate) candidates.push(candidate);
   }
@@ -78,7 +90,7 @@ function buildCandidate(
   areas: readonly PlannableArea[],
   request: PlanConditions,
   wanted: ReadonlySet<SpotCategory>,
-  { nearbyOf }: { nearbyOf?: PlannableArea },
+  { nearbyOf, included }: { nearbyOf?: PlannableArea; included?: IncludedSpot },
 ): PlanCandidate | null {
   const used = new Set<string>();
   const unused = (area: PlannableArea) =>
@@ -87,11 +99,21 @@ function buildCandidate(
 
   const days: PlanDay[] = [];
   for (let day = 1; day <= DAY_COUNTS[request.duration]; day++) {
+    // 必ず入れるスポットがまだ経路になく、その地域が近い地域なら、2日目以降はその地域を先にめぐる
+    const includedArea =
+      included &&
+      !used.has(included.spot.id) &&
+      unused(included.area).length >= MIN_DAY_SPOTS
+        ? nearbyAreas.find((a) => a.id === included.area.id)
+        : undefined;
     // 1日目は候補の地域。2日目以降は、候補の地域で組めなければ近い地域
     const area =
-      day === 1 || unused(base).length >= MIN_DAY_SPOTS
+      day === 1
         ? base
-        : nearbyAreas.find((a) => unused(a).length >= MIN_DAY_SPOTS);
+        : (includedArea ??
+          (unused(base).length >= MIN_DAY_SPOTS
+            ? base
+            : nearbyAreas.find((a) => unused(a).length >= MIN_DAY_SPOTS)));
     if (!area || unused(area).length < MIN_DAY_SPOTS) return null;
 
     // 残りの日を近い地域でまかなえないぶんは、候補の地域に1日2件ずつ残しておく
@@ -110,9 +132,18 @@ function buildCandidate(
     );
     if (limit < MIN_DAY_SPOTS) return null;
 
-    const picked = [...unused(area)]
-      .sort((a, b) => compareForRoute(a, b, wanted))
-      .slice(0, limit);
+    const sorted = [...unused(area)].sort((a, b) =>
+      compareForRoute(a, b, wanted),
+    );
+    let picked = sorted.slice(0, limit);
+    // 必ず入れるスポットがこの地域にあり、選んだ中になければ、最後の1件と入れ替える
+    const mustPick =
+      included && area.id === included.area.id && !used.has(included.spot.id)
+        ? sorted.find((s) => s.id === included.spot.id)
+        : undefined;
+    if (mustPick && !picked.includes(mustPick)) {
+      picked = [...picked.slice(0, limit - 1), mustPick];
+    }
     const route = orderByProximity(picked);
     for (const spot of route) used.add(spot.id);
 
@@ -125,6 +156,8 @@ function buildCandidate(
     });
   }
 
+  if (included && !used.has(included.spot.id)) return null;
+
   // 経路に使った地域の、経路に入らなかったスポット
   const dayAreaIds = new Set(days.map((d) => d.areaId));
   const otherSpots = areas
@@ -136,7 +169,7 @@ function buildCandidate(
     areaName: base.name,
     title: `${base.name}をめぐる${DURATION_LABELS[request.duration]}プラン`,
     summary: base.catchphrase ?? "",
-    reason: buildReason(request, days, base, nearbyOf),
+    reason: buildReason(request, days, base, nearbyOf, included),
     duration: request.duration,
     days,
     otherSpots,
@@ -205,6 +238,7 @@ function buildReason(
   days: readonly PlanDay[],
   base: PlannableArea,
   nearbyOf: PlannableArea | undefined,
+  included: IncludedSpot | undefined,
 ): string {
   const interests = request.interests.filter((i) => i in INTEREST_TO_CATEGORY);
   const sentences = [
@@ -215,6 +249,7 @@ function buildReason(
     ...days
       .filter((d) => d.areaId !== base.id)
       .map((d) => `${d.day}日目は近くの${d.areaName}をめぐります。`),
+    included ? `「${included.spot.name}」を経路に加えました。` : "",
   ];
   return sentences.join("");
 }

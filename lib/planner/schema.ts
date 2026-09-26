@@ -8,7 +8,8 @@ export const MAX_REQUEST_BYTES = 8_000;
 
 /**
  * 「絞る」で送られてくる条件（PlanConditions）。選択肢にない値や、余計な項目は受け付けない。
- * 地域の id は、ここでは長さだけを確かめる（知らない id は「おまかせ」として扱う、generate.ts・ai-prompt.ts）
+ * 地域とスポットの id は、ここでは長さだけを確かめる（知らない地域の id は「おまかせ」として扱う、generate.ts・ai-prompt.ts。
+ * 知らないスポットの id は、どの候補にも入れられないので候補を0件にする、include-spot.ts）
  */
 export const planConditionsSchema = z.strictObject({
   areaId: z.string().trim().min(1).max(64).nullable(),
@@ -19,6 +20,8 @@ export const planConditionsSchema = z.strictObject({
     .transform((interests) => [...new Set(interests)]),
   companion: z.enum(COMPANIONS),
   transport: z.enum(TRANSPORTS),
+  // 「このスポットを経路に加えて作り直す」（#32）で、どの候補にも必ず入れるスポットの id。知らない id なら候補は0件になる
+  includeSpotId: z.string().trim().min(1).max(64).optional(),
 });
 
 /**

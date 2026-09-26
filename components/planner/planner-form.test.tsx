@@ -1,9 +1,10 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
+import type { SpotMapProps } from "@/components/map/spot-map";
 import type { Spot } from "@/lib/data/spots";
-import type { PlannableArea } from "@/lib/planner/generate";
-import type { PlanResponse } from "@/lib/planner/types";
+import { generateCandidates, type PlannableArea } from "@/lib/planner/generate";
+import type { PlanConditions, PlanResponse } from "@/lib/planner/types";
 import { PlannerForm } from "./planner-form";
 import { PlannerStateProvider } from "./planner-state";
 
@@ -34,6 +35,19 @@ vi.mock("next/navigation", async () => {
     },
   };
 });
+
+// 地図（MapLibre）は jsdom で描けないので、経路外のスポット（小さなピン）をボタンで出す部品に差し替える
+vi.mock("@/components/map/spot-map", () => ({
+  SpotMap: ({ others = [], onSpotClick }: SpotMapProps) => (
+    <div role="group" aria-label="地図">
+      {others.map((s) => (
+        <button key={s.id} type="button" onClick={() => onSpotClick?.(s)}>
+          経路外のピン: {s.name}
+        </button>
+      ))}
+    </div>
+  ),
+}));
 
 function spot(areaId: string, name: string, category: string): Spot {
   return {
@@ -76,10 +90,13 @@ const areas: PlannableArea[] = [
   },
 ];
 
-function renderForm({ submit = true } = {}) {
+function renderForm({
+  submit = true,
+  areas: plannable = areas,
+}: { submit?: boolean; areas?: PlannableArea[] } = {}) {
   render(
     <PlannerStateProvider>
-      <PlannerForm areas={areas} />
+      <PlannerForm areas={plannable} />
     </PlannerStateProvider>,
   );
   if (submit) fireEvent.click(screen.getByRole("button", { name: "絞る" }));
@@ -251,6 +268,128 @@ describe("PlannerForm", () => {
           .getByRole("button", { name: "日帰り" })
           .getAttribute("aria-pressed"),
       ).toBe("true");
+    });
+  });
+
+  describe("経路に加えて作り直す（#32）", () => {
+    // 6件あるので、日帰りの経路（4件）に入らないスポットが2件できる
+    const sixSpots: PlannableArea[] = [
+      {
+        ...areas[0],
+        spots: [
+          ...areas[0].spots,
+          spot("matsumoto", "旧開智学校", "history"),
+          spot("matsumoto", "四柱神社", "history"),
+          spot("matsumoto", "中町通り", "gourmet"),
+        ],
+      },
+    ];
+
+    /**
+     * /api/plan の代わり。1回目は本当の作り方（デモモード）で候補を返し、2回目以降は second を返す。
+     * 口コミの読み込み（/api/spots/…）には応答を返さない
+     */
+    function stubPlanApi(
+      second: (body: PlanConditions) => Promise<Response> = async (body) =>
+        Response.json({
+          candidates: generateCandidates(sixSpots, body),
+          mode: "ai",
+        } satisfies PlanResponse),
+    ) {
+      let calls = 0;
+      const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+        if (url !== "/api/plan") return new Promise<Response>(() => {});
+        const body = JSON.parse(String(init?.body)) as PlanConditions;
+        calls++;
+        return calls === 1
+          ? Promise.resolve(
+              Response.json({
+                candidates: generateCandidates(sixSpots, body),
+                mode: "ai",
+              } satisfies PlanResponse),
+            )
+          : second(body);
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      return () =>
+        fetchMock.mock.calls
+          .filter(([url]) => url === "/api/plan")
+          .map(([, init]) => JSON.parse(String(init?.body)));
+    }
+
+    /** 最初の候補を出し、経路外のスポットのピンを押して詳細を開く。開いたスポットの名前を返す */
+    async function openOffRouteSpot() {
+      renderForm({ areas: sixSpots });
+      const [pin] = await screen.findAllByRole("button", {
+        name: /^経路外のピン: /,
+      });
+      const name = pin.textContent!.replace("経路外のピン: ", "");
+      fireEvent.click(pin);
+      return name;
+    }
+
+    const rebuildButton = () =>
+      screen.queryByRole("button", {
+        name: "このスポットを経路に加えて作り直す",
+      });
+
+    test("経路外のスポットの詳細から押すと、元の条件にスポットを足して呼び直し、候補を差し替える", async () => {
+      const sentBodies = stubPlanApi();
+      const name = await openOffRouteSpot();
+
+      fireEvent.click(rebuildButton()!);
+
+      // 差し替わると、そのスポットが経路（番号付きのリスト）に入り、経路外のピンから消える
+      const list = await screen.findByRole("list");
+      await within(list).findByRole("button", { name });
+      expect(
+        screen.queryByRole("button", { name: `経路外のピン: ${name}` }),
+      ).toBeNull();
+      const [first, second] = sentBodies();
+      expect(second).toEqual({
+        ...first,
+        includeSpotId: `matsumoto/${name}`,
+      });
+      expect(screen.queryByRole("alert")).toBeNull();
+    });
+
+    test("作り直しに失敗したら、元の候補を残したままエラーを出す", async () => {
+      stubPlanApi(() => Promise.reject(new TypeError("offline")));
+      const name = await openOffRouteSpot();
+
+      fireEvent.click(rebuildButton()!);
+
+      expect((await screen.findByRole("alert")).textContent).toContain(
+        "候補を作り直せませんでした。元の候補のままです。",
+      );
+      expect(
+        screen.getByRole("button", { name: `経路外のピン: ${name}` }),
+      ).toBeTruthy();
+    });
+
+    test("そのスポットを含む候補が0件なら、元の候補を残したままエラーを出す", async () => {
+      stubPlanApi(async () =>
+        Response.json({ candidates: [], mode: "ai" } satisfies PlanResponse),
+      );
+      const name = await openOffRouteSpot();
+
+      fireEvent.click(rebuildButton()!);
+
+      expect((await screen.findByRole("alert")).textContent).toContain(
+        `「${name}」を経路に入れた候補を組めませんでした。元の候補のままです。`,
+      );
+      expect(screen.getByText("松本市をめぐる日帰りプラン")).toBeTruthy();
+    });
+
+    test("経路に入っているスポットの詳細には、ボタンを出さない", async () => {
+      stubPlanApi();
+      renderForm({ areas: sixSpots });
+      const list = await screen.findByRole("list");
+
+      fireEvent.click(within(list).getAllByRole("button")[0]);
+
+      expect(await screen.findByRole("dialog")).toBeTruthy();
+      expect(rebuildButton()).toBeNull();
     });
   });
 });

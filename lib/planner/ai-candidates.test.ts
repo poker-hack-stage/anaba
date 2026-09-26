@@ -236,3 +236,61 @@ describe("toPlanCandidates", () => {
     );
   });
 });
+
+describe("toPlanCandidates: 必ず入れるスポット（#32）", () => {
+  test("そのスポットがどの日の経路にもない候補は捨てる", () => {
+    const req = request({
+      duration: "1n2d",
+      includeSpotId: matsumoto.spots[7].id,
+    });
+
+    const candidates = run(req, [
+      {
+        days: [
+          { area: azumino, spots: [0, 1] },
+          { area: matsumoto, spots: [7, 0] },
+        ],
+      },
+      {
+        days: [
+          { area: omachi, spots: [0, 1] },
+          { area: omachi, spots: [2, 3] },
+        ],
+      },
+    ]);
+
+    expect(candidates.map((c) => c.id)).toEqual(["安曇野市"]);
+  });
+
+  test("日帰りで選んだ地域では入れられないスポットなら、全部を捨てずに近い地域の候補を返す", () => {
+    const req = request({
+      areaId: "松本市",
+      includeSpotId: azumino.spots[7].id,
+    });
+
+    const candidates = run(req, [{ days: [{ area: azumino, spots: [7, 0] }] }]);
+
+    expect(candidates.map((c) => [c.id, c.nearby])).toEqual([
+      ["安曇野市", true],
+    ]);
+  });
+
+  test("選んだ地域で入れられるなら、選んだ地域の候補がなければ全部を捨てる（今までどおり）", () => {
+    const req = request({
+      areaId: "松本市",
+      duration: "1n2d",
+      includeSpotId: matsumoto.spots[7].id,
+    });
+
+    const candidates = run(req, [
+      {
+        days: [
+          { area: azumino, spots: [0, 1] },
+          { area: matsumoto, spots: [7, 0] },
+        ],
+      },
+    ]);
+
+    expect(candidates).toEqual([]);
+  });
+});
