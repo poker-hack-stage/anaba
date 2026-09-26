@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PAGE_CONTAINER } from "./page-width";
 
 /**
  * 画面の一番下のフッター。写真の出典（CC BY・CC BY-SA の表示の条件、#67）へリンクする。
@@ -6,7 +7,9 @@ import Link from "next/link";
  */
 export function SiteFooter() {
   return (
-    <footer className="mx-auto w-full max-w-7xl px-4 pb-24 pt-2 text-xs text-stone-500 sm:px-6 md:pb-8 lg:px-8">
+    <footer
+      className={`${PAGE_CONTAINER} pb-24 pt-2 text-xs text-stone-500 md:pb-8`}
+    >
       <nav aria-label="サイトの情報" className="flex flex-wrap gap-x-4 gap-y-1">
         <Link
           href="/credits"

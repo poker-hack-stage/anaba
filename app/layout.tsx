@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Noto_Sans_JP, Zen_Maru_Gothic } from "next/font/google";
 import { BottomNav } from "@/components/layout/bottom-nav";
+import { PAGE_CONTAINER } from "@/components/layout/page-width";
 import { SiteHeader } from "@/components/layout/site-header";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { PlannerStateProvider } from "@/components/planner/planner-state";
@@ -48,7 +49,7 @@ export default function RootLayout({
         <SpotSubmissionProvider>
           <SiteHeader />
           {/* スマホの下部ナビの高さぶんの余白は、フッター（site-footer.tsx）がとる */}
-          <main className="mx-auto w-full max-w-7xl flex-1 px-4 pb-6 pt-5 sm:px-6 md:pb-8 lg:px-8">
+          <main className={`${PAGE_CONTAINER} flex-1 pb-6 pt-5 md:pb-8`}>
             <PlannerStateProvider>{children}</PlannerStateProvider>
           </main>
           <SiteFooter />
