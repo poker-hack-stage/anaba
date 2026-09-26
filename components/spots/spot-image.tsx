@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image, { getImageProps } from "next/image";
 import { getCategory } from "@/lib/spots/categories";
-import { AI_IMAGE_LABEL, isAiImagePath } from "@/lib/spots/image-kind";
+import { isAiImagePath } from "@/lib/spots/image-kind";
 import { cn } from "@/lib/utils";
 
 /**
@@ -46,7 +46,7 @@ export function preloadSpotImage(
  * スポットの写真。`imagePath` があれば写真を、なければカテゴリ色のプレースホルダーを出す。
  * 写真はプレースホルダーの上に重ねるので、読み込み中や読み込めなかったときもプレースホルダーが見える。
  * AI で生成したイメージ画像（lib/spots/image-kind.ts）には、右下に「イメージ（AI で生成）」を重ねる（#146）。
- * カード・詳細・経路のカードのどれもこの部品で出すので、どこでも表示がそろう。
+ * 重ねるのが小さすぎる画像（経路のカードの 64px）は `showAiLabel={false}` にして、横の文字の中に AiImageBadge を置く。
  * Vercel の画像変換の無料枠（5,000回/月）を超えないよう、`sizes` に表示する幅を必ず指定する（#30）
  */
 export function SpotImage({
@@ -56,6 +56,7 @@ export function SpotImage({
   alt = "",
   className,
   aiLabelClassName,
+  showAiLabel = true,
 }: {
   category: string;
   imagePath?: string | null;
@@ -69,6 +70,8 @@ export function SpotImage({
   className?: string;
   /** 「イメージ（AI で生成）」の表示の位置・大きさを変えるとき（詳細の大きい画像など） */
   aiLabelClassName?: string;
+  /** AI の画像に「イメージ（AI で生成）」を重ねるか。横に AiImageBadge を置く場所では false */
+  showAiLabel?: boolean;
 }) {
   const meta = getCategory(category);
   // 読み込めなかった写真のパス（別のスポットに替わったら、また写真を試す）
@@ -103,17 +106,44 @@ export function SpotImage({
           onError={() => setFailedPath(imagePath)}
         />
       )}
-      {showPhoto && isAiImagePath(imagePath) && (
-        // 小さい画像（経路のカードの 64px）では2行に折り返す
+      {showAiLabel && showPhoto && isAiImagePath(imagePath) && (
         <span
           className={cn(
             "absolute bottom-1 right-1 max-w-[calc(100%-0.5rem)] rounded bg-black/60 px-1 py-px text-right text-[10px] font-bold leading-tight text-white",
             aiLabelClassName,
           )}
         >
-          {AI_IMAGE_LABEL}
+          <AiImageLabelText />
         </span>
       )}
+    </span>
+  );
+}
+
+/**
+ * 「イメージ（AI で生成）」の文字。幅が足りないとき（カードの 96px の画像）は、途中の文字ではなく
+ * 「イメージ」と「（AI で生成）」の間で折り返す（keep-all で日本語の途中の折り返しを止め、<wbr> だけで折り返す）
+ */
+function AiImageLabelText() {
+  return (
+    <span className="[word-break:keep-all]">
+      イメージ
+      <wbr />
+      （AI&nbsp;で生成）
+    </span>
+  );
+}
+
+/** 画像の横の文字の中に置く「イメージ（AI で生成）」（経路のカードなど、画像が小さくて重ねられない場所）。AI の画像でなければ何も出さない */
+export function AiImageBadge({
+  imagePath,
+}: {
+  imagePath: string | null | undefined;
+}) {
+  if (!isSpotImagePath(imagePath) || !isAiImagePath(imagePath)) return null;
+  return (
+    <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-bold text-stone-600">
+      <AiImageLabelText />
     </span>
   );
 }

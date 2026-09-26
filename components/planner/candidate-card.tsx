@@ -6,7 +6,7 @@ import { SpotMapSkeleton } from "@/components/map/spot-map-skeleton";
 import type { SpotRoute } from "@/components/map/spot-map";
 import { CategoryBadge } from "@/components/spots/category-badge";
 import { HiddenGemScore } from "@/components/spots/hidden-gem-score";
-import { SpotImage } from "@/components/spots/spot-image";
+import { AiImageBadge, SpotImage } from "@/components/spots/spot-image";
 import { Rating } from "@/components/ui/rating";
 import type { Spot } from "@/lib/data/spots";
 import { formatMinutes } from "@/lib/planner/duration";
@@ -232,6 +232,8 @@ function RouteSpotCard({
         imagePath={spot.image_path}
         sizes={ROUTE_IMAGE_SIZES}
         className="h-16 w-16 shrink-0 rounded-lg text-2xl"
+        // 64px の画像に重ねると画像が隠れるので、下のバッジの並びに出す
+        showAiLabel={false}
       />
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="flex items-baseline gap-2">
@@ -249,6 +251,7 @@ function RouteSpotCard({
           <CategoryBadge category={spot.category} />
           <Rating value={rating} />
           <HiddenGemScore score={hiddenGemScore} />
+          <AiImageBadge imagePath={spot.image_path} />
         </span>
         {spot.catchphrase && (
           <span className="line-clamp-1 text-xs text-stone-600">

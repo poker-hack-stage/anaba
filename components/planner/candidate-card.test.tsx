@@ -237,6 +237,20 @@ describe("CandidateCard", () => {
       expect(screen.getByRole("listitem").querySelector("svg")).not.toBeNull();
     });
 
+    test("AI の画像は、画像に重ねずバッジの並びに「イメージ（AI で生成）」を1つだけ出す", () => {
+      const card = routeCard(
+        richSpot({ image_path: "/images/spots/ai/yu.jpg" }),
+      );
+      const labels = card.getAllByText("イメージ（AI で生成）");
+      expect(labels).toHaveLength(1);
+      expect(labels[0].closest(".rounded-full")).not.toBeNull();
+    });
+
+    test("写真には「イメージ（AI で生成）」を出さない", () => {
+      const card = routeCard(richSpot());
+      expect(card.queryByText("イメージ（AI で生成）")).toBeNull();
+    });
+
     test("評価・穴場度・キャッチコピーがなければ出さない", () => {
       const card = routeCard(
         richSpot({ rating: null, hidden_gem_score: null, catchphrase: null }),

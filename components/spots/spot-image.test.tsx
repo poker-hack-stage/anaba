@@ -1,7 +1,12 @@
 import { fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { SpotImage, isSpotImagePath, preloadSpotImage } from "./spot-image";
+import {
+  AiImageBadge,
+  SpotImage,
+  isSpotImagePath,
+  preloadSpotImage,
+} from "./spot-image";
 
 describe("SpotImage", () => {
   test("image_path があれば写真を出す", () => {
@@ -48,6 +53,18 @@ describe("SpotImage", () => {
     expect(getByText("イメージ（AI で生成）")).toBeTruthy();
   });
 
+  test("showAiLabel={false} なら、AI の画像でも重ねない（横にバッジを置く場所）", () => {
+    const { queryByText } = render(
+      <SpotImage
+        category="onsen"
+        imagePath="/images/spots/ai/yu.jpg"
+        sizes="64px"
+        showAiLabel={false}
+      />,
+    );
+    expect(queryByText("イメージ（AI で生成）")).toBeNull();
+  });
+
   test("写真には「イメージ（AI で生成）」を出さない", () => {
     const { queryByText } = render(
       <SpotImage
@@ -82,6 +99,25 @@ describe("SpotImage", () => {
     fireEvent.error(container.querySelector("img")!);
     expect(container.querySelector("img")).toBeNull();
     expect(container.querySelector("svg")).not.toBeNull();
+  });
+});
+
+describe("AiImageBadge", () => {
+  test("AI の画像なら「イメージ（AI で生成）」を出す", () => {
+    const { getByText } = render(
+      <AiImageBadge imagePath="/images/spots/ai/yu.jpg" />,
+    );
+    expect(getByText("イメージ（AI で生成）")).toBeTruthy();
+  });
+
+  test("写真・画像なしなら何も出さない", () => {
+    expect(
+      render(<AiImageBadge imagePath="/images/spots/yu.jpg" />).container
+        .firstChild,
+    ).toBeNull();
+    expect(
+      render(<AiImageBadge imagePath={null} />).container.firstChild,
+    ).toBeNull();
   });
 });
 
