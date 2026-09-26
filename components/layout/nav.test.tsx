@@ -31,6 +31,26 @@ describe.each([
     ).toBe(false);
   });
 
+  test("タブの下の階層のページでも、そのタブに付ける", () => {
+    pathname.current = "/planner/result";
+    render(<Nav />);
+
+    expect(
+      screen
+        .getByRole("link", { name: "AI旅プラン" })
+        .getAttribute("aria-current"),
+    ).toBe("page");
+  });
+
+  test("名前の頭だけが同じページ（/planner-extra など）では付けない", () => {
+    pathname.current = "/planner-extra";
+    render(<Nav />);
+
+    for (const link of screen.getAllByRole("link")) {
+      expect(link.hasAttribute("aria-current")).toBe(false);
+    }
+  });
+
   test("どのタブにも当たらないページ（404 など）では付けない", () => {
     pathname.current = "/no-such-page";
     render(<Nav />);

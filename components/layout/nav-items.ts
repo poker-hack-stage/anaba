@@ -24,7 +24,10 @@ export const NAV_ITEMS: NavItem[] = [
   },
 ];
 
+// タブのパスそのものか、その下の階層（`/planner/...`）だけを今いるタブにする。
+// 単なる前方一致だと `/planner-extra` でも一致してしまう（#127）
 export function isActive(href: string, pathname: string | null) {
   if (!pathname) return false;
-  return href === "/" ? pathname === "/" : pathname.startsWith(href);
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(`${href}/`);
 }
