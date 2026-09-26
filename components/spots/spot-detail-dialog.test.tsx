@@ -62,4 +62,49 @@ describe("SpotDetailDialog", () => {
     );
     expect(screen.queryByRole("img", { name: /5段階中/ })).toBeNull();
   });
+
+  test("onIncludeInRoute を渡さなければ、経路に加えるボタンを出さない（「穴場を探す」など）", () => {
+    renderDetail(spot("hakuba", "姫川源流", "nature"));
+    expect(
+      screen.queryByRole("button", {
+        name: "このスポットを経路に加えて作り直す",
+      }),
+    ).toBeNull();
+  });
+
+  test("onIncludeInRoute を渡すと、経路に加えるボタンを出し、押すとそのスポットを渡す", () => {
+    const s = spot("hakuba", "姫川源流", "nature");
+    const onIncludeInRoute = vi.fn();
+    render(
+      <SpotDetailDialog
+        spot={s}
+        onClose={() => {}}
+        onIncludeInRoute={onIncludeInRoute}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "このスポットを経路に加えて作り直す",
+      }),
+    );
+
+    expect(onIncludeInRoute).toHaveBeenCalledWith(s);
+  });
+
+  test("開いたまま onIncludeInRoute が外れたら、ボタンを消す（閉じるときは spot が null になるまで残す）", () => {
+    const s = spot("hakuba", "姫川源流", "nature");
+    const name = "このスポットを経路に加えて作り直す";
+    const { rerender } = render(
+      <SpotDetailDialog
+        spot={s}
+        onClose={() => {}}
+        onIncludeInRoute={vi.fn()}
+      />,
+    );
+    screen.getByRole("button", { name });
+
+    rerender(<SpotDetailDialog spot={s} onClose={() => {}} />);
+    expect(screen.queryByRole("button", { name })).toBeNull();
+  });
 });

@@ -64,6 +64,17 @@ describe("POST /api/plan", () => {
     expect(createPlan).toHaveBeenCalledWith([], valid, { useAi: true });
   });
 
+  test("必ず入れるスポットの id（#32）を、条件に付けて渡す", async () => {
+    const res = await post({ ...valid, includeSpotId: "spot-1" });
+
+    expect(res.status).toBe(200);
+    expect(createPlan).toHaveBeenCalledWith(
+      [],
+      { ...valid, includeSpotId: "spot-1" },
+      { useAi: true },
+    );
+  });
+
   test("上限を超えたら、本文を読まずに 429 と Retry-After を返す", async () => {
     mock.state.rateLimitAllowed = false;
 

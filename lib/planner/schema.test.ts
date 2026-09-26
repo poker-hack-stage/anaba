@@ -18,6 +18,12 @@ describe("planConditionsSchema", () => {
     ).toMatchObject({ areaId: null, interests: [] });
   });
 
+  test("必ず入れるスポットの id（#32）は任意で受け付ける", () => {
+    expect(
+      planConditionsSchema.parse({ ...valid, includeSpotId: "spot-1" }),
+    ).toEqual({ ...valid, includeSpotId: "spot-1" });
+  });
+
   test("興味の重なりは1つにまとめる", () => {
     expect(
       planConditionsSchema.parse({ ...valid, interests: ["温泉", "温泉"] })
@@ -34,6 +40,9 @@ describe("planConditionsSchema", () => {
     ["移動手段が選択肢にない", { transport: "飛行機" }],
     ["地域の id が空", { areaId: " " }],
     ["地域の id が長すぎる", { areaId: "a".repeat(65) }],
+    ["必ず入れるスポットの id が空", { includeSpotId: " " }],
+    ["必ず入れるスポットの id が長すぎる", { includeSpotId: "a".repeat(65) }],
+    ["必ず入れるスポットの id が文字列でない", { includeSpotId: 1 }],
     ["地域名で送っている（古い形）", { areaId: undefined, area: "松本市" }],
     ["余計な項目がある", { note: "よろしく" }],
     ["型が違う", { interests: "温泉" }],

@@ -18,6 +18,8 @@ export type PlannerResult = {
   mode: PlanResponse["mode"] | null;
   /** /api/plan が 429（レート制限、#25）を返し、ブラウザでデモモードの候補を作ったとき true */
   rateLimited?: boolean;
+  /** 「このスポットを経路に加えて作り直す」（#32）に失敗したときの文言。元の候補を残したまま出す */
+  rebuildError?: string;
 };
 
 type PlannerState = {
@@ -25,7 +27,8 @@ type PlannerState = {
   savedConditions: PlanConditions | null;
   saveConditions: (conditions: PlanConditions) => void;
   result: PlannerResult;
-  setResult: (result: PlannerResult) => void;
+  /** selectedIndex を渡すと、新しい候補の中でその番号を選ぶ（渡さなければ 0 番） */
+  setResult: (result: PlannerResult, selectedIndex?: number) => void;
   /** タブで選んでいる候補の番号（0 始まり）。候補が変わったら（絞り直し）0 に戻る */
   selectedCandidate: number;
   selectCandidate: (index: number) => void;
@@ -42,7 +45,7 @@ export function PlannerStateProvider({
   const [savedConditions, saveConditions] = useState<PlanConditions | null>(
     null,
   );
-  const [result, setResult] = useState<PlannerResult>({
+  const [result, setResultState] = useState<PlannerResult>({
     status: "idle",
     candidates: [],
     conditions: null,
@@ -61,7 +64,12 @@ export function PlannerStateProvider({
       savedConditions,
       saveConditions,
       result,
-      setResult,
+      setResult: (next: PlannerResult, selectedIndex?: number) => {
+        setResultState(next);
+        if (selectedIndex !== undefined) {
+          setSelection({ candidates: next.candidates, index: selectedIndex });
+        }
+      },
       selectedCandidate,
       selectCandidate: (index: number) =>
         setSelection({ candidates: result.candidates, index }),
