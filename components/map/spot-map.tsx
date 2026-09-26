@@ -21,7 +21,7 @@ import { Map, MapPin } from "lucide-react";
 import type { Spot } from "@/lib/data/spots";
 import { outsideOf, toAreaBoundary } from "@/lib/map/boundary";
 import { computeBounds } from "@/lib/map/bounds";
-import { spreadApart, type PixelPoint } from "@/lib/map/spread";
+import { spreadOffsetsById, type PixelPoint } from "@/lib/map/spread";
 import { getCategory } from "@/lib/spots/categories";
 import { cn } from "@/lib/utils";
 
@@ -300,23 +300,16 @@ export function SpotMap({
     if (!map) return;
     const update = () => {
       const narrow = map.getContainer().clientWidth < NARROW_MAP_WIDTH;
-      const offsets =
+      const next =
         narrow && highlighted.length > 1
-          ? spreadApart(
-              highlighted.map((s) => map.project([s.lng, s.lat])),
+          ? spreadOffsetsById(
+              highlighted.map((s) => ({
+                id: s.id,
+                point: map.project([s.lng, s.lat]),
+              })),
               HIGHLIGHT_MIN_DISTANCE,
             )
-          : [];
-      const next = new globalThis.Map<string, PixelPoint>();
-      offsets.forEach((o, i) => {
-        // 0.5px 未満のずれは描いても見分けられないので、ずらさない扱いにする
-        if (Math.hypot(o.x, o.y) >= 0.5) {
-          next.set(highlighted[i].id, {
-            x: Math.round(o.x),
-            y: Math.round(o.y),
-          });
-        }
-      });
+          : NO_OFFSETS;
       // ズームの途中は毎フレーム呼ばれるので、変わったときだけ描き直す
       setHighlightOffsets((prev) =>
         sameOffsets(prev, next) ? prev : next.size === 0 ? NO_OFFSETS : next,
@@ -598,6 +591,8 @@ function SpotMarker({
       element,
       anchor: "center",
       offset: offsetRef.current,
+      // 既定では位置を整数 px に丸め、ずらしたピンの間隔が 44px を切ることがあるので、小数のまま置く
+      subpixelPositioning: true,
     })
       .setLngLat([spot.lng, spot.lat])
       .addTo(map);

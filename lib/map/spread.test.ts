@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { spreadApart, type PixelPoint } from "./spread";
+import { spreadApart, spreadOffsetsById, type PixelPoint } from "./spread";
 
 function moved(points: PixelPoint[], offsets: PixelPoint[]): PixelPoint[] {
   return points.map((p, i) => ({
@@ -87,5 +87,32 @@ describe("spreadApart", () => {
     }));
     const offsets = spreadApart(points, 44);
     expect(minDistanceOf(moved(points, offsets))).toBeGreaterThanOrEqual(44);
+  });
+});
+
+describe("spreadOffsetsById", () => {
+  it("離れている点は Map に入れない", () => {
+    const offsets = spreadOffsetsById(
+      [
+        { id: "a", point: { x: 0, y: 0 } },
+        { id: "b", point: { x: 50, y: 0 } },
+      ],
+      44,
+    );
+    expect(offsets.size).toBe(0);
+  });
+
+  it("minDistance にわずかに足りない2点（43.4px）も、丸めずにずらして 44px 以上離す", () => {
+    const items = [
+      { id: "a", point: { x: 100, y: 100 } },
+      { id: "b", point: { x: 143.4, y: 100 } },
+    ];
+    const offsets = spreadOffsetsById(items, 44);
+    expect(offsets.size).toBe(2);
+    const after = items.map(({ id, point }) => ({
+      x: point.x + (offsets.get(id)?.x ?? 0),
+      y: point.y + (offsets.get(id)?.y ?? 0),
+    }));
+    expect(minDistanceOf(after)).toBeGreaterThanOrEqual(44);
   });
 });

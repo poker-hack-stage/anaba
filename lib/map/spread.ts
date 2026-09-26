@@ -45,3 +45,22 @@ export function spreadApart(
   }
   return pos.map((p, i) => ({ x: p.x - points[i].x, y: p.y - points[i].y }));
 }
+
+/**
+ * id ごとに spreadApart を掛け、ずらす点だけを Map で返す。
+ * 丸めると 44px に届かないことがある（43.4px の2点なら 0.3px ずつ）ので、小数のまま返す
+ */
+export function spreadOffsetsById(
+  items: readonly { id: string; point: PixelPoint }[],
+  minDistance: number,
+): Map<string, PixelPoint> {
+  const offsets = spreadApart(
+    items.map((item) => item.point),
+    minDistance,
+  );
+  const result = new Map<string, PixelPoint>();
+  offsets.forEach((o, i) => {
+    if (o.x !== 0 || o.y !== 0) result.set(items[i].id, o);
+  });
+  return result;
+}
