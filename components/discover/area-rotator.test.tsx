@@ -38,17 +38,20 @@ vi.mock("next/navigation", async () => {
 vi.mock("./area-map", () => ({
   AreaMap: ({
     area,
+    activeSpotId,
     onSpotClick,
     onSpotHover,
     onUserMove,
   }: {
     area?: AreaWithSpots;
+    activeSpotId?: string | null;
     onSpotClick?: (spot: Spot) => void;
     onSpotHover?: (spot: Spot | null) => void;
     onUserMove?: () => void;
   }) => (
     <div>
       <div data-testid="map">{area?.name ?? "日本全体"}</div>
+      <div data-testid="active-pin">{activeSpotId ?? ""}</div>
       <button type="button" onClick={onUserMove}>
         地図を動かす
       </button>
@@ -422,6 +425,133 @@ describe("地図のピンと情報パネルの連動（#14）", () => {
   });
 });
 
+/** スマホのおすすめのカードの点（aria-current の付いたもの）の名前 */
+function currentCardDot() {
+  return screen
+    .queryAllByRole("button", { name: /件目: / })
+    .filter((dot) => dot.getAttribute("aria-current") === "true")
+    .map((dot) => dot.getAttribute("aria-label"));
+}
+
+function activePin() {
+  return screen.getByTestId("active-pin").textContent;
+}
+
+describe("スマホのおすすめのカード（#142）", () => {
+  test("前／次のボタンと点で見えるカードを切り替え、地図で同じスポットのピンを目立たせる", () => {
+    render(<AreaRotator areas={areas} />);
+    const prev = screen.getByRole("button", { name: "前のおすすめ" });
+    const next = screen.getByRole("button", { name: "次のおすすめ" });
+    expect(currentCardDot()).toEqual(["1件目: 白馬八方温泉"]);
+    expect(activePin()).toBe("hakuba/白馬八方温泉");
+    // 端では押せないことを伝える（フォーカスが外れないよう disabled にはしない）
+    expect(prev.getAttribute("aria-disabled")).toBe("true");
+    expect(prev.hasAttribute("disabled")).toBe(false);
+
+    fireEvent.click(next);
+    expect(currentCardDot()).toEqual(["2件目: 八方池"]);
+    expect(activePin()).toBe("hakuba/八方池");
+    expect(next.getAttribute("aria-disabled")).toBe("true");
+
+    // 最後のカードでは、次へを押しても動かない
+    fireEvent.click(next);
+    expect(currentCardDot()).toEqual(["2件目: 八方池"]);
+
+    fireEvent.click(prev);
+    expect(currentCardDot()).toEqual(["1件目: 白馬八方温泉"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "2件目: 八方池" }));
+    expect(activePin()).toBe("hakuba/八方池");
+  });
+
+  test("横にスクロールすると、いちばん近いカードを見えるカードにする", () => {
+    render(<AreaRotator areas={areas} />);
+    const list = screen.getByRole("list", { name: "おすすめの2か所" });
+    const items = within(list).getAllByRole("listitem");
+    // jsdom はレイアウトしないので、カードの位置とスクロールの幅を決めておく（カード 290px・すき間 8px）
+    items.forEach((item, i) =>
+      Object.defineProperty(item, "offsetLeft", { value: 12 + i * 298 }),
+    );
+    Object.defineProperty(list, "clientWidth", { value: 351 });
+    Object.defineProperty(list, "scrollWidth", { value: 12 + 2 * 298 + 4 });
+
+    list.scrollLeft = 120;
+    fireEvent.scroll(list);
+    act(() => vi.advanceTimersByTime(20));
+    expect(currentCardDot()).toEqual(["1件目: 白馬八方温泉"]);
+
+    // 右端まで送ったら最後のカード
+    list.scrollLeft = 12 + 2 * 298 + 4 - 351;
+    fireEvent.scroll(list);
+    act(() => vi.advanceTimersByTime(20));
+    expect(currentCardDot()).toEqual(["2件目: 八方池"]);
+    expect(activePin()).toBe("hakuba/八方池");
+  });
+
+  test("地域が変わったら最初のカードに戻す。1件だけの地域では点とボタンを出さない", () => {
+    render(<AreaRotator areas={areas} />);
+    fireEvent.click(screen.getByRole("button", { name: "次のおすすめ" }));
+    expect(activePin()).toBe("hakuba/八方池");
+
+    fireEvent.click(screen.getByRole("button", { name: "次の地域" }));
+    expect(activePin()).toBe("matsumoto/松本城");
+    expect(screen.queryByRole("button", { name: "次のおすすめ" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "前の地域" }));
+    expect(currentCardDot()).toEqual(["1件目: 白馬八方温泉"]);
+    expect(activePin()).toBe("hakuba/白馬八方温泉");
+  });
+
+  test("絞り込みで同じ地域に留まったときも、横スクロールを最初のカードに戻す", () => {
+    render(<AreaRotator areas={areas} />);
+    const list = screen.getByRole("list", { name: "おすすめの2か所" });
+    fireEvent.click(screen.getByRole("button", { name: "次のおすすめ" }));
+    list.scrollLeft = 298;
+    expect(activePin()).toBe("hakuba/八方池");
+
+    // 白馬村の2か所とも条件に合うので、地域もカードの並びもそのまま
+    fireEvent.change(searchBox(), { target: { value: "白馬" } });
+    act(() => vi.advanceTimersByTime(300));
+    expect(currentArea()).toBe("白馬村");
+    expect(screen.getByRole("list", { name: "おすすめの2か所" })).toBe(list);
+    expect(list.scrollLeft).toBe(0);
+    expect(currentCardDot()).toEqual(["1件目: 白馬八方温泉"]);
+    expect(activePin()).toBe("hakuba/白馬八方温泉");
+  });
+
+  test("絞り込みで0件なら、目立たせるピンはない", () => {
+    render(<AreaRotator areas={areas} />);
+    fireEvent.change(searchBox(), { target: { value: "該当なし" } });
+    act(() => vi.advanceTimersByTime(300));
+    expect(activePin()).toBe("");
+  });
+
+  test("カードに触れたら、地域の巡回を 15 秒止める（#128）", () => {
+    // 「視差効果を減らす」を切って、自動で切り替わるようにする
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({
+        matches: false,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      })),
+    );
+    render(<AreaRotator areas={areas} />);
+    const list = screen.getByRole("list", { name: "おすすめの2か所" });
+    fireEvent.pointerDown(within(list).getAllByRole("listitem")[1], {
+      pointerType: "touch",
+    });
+
+    act(() => vi.advanceTimersByTime(14000));
+    expect(currentArea()).toBe("白馬村");
+
+    // 止めていた 15 秒が過ぎたら、また 6 秒ごとに切り替わる
+    act(() => vi.advanceTimersByTime(1000));
+    act(() => vi.advanceTimersByTime(6000));
+    expect(currentArea()).toBe("松本市");
+  });
+});
+
 describe("地図を動かしたあとの巡回（#151）", () => {
   beforeEach(() => {
     // 自動の切り替えを動かす（「視差効果を減らす」を切る）
@@ -469,5 +599,32 @@ describe("地図を動かしたあとの巡回（#151）", () => {
     expect(currentArea()).toBe("松本市");
     act(() => vi.advanceTimersByTime(6000));
     expect(currentArea()).toBe("大町市");
+  });
+});
+
+describe("スマホの写真の出典（#155）", () => {
+  test("フッターを出さないスマホでも、地図の枠の中から写真の出典へたどれる（sm 以上では出さない）", () => {
+    render(<AreaRotator areas={areas} />);
+    const link = screen.getByRole("link", { name: "写真の出典" });
+    expect(link.getAttribute("href")).toBe("/credits");
+    expect(link.className).toMatch(/\bsm:hidden\b/);
+  });
+
+  test("絞り込みで0件のときも出す", () => {
+    render(<AreaRotator areas={areas} />);
+    fireEvent.change(searchBox(), { target: { value: "該当なし" } });
+    act(() => vi.advanceTimersByTime(300));
+    expect(screen.getByRole("link", { name: "写真の出典" })).toBeTruthy();
+  });
+});
+
+describe("スマホのおすすめのカードの大きさ（#155）", () => {
+  test("3枚の li を同じ幅にし、中のカードを li の高さまで伸ばす（いちばん高いカードにそろえる）", () => {
+    render(<AreaRotator areas={areas} />);
+    const list = screen.getByRole("list", { name: "おすすめの2か所" });
+    for (const item of within(list).getAllByRole("listitem")) {
+      expect(item.className).toMatch(/\bmax-lg:flex\b/);
+      expect(item.className).toMatch(/max-lg:w-\[85%\]/);
+    }
   });
 });

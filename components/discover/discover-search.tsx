@@ -18,7 +18,9 @@ const CATEGORY_ENTRIES = Object.entries(CATEGORIES) as [
  * 件数の変化は aria-live で読み上げる。
  * スマホ（sm 未満）では検索欄だけを見せ、検索欄を押したらカテゴリのチップを出す。
  * フォーカスが検索欄とチップの外へ出たら閉じる。ただしカテゴリを選んでいる間は閉じない（どの条件で絞っているかが見えなくなるため、#120）。
- * 検索欄とチップは背景でひとまとまりに見せる（kosei の判断）
+ * 検索欄とチップは背景でひとまとまりに見せる（kosei の判断）。
+ * スマホ・タブレット（lg 未満）では地図の上端に浮かべる（#142、area-rotator.tsx）。スマホでは検索欄とチップ・件数に影を付け、
+ * 件数と「条件をクリア」は白い帯に載せて地図の上でも読めるようにする。まわりの隙間は地図を触れるよう、ここだけ触れるようにする
  */
 export function DiscoverSearch({
   text,
@@ -55,11 +57,11 @@ export function DiscoverSearch({
   return (
     <div
       role="search"
-      className="flex flex-wrap items-center gap-x-3 gap-y-3 lg:flex-col lg:flex-nowrap lg:items-stretch"
+      className="flex flex-wrap items-center gap-x-3 gap-y-3 max-sm:gap-y-2 lg:flex-col lg:flex-nowrap lg:items-stretch"
     >
       {/* スマホでは検索欄とチップを背景でひとまとまりにする。sm 以上では contents で枠をなくし、今までどおり1行に並べる */}
       <div
-        className={`flex w-full flex-col rounded-2xl transition-all duration-200 ease-out motion-reduce:transition-none sm:contents ${chipsOpen ? "gap-2 bg-ink-light p-2" : "gap-0 bg-transparent p-0"}`}
+        className={`flex w-full flex-col rounded-2xl transition-all duration-200 ease-out motion-reduce:transition-none max-sm:pointer-events-auto sm:contents ${chipsOpen ? "gap-2 bg-ink-light p-2 shadow-lg" : "gap-0 bg-transparent p-0"}`}
         onFocus={() => setFocusWithin(true)}
         onBlur={(e) => {
           // フォーカスが検索欄とチップの外へ出たときだけ閉じる
@@ -84,7 +86,7 @@ export function DiscoverSearch({
             maxLength={MAX_QUERY_LENGTH}
             placeholder="スポット名・地域・タグで探す"
             aria-label="スポット名・地域・タグで探す"
-            className="h-10 rounded-xl border-stone-200 bg-white pl-9"
+            className="h-10 rounded-xl border-stone-200 bg-white pl-9 max-sm:shadow-md"
           />
         </div>
 
@@ -114,7 +116,9 @@ export function DiscoverSearch({
         </div>
       </div>
 
-      <div className="flex items-center gap-2 lg:flex-wrap">
+      <div
+        className={`flex items-center gap-2 lg:flex-wrap ${summary ? "max-sm:pointer-events-auto max-sm:rounded-full max-sm:bg-white/95 max-sm:py-0.5 max-sm:pl-3 max-sm:pr-1 max-sm:shadow-md" : ""}`}
+      >
         {/* 空のときも置いておく（あとから中身が入ったときに読み上げられるように） */}
         <p aria-live="polite" className="text-sm font-semibold text-stone-700">
           {summary &&

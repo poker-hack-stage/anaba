@@ -2,14 +2,14 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { Route } from "lucide-react";
 import { AreaRotator } from "@/components/discover/area-rotator";
-import { SpotCardSkeleton } from "@/components/spots/spot-card";
 import { SpotSubmissionTrigger } from "@/components/submit/spot-submission";
 import { getAreasWithSpots } from "@/lib/data/areas";
 
-// 穴場を探す（トップページ）
+// 穴場を探す（トップページ）。
+// data-fullscreen-map を付けると、スマホ（sm 未満）ではページ全体を縦にスクロールさせない（app/globals.css、#155）
 export default function DiscoverPage() {
   return (
-    <div className="flex flex-col gap-6">
+    <div data-fullscreen-map className="flex flex-col gap-6">
       <Hero />
       <Suspense fallback={<DiscoverSkeleton />}>
         <Discover />
@@ -52,19 +52,18 @@ async function Discover() {
 
 function DiscoverSkeleton() {
   return (
-    // PC は地図が大きく出る（components/discover/area-rotator.tsx）。読み込み中も同じ大きさを取り、下のフッターが跳ねないようにする
-    <div className="flex flex-col gap-4 lg:h-[calc(100dvh-7rem)] lg:animate-pulse lg:rounded-2xl lg:bg-stone-200/60">
-      {/* 検索欄の行（components/discover/discover-search.tsx）の高さぶん */}
-      <div className="h-[52px] animate-pulse rounded-xl bg-stone-200/60 sm:h-24 lg:hidden" />
-      <section className="grid gap-4 lg:hidden">
-        <div className="h-72 animate-pulse rounded-2xl bg-stone-200/60 sm:h-96" />
-        <div className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-5">
-          <div className="h-12 w-40 animate-pulse rounded-lg bg-stone-200/60" />
-          <SpotCardSkeleton />
-          <SpotCardSkeleton />
-          <SpotCardSkeleton />
-        </div>
-      </section>
+    // 地図の枠（components/discover/area-rotator.tsx）と同じ大きさを取り、読み込み後に跳ねないようにする。
+    // スマホ・タブレットは地図の上に検索欄、下に情報パネルが浮かぶ（#142）ので、その位置に枠を出す
+    <div className="relative -mx-4 -mt-5 h-[calc(100dvh-3.5rem-1px-57px)] animate-pulse overflow-hidden bg-stone-200/60 sm:mx-0 sm:mt-0 sm:h-[calc(100dvh-4rem-1px-57px-2.5rem)] sm:rounded-2xl md:h-[calc(100dvh-7rem)]">
+      {/* 検索欄（components/discover/discover-search.tsx）の高さぶん */}
+      <div className="absolute inset-x-3 top-3 h-10 rounded-xl bg-white/80 sm:h-24 sm:rounded-2xl lg:hidden" />
+      {/* 情報パネル（components/discover/spot-panel.tsx）。地域の切り替え・地域名・カード1枚ぶん */}
+      <div className="absolute inset-x-3 bottom-9 flex flex-col gap-2 rounded-2xl bg-white/80 p-3 sm:bottom-3 sm:right-auto sm:w-[420px] lg:hidden">
+        <div className="h-8 w-48 rounded-lg bg-stone-200/60" />
+        <div className="h-10 w-40 rounded-lg bg-stone-200/60" />
+        <div className="h-7 w-full rounded-lg bg-stone-200/60" />
+        <div className="h-[106px] w-[85%] rounded-2xl bg-stone-200/60" />
+      </div>
     </div>
   );
 }

@@ -22,6 +22,11 @@ vi.mock("maplibre-gl", () => {
     fitBounds = vi.fn();
     touchZoomRotate = { disableRotation: () => {} };
     keyboard = { disableRotation: () => {} };
+    cooperativeGestures = {
+      isEnabled: () => true,
+      enable: () => {},
+      disable: () => {},
+    };
     constructor() {
       maps.push(this);
     }
@@ -46,6 +51,13 @@ vi.mock("maplibre-gl", () => {
     remove() {}
   }
   class FakeMarker {
+    private element: HTMLElement;
+    constructor(options?: { element?: HTMLElement }) {
+      this.element = options?.element ?? document.createElement("div");
+    }
+    getElement() {
+      return this.element;
+    }
     setLngLat() {
       return this;
     }
@@ -164,5 +176,42 @@ describe("SpotMap の onUserMove（#151）", () => {
 
     act(() => map.fire("movestart", { originalEvent: new Event("wheel") }));
     expect(onUserMove).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("SpotMap の余白の変更と利用者の操作（#155）", () => {
+  const padding = (top: number) => ({ top, right: 24, bottom: 300, left: 24 });
+
+  test("余白だけが変わったら合わせ直す。利用者が動かしたあとは合わせ直さない", () => {
+    const { rerender } = render(
+      <SpotMap highlighted={spots} fitPadding={padding(80)} />,
+    );
+    const map = maps[0];
+    expect(map.fitBounds).toHaveBeenCalledTimes(1);
+
+    // スマホで検索欄のチップが開いて、上の余白が広がった
+    rerender(<SpotMap highlighted={spots} fitPadding={padding(200)} />);
+    expect(map.fitBounds).toHaveBeenCalledTimes(2);
+
+    // 利用者が拡大したあとは、チップを閉じて余白が戻っても表示を戻さない
+    act(() => map.fire("movestart", { originalEvent: new Event("touchmove") }));
+    rerender(<SpotMap highlighted={spots} fitPadding={padding(80)} />);
+    expect(map.fitBounds).toHaveBeenCalledTimes(2);
+  });
+
+  test("利用者が動かしたあとでも、見る対象（地域）が変わったら合わせる", () => {
+    const { rerender } = render(
+      <SpotMap highlighted={spots} fitPadding={padding(80)} />,
+    );
+    const map = maps[0];
+    act(() => map.fire("movestart", { originalEvent: new Event("wheel") }));
+
+    rerender(
+      <SpotMap
+        highlighted={[spot("c", 138.0, 36.5), spot("d", 138.1, 36.6)]}
+        fitPadding={padding(80)}
+      />,
+    );
+    expect(map.fitBounds).toHaveBeenCalledTimes(2);
   });
 });

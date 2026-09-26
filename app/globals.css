@@ -45,6 +45,24 @@
   }
 }
 
+/*
+  スマホ（sm 未満）の「穴場を探す」（app/page.tsx の data-fullscreen-map）は、地図をヘッダーと下部ナビのあいだに収め、
+  ページ全体を縦にスクロールさせない（#155）。main の下の余白とフッターをなくし、body の最小の高さ（min-h-screen = 100vh）も外す。
+  iOS Safari の 100vh はアドレスバーを畳んだときの高さで、アドレスバーが出ている間は画面より高くなるため。
+  フッターの「写真の出典」の代わりに、地図の右下にリンクを出す（components/discover/area-rotator.tsx）
+*/
+@media not all and (min-width: 640px) {
+  body:has([data-fullscreen-map]) {
+    min-height: 0;
+  }
+  main:has([data-fullscreen-map]) {
+    padding-bottom: 0;
+  }
+  body:has([data-fullscreen-map]) > footer {
+    display: none;
+  }
+}
+
 /* 控えめなスクロールバー */
 ::-webkit-scrollbar {
   width: 6px;
