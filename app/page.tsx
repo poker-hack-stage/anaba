@@ -111,11 +111,12 @@ async function Discover() {
 
 function DiscoverSkeleton() {
   return (
-    <div className="flex flex-col gap-4">
+    // PC は地図が大きく出る（components/discover/area-rotator.tsx）。読み込み中も同じ大きさを取り、下のフッターが跳ねないようにする
+    <div className="flex flex-col gap-4 lg:h-[calc(100dvh-7rem)] lg:animate-pulse lg:rounded-2xl lg:bg-stone-200/60">
       {/* 検索欄の行（components/discover/discover-search.tsx）の高さぶん */}
-      <div className="h-[52px] animate-pulse rounded-xl bg-stone-200/60 sm:h-24 lg:h-10" />
-      <section className="grid gap-4 lg:grid-cols-[1fr_400px]">
-        <div className="h-72 animate-pulse rounded-2xl bg-stone-200/60 sm:h-96 lg:h-[520px]" />
+      <div className="h-[52px] animate-pulse rounded-xl bg-stone-200/60 sm:h-24 lg:hidden" />
+      <section className="grid gap-4 lg:hidden">
+        <div className="h-72 animate-pulse rounded-2xl bg-stone-200/60 sm:h-96" />
         <div className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-5">
           <div className="h-12 w-40 animate-pulse rounded-lg bg-stone-200/60" />
           <SpotCardSkeleton />

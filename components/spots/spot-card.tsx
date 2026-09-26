@@ -3,28 +3,48 @@ import { Rating } from "@/components/ui/rating";
 import type { Spot } from "@/lib/data/spots";
 import { getCategory } from "@/lib/spots/categories";
 import { getHiddenGemScore, getRating } from "@/lib/spots/score";
+import { cn } from "@/lib/utils";
 import { HiddenGemScore } from "./hidden-gem-score";
 import { SpotImage, preloadSpotImage } from "./spot-image";
 
-/** カードの写真の表示幅（h-24 w-24）。next/image の sizes と先読みで同じ値を使う */
-const CARD_IMAGE_SIZES = "96px";
+/**
+ * カードの写真の表示幅。next/image の sizes と先読みで同じ値を使う。
+ * - default: h-24 w-24
+ * - panel: 「穴場を探す」の情報パネル。PC（lg 以上）はカードの幅いっぱい
+ *   （パネルの幅 360px / 420px から、パネルとカードの余白と枠線を引いた値。area-rotator.tsx）
+ */
+const CARD_IMAGE_SIZES = {
+  default: "96px",
+  panel: "(min-width: 1280px) 354px, (min-width: 1024px) 294px, 96px",
+} as const;
 
-/** カードの写真を先に読み込んでおく（次の地域の3件など） */
-export function preloadSpotCardImages(spots: Pick<Spot, "image_path">[]) {
-  for (const spot of spots) preloadSpotImage(spot.image_path, CARD_IMAGE_SIZES);
+export type SpotCardVariant = keyof typeof CARD_IMAGE_SIZES;
+
+/** カードの写真を先に読み込んでおく（次の地域の3件など）。`variant` は表示するカードと同じにする */
+export function preloadSpotCardImages(
+  spots: Pick<Spot, "image_path">[],
+  variant: SpotCardVariant = "default",
+) {
+  for (const spot of spots) {
+    preloadSpotImage(spot.image_path, CARD_IMAGE_SIZES[variant]);
+  }
 }
 
 /**
  * 情報パネルに並べるスポットカード（写真・カテゴリ・名前・評価・穴場度・キャッチコピー・タグ）。クリックで詳細を開く。
- * 口コミの件数・平均はカードには出さない（詳細の口コミ欄だけ、#53）
+ * 口コミの件数・平均はカードには出さない（詳細の口コミ欄だけ、#53）。
+ * `variant="panel"` は PC（lg 以上）で写真を上に大きく出し、その下に文字を並べる
  */
 export function SpotCard({
   spot,
   onSelect,
+  variant = "default",
 }: {
   spot: Spot;
   onSelect?: (spot: Spot) => void;
+  variant?: SpotCardVariant;
 }) {
+  const panel = variant === "panel";
   const meta = getCategory(spot.category);
   const rating = getRating(spot);
   const hiddenGemScore = getHiddenGemScore(spot);
@@ -33,13 +53,19 @@ export function SpotCard({
     <button
       type="button"
       onClick={() => onSelect?.(spot)}
-      className="flex w-full gap-3 overflow-hidden rounded-2xl border border-stone-200 bg-white p-3 text-left transition-colors hover:border-stone-300 hover:bg-stone-50"
+      className={cn(
+        "flex w-full gap-3 overflow-hidden rounded-2xl border border-stone-200 bg-white p-3 text-left transition-colors hover:border-stone-300 hover:bg-stone-50",
+        panel && "lg:flex-col",
+      )}
     >
       <SpotImage
         category={spot.category}
         imagePath={spot.image_path}
-        sizes={CARD_IMAGE_SIZES}
-        className="h-24 w-24 shrink-0 rounded-xl"
+        sizes={CARD_IMAGE_SIZES[variant]}
+        className={cn(
+          "h-24 w-24 shrink-0 rounded-xl",
+          panel && "lg:aspect-[16/10] lg:h-auto lg:w-full",
+        )}
       />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <span
@@ -48,7 +74,14 @@ export function SpotCard({
           <meta.icon aria-hidden className="h-3 w-3 shrink-0" />
           {meta.label}
         </span>
-        <h3 className="truncate font-extrabold text-stone-900">{spot.name}</h3>
+        <h3
+          className={cn(
+            "truncate font-extrabold text-stone-900",
+            panel && "lg:text-lg",
+          )}
+        >
+          {spot.name}
+        </h3>
         {(rating !== null || hiddenGemScore !== null) && (
           // 狭い幅では穴場度の数でカードごとに折り返しがばらつくので、最初から2行にする
           <div className="flex flex-col items-start gap-y-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3">
