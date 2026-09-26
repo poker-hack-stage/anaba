@@ -36,7 +36,17 @@ export function SpotDetailDialog({
 }) {
   // 閉じるアニメーションの間も中身を出しておくため、最後に開いたスポットを覚えておく
   const [shown, setShown] = useState(spot);
-  if (spot && spot !== shown) setShown(spot);
+  // ボタンを出すかも覚えておく（押すと onIncludeInRoute が外れるが、閉じるアニメーションの間はボタンを残す）
+  const [shownCanInclude, setShownCanInclude] = useState(
+    onIncludeInRoute !== undefined,
+  );
+  if (
+    spot &&
+    (spot !== shown || (onIncludeInRoute !== undefined) !== shownCanInclude)
+  ) {
+    setShown(spot);
+    setShownCanInclude(onIncludeInRoute !== undefined);
+  }
   // Trigger を使わずに開くので、閉じたら開く前にフォーカスがあった場所（カードなど）へ自分で戻す
   const returnFocusRef = useRef<HTMLElement | null>(null);
 
@@ -107,11 +117,11 @@ export function SpotDetailDialog({
               )}
             </div>
 
-            {onIncludeInRoute && (
+            {shownCanInclude && (
               // スクロールしなくても見えるよう、名前のすぐ下に置く
               <button
                 type="button"
-                onClick={() => onIncludeInRoute(shown)}
+                onClick={() => onIncludeInRoute?.(shown)}
                 className="flex items-center justify-center gap-1.5 rounded-xl bg-ink py-3 text-sm font-bold text-white transition-all hover:bg-ink/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98]"
               >
                 <Route aria-hidden className="h-4 w-4" />

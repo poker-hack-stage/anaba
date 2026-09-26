@@ -91,4 +91,20 @@ describe("SpotDetailDialog", () => {
 
     expect(onIncludeInRoute).toHaveBeenCalledWith(s);
   });
+
+  test("開いたまま onIncludeInRoute が外れたら、ボタンを消す（閉じるときは spot が null になるまで残す）", () => {
+    const s = spot("hakuba", "姫川源流", "nature");
+    const name = "このスポットを経路に加えて作り直す";
+    const { rerender } = render(
+      <SpotDetailDialog
+        spot={s}
+        onClose={() => {}}
+        onIncludeInRoute={vi.fn()}
+      />,
+    );
+    screen.getByRole("button", { name });
+
+    rerender(<SpotDetailDialog spot={s} onClose={() => {}} />);
+    expect(screen.queryByRole("button", { name })).toBeNull();
+  });
 });
