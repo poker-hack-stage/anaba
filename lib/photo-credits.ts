@@ -32,7 +32,8 @@ export type PhotoCredit = {
 };
 
 /**
- * AI で生成したイメージ画像。実在の建物・看板・人物を写真のように再現せず、「イメージ」と分かる絵柄にする。
+ * AI で生成したイメージ画像。ほかの写真と並んでも浮かないよう写真調にし（#158）、実在の店や施設の外観・看板・特定の建物・人物の顔は再現しない。
+ * 写真と見分けられるよう、画面では必ず「イメージ（AI で生成）」と示す。
  * path は AI_IMAGE_DIR（lib/spots/image-kind.ts）の下に置く（画面はパスで「イメージ（AI で生成）」を出すかを決める）
  */
 export type AiImageCredit = {
@@ -67,6 +68,9 @@ const FLICKR = "https://www.flickr.com/photos/";
 const KAMIKAWA_ALBUM = "https://www.kamikawa.pref.hokkaido.lg.jp/ts/tss/album/";
 const KAMIKAWA = "北海道上川総合振興局";
 export const VIEW_OF_KAMIKAWA = "北海道の風景～VIEW OF KAMIKAWA～";
+
+/** AI の画像を作ったモデル（#158。ChatGPT のアカウントでログインした Codex CLI の組み込みの画像生成） */
+const AI_MODEL = "OpenAI の画像生成（Codex CLI の image_gen）";
 
 export const PHOTO_CREDITS: PhotoCredit[] = [
   {
@@ -656,7 +660,258 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
 ];
 
 /** AI で生成したイメージ画像。許可のいらない写真が見つからなかったスポットに使う（#146。探した結果は docs/image-credits.md） */
-export const AI_IMAGE_CREDITS: AiImageCredit[] = [];
+export const AI_IMAGE_CREDITS: AiImageCredit[] = [
+  {
+    kind: "ai",
+    path: "/images/spots/ai/hakuba-05.jpg",
+    subject: "白馬ガラス工房GAKU",
+    model: AI_MODEL,
+    prompt:
+      "ガラス工房の作業台に並ぶ色とりどりのとんぼ玉と、ガラス棒・バーナー（初夏）",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/hakuba-07.jpg",
+    subject: "おやきの山愛",
+    model: AI_MODEL,
+    prompt:
+      "木のテーブルの上の焼き目のついたおやき（1つは割って野沢菜の具）と緑茶、窓の外に初夏の山並み",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/hakuba-08.jpg",
+    subject: "Kitchen＆Marché 農かふぇ",
+    model: AI_MODEL,
+    prompt:
+      "テラス席のテーブルの夏野菜のスープカレーとごはん、背景に初夏の田畑と山並み",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/omachi-04.jpg",
+    subject: "ゆいせきや",
+    model: AI_MODEL,
+    prompt:
+      "古い木の机の上の、柿渋を塗った一閑張りのカゴと小物入れ、刷毛と和紙（初夏）",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/omachi-05.jpg",
+    subject: "創舎 わちがい",
+    model: AI_MODEL,
+    prompt:
+      "古い屋敷の座敷の塗りの膳に並ぶ郷土料理（山菜の煮物・川魚の塩焼き・炊き込みごはんなど）",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/ikeda-02.jpg",
+    subject: "あづみ野池田クラフトパーク",
+    model: AI_MODEL,
+    prompt:
+      "丘の上の公園の芝生と満開の桜の向こうに、安曇野の田園と残雪の北アルプス（春の夕方前）",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/ikeda-03.jpg",
+    subject: "北アルプス展望美術館",
+    model: AI_MODEL,
+    prompt: "丘の上から見渡す、初夏の安曇野の田園と残雪の北アルプス",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/ikeda-06.jpg",
+    subject: "カフェ風のいろ",
+    model: AI_MODEL,
+    prompt:
+      "窓辺の席のハンドドリップのコーヒーと焼き菓子、窓の外に初夏の庭と田園",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/ikeda-07.jpg",
+    subject: "HOP FROG CAFE",
+    model: AI_MODEL,
+    prompt:
+      "カウンターに並ぶ味見用のクラフトビールのグラスと浅煎りのコーヒー、小皿の料理",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/ikeda-08.jpg",
+    subject: "発酵と暮らし おはこ",
+    model: AI_MODEL,
+    prompt:
+      "古民家の食堂の発酵ごはんの定食（玄米・味噌汁・ぬか漬け・果実のシロップのソーダ）",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/azumino-01.jpg",
+    subject: "豊科温泉 湯多里山の神",
+    model: AI_MODEL,
+    prompt: "自然石で囲んだ露天の岩風呂と、竹の垣根の向こうの初夏の丘",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/azumino-03.jpg",
+    subject: "安曇野市天蚕センター",
+    model: AI_MODEL,
+    prompt:
+      "クヌギの葉の間についた天蚕の淡い黄緑色の繭と、天蚕糸のかせ（初夏）",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/azumino-05.jpg",
+    subject: "長峰山",
+    model: AI_MODEL,
+    prompt:
+      "山頂の草地と山桜の向こうに、安曇野の田園と川の合流、残雪の北アルプス（春の夕方前）",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/azumino-08.jpg",
+    subject: "三郷サラダ市",
+    model: AI_MODEL,
+    prompt: "直売所の台に並ぶ、かごに盛ったりんご・梨・ぶどう（秋の朝）",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/matsumoto-02.jpg",
+    subject: "ホットプラザ浅間",
+    model: AI_MODEL,
+    prompt: "石で囲んだ露天風呂と、竹の垣根の向こうの初夏の山の稜線",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/matsumoto-03.jpg",
+    subject: "手仕事商會 すぐり",
+    model: AI_MODEL,
+    prompt:
+      "古い蔵の中の机に並ぶ、草木染めの糸でかがった松本てまりと糸の束（初夏）",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/matsumoto-04.jpg",
+    subject: "ファーマーズガーデンうちだ",
+    model: AI_MODEL,
+    prompt:
+      "直売所の台の採れたての夏野菜と卵の向こうに、松本平と残雪の北アルプス（初夏の朝）",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/matsumoto-08.jpg",
+    subject: "城山公園",
+    model: AI_MODEL,
+    prompt: "丘の上の満開の桜の向こうに、松本の市街地と残雪の北アルプス（春）",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/higashikawa-06.jpg",
+    subject: "平田とうふ店",
+    model: AI_MODEL,
+    prompt: "皿にのった大きな木綿豆腐と、水槽の豆腐・醤油と刻みねぎ（初夏）",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/marumori-02.jpg",
+    subject: "阿武隈ライン舟下り",
+    model: AI_MODEL,
+    prompt: "秋の阿武隈川の渓谷と紅葉の山肌、遠くに浮かぶ屋根のない川舟",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/marumori-03.jpg",
+    subject: "不動尊公園",
+    model: AI_MODEL,
+    prompt: "岩の間を流れる渓流と、川岸に並ぶ満開の桜、新緑の山（春）",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/marumori-04.jpg",
+    subject: "百々石公園",
+    model: AI_MODEL,
+    prompt:
+      "丘の上の桜とツツジの向こうに、川と小さな町並み、遠くの残雪の山並み（春）",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/marumori-05.jpg",
+    subject: "ラーメンきく屋",
+    model: AI_MODEL,
+    prompt:
+      "白い丼の澄んだ醤油色のスープの中華そば（細麺・チャーシュー・メンマ・ねぎ・海苔）",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/marumori-06.jpg",
+    subject: "西円寺（猫神さま）",
+    model: AI_MODEL,
+    prompt: "寺の境内の片隅の、猫の姿を浮き彫りにした苔むした古い石碑（初夏）",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/nakanojo-01.jpg",
+    subject: "日向見薬師堂",
+    model: AI_MODEL,
+    prompt: "杉の大木の木立の中を上へ続く、苔むした石段と小さな石灯籠（初夏）",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/takashima-05.jpg",
+    subject: "高島びれっじ",
+    model: AI_MODEL,
+    prompt:
+      "古い商家の土間と木の梁、棚に並ぶ手作りのキャンドルとハーバリウム（初夏）",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/takashima-06.jpg",
+    subject: "ホソイフクロモノ",
+    model: AI_MODEL,
+    prompt:
+      "作業台の上の綿帆布と麻織物、帆布のトートバッグと裁ちばさみ、奥にミシン（初夏）",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/takahashi-06.jpg",
+    subject: "中野 実りの直売所",
+    model: AI_MODEL,
+    prompt:
+      "山あいの直売所の台に並ぶ、かごに盛った季節の野菜と果物、奥に古い石垣（初夏）",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/taketa-04.jpg",
+    subject: "小津留湧水",
+    model: AI_MODEL,
+    prompt: "石で囲った池に澄んだ水が湧き、石の水路へ流れ出る湧き水（初夏）",
+    createdOn: "2026-09-26",
+  },
+];
 
 /** 写真と AI の画像のすべて（パスで引くとき・シードとの突き合わせ） */
 export const IMAGE_CREDITS: ImageCredit[] = [
