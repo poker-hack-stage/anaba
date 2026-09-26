@@ -107,10 +107,18 @@ vitest.config.mts     Vitest の設定
 1. Issue を立てる（またはアサインされる）
 2. `main` からブランチを切る: `feat/xxx`, `fix/xxx`, `chore/xxx`
 3. 実装してコミット（例: `feat: 口コミの投稿フォームを追加`）
-4. PR を作成 → CI（lint / format / typecheck / test / build）が通ること、1 人以上のレビューで `main` にマージ
+4. PR を作成 → CI（lint / format / typecheck / test / build）が通り、CodeRabbit のレビューの指摘に対応したら、自分で `main` にマージする（Merge commit）
 5. PR ごとに Vercel の Preview URL が発行され、`main` へのマージで本番デプロイされる
 
-`main` への直 push は禁止（GitHub の Branch protection で設定推奨）。
+`main` はブランチ保護で、直接 push できず、CI（ジョブ `check`）が通らない PR はマージできない。人のレビューは必須にしていない（見てほしい PR は、レビューを頼んでからマージする）。
+
+### 公開リポジトリでの注意
+
+このリポジトリは public なので、コミット・Issue・PR・コメントは誰でも読める。
+
+- API キー・`.env.local` の中身・パスワードは、コミットしない。Issue・PR・コメントにも貼らない（ログやスクリーンショットに写り込んだものも同じ）
+- うっかり貼ったりコミットしたりしたら、消すだけでは足りない（履歴やキャッシュに残る）。すぐにそのキーを無効にして作り直し、チームに伝える
+- `main` へのマージは本番デプロイになる（#25）。動作確認していないものはマージしない
 
 ### DB を変更するとき
 
