@@ -502,6 +502,23 @@ describe("スマホのおすすめのカード（#142）", () => {
     expect(activePin()).toBe("hakuba/白馬八方温泉");
   });
 
+  test("絞り込みで同じ地域に留まったときも、横スクロールを最初のカードに戻す", () => {
+    render(<AreaRotator areas={areas} />);
+    const list = screen.getByRole("list", { name: "おすすめの2か所" });
+    fireEvent.click(screen.getByRole("button", { name: "次のおすすめ" }));
+    list.scrollLeft = 298;
+    expect(activePin()).toBe("hakuba/八方池");
+
+    // 白馬村の2か所とも条件に合うので、地域もカードの並びもそのまま
+    fireEvent.change(searchBox(), { target: { value: "白馬" } });
+    act(() => vi.advanceTimersByTime(300));
+    expect(currentArea()).toBe("白馬村");
+    expect(screen.getByRole("list", { name: "おすすめの2か所" })).toBe(list);
+    expect(list.scrollLeft).toBe(0);
+    expect(currentCardDot()).toEqual(["1件目: 白馬八方温泉"]);
+    expect(activePin()).toBe("hakuba/白馬八方温泉");
+  });
+
   test("絞り込みで0件なら、目立たせるピンはない", () => {
     render(<AreaRotator areas={areas} />);
     fireEvent.change(searchBox(), { target: { value: "該当なし" } });

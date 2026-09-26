@@ -125,6 +125,16 @@ function SpotCarousel({
     [],
   );
 
+  // 絞り込みでおすすめが選び直されたら、最初のカードまで戻す。同じ地域のままだと並びを作り直さないので、
+  // スクロールの位置が残って、点・地図のピンと見えるカードがずれるため（地域が変わったときは key で作り直す）。
+  // `spots` は絞り込みの条件が変わったときだけ新しい配列になる（area-rotator.tsx の useMemo）
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    list.scrollLeft = 0;
+    onCardIndexChange?.(0);
+  }, [spots, onCardIndexChange]);
+
   // スクロールのたびに見えているカードを求める（1フレームに1回）
   const handleScroll = () => {
     if (frame.current !== null) return;
