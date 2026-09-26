@@ -15,6 +15,8 @@ export function createCommunitySupabaseMock() {
     /** published_reviews の一覧と、星ごとの件数（[★1, …, ★5]） */
     reviews: [] as unknown[],
     ratingCounts: [0, 0, 0, 0, 0],
+    /** published_reviews のうち is_sample = true の件数（#152） */
+    sampleCount: 0,
   };
 
   const rpcResult = async (name: string) => {
@@ -48,6 +50,7 @@ export function createCommunitySupabaseMock() {
   function readQuery() {
     let head = false;
     let rating: number | null = null;
+    let sampleOnly = false;
     const query = {
       select: (_columns: string, options?: { head?: boolean }) => {
         head = options?.head ?? false;
@@ -55,15 +58,18 @@ export function createCommunitySupabaseMock() {
       },
       eq: (column: string, value: unknown) => {
         if (column === "rating") rating = value as number;
+        if (column === "is_sample" && value === true) sampleOnly = true;
         return query;
       },
       order: () => query,
       limit: () => query,
       then: (resolve: (result: unknown) => void) =>
         resolve(
-          head
-            ? { count: state.ratingCounts[(rating ?? 1) - 1], error: null }
-            : { data: state.reviews, error: null },
+          !head
+            ? { data: state.reviews, error: null }
+            : sampleOnly
+              ? { count: state.sampleCount, error: null }
+              : { count: state.ratingCounts[(rating ?? 1) - 1], error: null },
         ),
     };
     return query;

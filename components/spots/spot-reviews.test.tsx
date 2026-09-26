@@ -15,6 +15,7 @@ const REVIEWS: SpotReviews = {
       rating: 5,
       body: "朝の光がきれい。\n静かでした",
       created_at: "2026-09-24T01:00:00Z",
+      is_sample: false,
     },
     {
       id: "r1",
@@ -23,10 +24,12 @@ const REVIEWS: SpotReviews = {
       rating: 3,
       body: "<b>駐車場</b>が狭い",
       created_at: "2026-09-20T01:00:00Z",
+      is_sample: false,
     },
   ],
   count: 2,
   average: 4,
+  sampleCount: 0,
 };
 
 afterEach(() => {
@@ -96,10 +99,47 @@ describe("SpotReviewsSection の一覧", () => {
   });
 
   test("口コミがなければ、ない旨を出す", async () => {
-    stubFetch(Response.json({ reviews: [], count: 0, average: null }));
+    stubFetch(
+      Response.json({
+        reviews: [],
+        count: 0,
+        average: null,
+        sampleCount: 0,
+      }),
+    );
     render(<SpotReviewsSection spotId={SPOT_ID} />);
 
     expect(await screen.findByText(/まだ口コミはありません/)).toBeTruthy();
+  });
+
+  test("サンプルの口コミには「サンプル」を付け、件数にサンプルの数と、一覧の下に説明を出す（#152）", async () => {
+    stubFetch(
+      Response.json({
+        ...REVIEWS,
+        reviews: [
+          { ...REVIEWS.reviews[0], is_sample: true },
+          REVIEWS.reviews[1],
+        ],
+        sampleCount: 1,
+      }),
+    );
+    render(<SpotReviewsSection spotId={SPOT_ID} />);
+
+    await screen.findByText("安曇野の人");
+    const heading = screen.getByRole("heading", { name: /口コミ/ });
+    expect(heading.textContent).toContain("（2件・うちサンプル1件）");
+    const items = screen.getAllByRole("listitem");
+    expect(items[0].textContent).toContain("サンプル");
+    expect(items[1].textContent).not.toContain("サンプル");
+    expect(screen.getByText(/実際に訪れた人の声ではありません/)).toBeTruthy();
+  });
+
+  test("サンプルがなければ「サンプル」も説明も出さない", async () => {
+    stubFetch(Response.json(REVIEWS));
+    render(<SpotReviewsSection spotId={SPOT_ID} />);
+
+    await screen.findByText("安曇野の人");
+    expect(screen.queryByText(/サンプル/)).toBeNull();
   });
 
   test("読めなければ「口コミを読み込めませんでした」を出し、もう一度読み込める", async () => {
@@ -138,11 +178,13 @@ describe("SpotReviewsSection の読み込みの順番とブラウザの違い", 
           rating: 4,
           body: "夕方がおすすめ",
           created_at: "2026-09-25T01:00:00Z",
+          is_sample: false,
         },
         ...REVIEWS.reviews,
       ],
       count: 3,
       average: 4,
+      sampleCount: 0,
     };
     const fetchMock = vi
       .fn()
