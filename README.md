@@ -132,7 +132,7 @@ npm run db:types                  # 型を再生成してコミット
 | 項目         | 内容                                                                         |
 | ------------ | ---------------------------------------------------------------------------- |
 | 持ち主       | hayato-psg（Organization の Owner）                                          |
-| メンバー     | GitHub の poker-hack-stage Organization のメンバー全員                       |
+| メンバー     | 招待しない（本番の DB は持ち主だけが触る）                                   |     |
 | プロジェクト | HACK-STAGE（ref: `keiqxofwbvvreowgihjx`、リージョン: 東京 `ap-northeast-1`） |
 | プラン       | Free。自動バックアップはなく、1週間アクセスがないと一時停止する              |
 
@@ -172,11 +172,11 @@ Vitest + React Testing Library（`jsdom`）。設定は `vitest.config.mts`、�
 
 ## 外部サービス
 
-| サービス                | 持ち主     | ほかのメンバー                                 | 料金   |
-| ----------------------- | ---------- | ---------------------------------------------- | ------ |
-| Supabase（本番の DB）   | hayato-psg | Organization に招待する（「本番の Supabase」） | Free   |
-| Vercel（本番・Preview） | hayato-psg | 招待できない（Hobby）                          | Hobby  |
-| Gemini API              | 各自       | 各自でキーを作る（「セットアップ」）           | 無料枠 |
+| サービス                | 持ち主     | ほかのメンバー                                                      | 料金   |
+| ----------------------- | ---------- | ------------------------------------------------------------------- | ------ |
+| Supabase（本番の DB）   | hayato-psg | 招待しない。本番の DB への反映は持ち主が行う（「本番の Supabase」） | Free   |
+| Vercel（本番・Preview） | hayato-psg | 招待できない（Hobby）                                               | Hobby  |
+| Gemini API              | 各自       | 各自でキーを作る（「セットアップ」）                                | 無料枠 |
 
 キーの受け取り方:
 
