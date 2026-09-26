@@ -14,28 +14,36 @@ import { CircleCheckBig, Loader2, MapPinPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogOverlay, DialogPortal } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { loadSubmittableAreas } from "./load-areas";
 import {
   SpotSubmissionForm,
   type SubmittableArea,
 } from "./spot-submission-form";
 
 /*
-  「穴場を教える」（#54）。入口のボタンは PC のヒーローとスマホのページの下の2か所にあるので、
-  ダイアログは SpotSubmissionProvider に1つだけ置き、ボタン（SpotSubmissionTrigger）から開く。
-  地域の一覧（境界を含む）はサーバーから Promise で受け取り、ダイアログを開いたときに読む（ページの表示を待たせない）。
-  読めなかったときは null（ページごとエラーにせず、ダイアログの中で知らせる）
+  「穴場を教える」（#54）。入口のボタンは PC のヒーローとスマホの下部ナビの真ん中（#134）にあり、
+  下部ナビはどのページにも出るので、ダイアログはルートのレイアウトの SpotSubmissionProvider に1つだけ置き、
+  ボタン（SpotSubmissionTrigger・useOpenSpotSubmission）から開く。
+  地域の一覧（境界を含む）は、初めて開いたときにブラウザから読み、以後はその結果を使い回す
+  （ページの表示を待たせず、開かない人のぶんは読まない）。読めなかったときは null（ダイアログの中で知らせ、次に開いたときに読み直す）
 */
+
+type AreasPromise = Promise<SubmittableArea[] | null>;
 
 const OpenContext = createContext<(() => void) | null>(null);
 
 export function SpotSubmissionProvider({
-  areas,
+  loadAreas = loadSubmittableAreas,
   children,
 }: {
-  areas: Promise<SubmittableArea[] | null>;
+  /** 地域の一覧を読む関数（テストで差し替える） */
+  loadAreas?: () => AreasPromise;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const [areas, setAreas] = useState<AreasPromise | null>(null);
+  // 読み込み中・読めた Promise。読めなかったら null に戻し、次に開いたときに読み直す
+  const areasRef = useRef<AreasPromise | null>(null);
   // Trigger を使わずに開くので、閉じたら開く前にフォーカスがあった場所（押したボタン）へ自分で戻す
   const returnFocusRef = useRef<HTMLElement | null>(null);
 
@@ -44,25 +52,40 @@ export function SpotSubmissionProvider({
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
+    if (!areasRef.current) {
+      const loading = loadAreas().then((loaded) => {
+        if (!loaded) areasRef.current = null;
+        return loaded;
+      });
+      areasRef.current = loading;
+      setAreas(loading);
+    }
     setOpen(true);
   };
 
   return (
     <OpenContext value={openDialog}>
       {children}
-      <SpotSubmissionDialog
-        areas={areas}
-        open={open}
-        onOpenChange={setOpen}
-        returnFocusRef={returnFocusRef}
-      />
+      {areas && (
+        <SpotSubmissionDialog
+          areas={areas}
+          open={open}
+          onOpenChange={setOpen}
+          returnFocusRef={returnFocusRef}
+        />
+      )}
     </OpenContext>
   );
 }
 
+/** 投稿のダイアログを開く関数。SpotSubmissionProvider の外では null */
+export function useOpenSpotSubmission() {
+  return use(OpenContext);
+}
+
 /** 「穴場を教える」のボタン。見た目は置く場所に合わせて className で決める */
 export function SpotSubmissionTrigger({ className }: { className?: string }) {
-  const open = use(OpenContext);
+  const open = useOpenSpotSubmission();
   return (
     <button
       type="button"
@@ -90,7 +113,7 @@ function SpotSubmissionDialog({
   onOpenChange,
   returnFocusRef,
 }: {
-  areas: Promise<SubmittableArea[] | null>;
+  areas: AreasPromise;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   returnFocusRef: React.RefObject<HTMLElement | null>;
@@ -161,7 +184,7 @@ function FormWithAreas({
   areas,
   ...props
 }: {
-  areas: Promise<SubmittableArea[] | null>;
+  areas: AreasPromise;
   onSubmitted: () => void;
   onCancel: () => void;
 }) {
@@ -172,7 +195,7 @@ function FormWithAreas({
         role="alert"
         className="rounded-lg bg-red-50 p-3 text-sm font-bold text-red-700"
       >
-        地域を読み込めませんでした。時間をおいて、ページを読み込み直してください
+        地域を読み込めませんでした。時間をおいて、開き直してください
       </p>
     );
   }

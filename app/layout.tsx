@@ -4,6 +4,7 @@ import { BottomNav } from "@/components/layout/bottom-nav";
 import { SiteHeader } from "@/components/layout/site-header";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { PlannerStateProvider } from "@/components/planner/planner-state";
+import { SpotSubmissionProvider } from "@/components/submit/spot-submission";
 import "./globals.css";
 
 const defaultUrl = process.env.VERCEL_URL
@@ -43,13 +44,16 @@ export default function RootLayout({
       <body
         className={`${notoSansJP.className} ${zenMaruGothic.variable} flex min-h-screen flex-col antialiased`}
       >
-        <SiteHeader />
-        {/* スマホの下部ナビの高さぶんの余白は、フッター（site-footer.tsx）がとる */}
-        <main className="mx-auto w-full max-w-7xl flex-1 px-4 pb-6 pt-5 sm:px-6 md:pb-8 lg:px-8">
-          <PlannerStateProvider>{children}</PlannerStateProvider>
-        </main>
-        <SiteFooter />
-        <BottomNav />
+        {/* 「穴場を教える」のダイアログ。どのページでも下部ナビの真ん中のボタンから開く（#134） */}
+        <SpotSubmissionProvider>
+          <SiteHeader />
+          {/* スマホの下部ナビの高さぶんの余白は、フッター（site-footer.tsx）がとる */}
+          <main className="mx-auto w-full max-w-7xl flex-1 px-4 pb-6 pt-5 sm:px-6 md:pb-8 lg:px-8">
+            <PlannerStateProvider>{children}</PlannerStateProvider>
+          </main>
+          <SiteFooter />
+          <BottomNav />
+        </SpotSubmissionProvider>
       </body>
     </html>
   );

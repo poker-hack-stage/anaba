@@ -1,11 +1,15 @@
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { SpotSubmissionProvider } from "@/components/submit/spot-submission";
 import { BottomNav } from "./bottom-nav";
 import { HeaderTabs } from "./header-tabs";
 
 const pathname = vi.hoisted(() => ({ current: "/" }));
-vi.mock("next/navigation", () => ({ usePathname: () => pathname.current }));
+vi.mock("next/navigation", () => ({
+  usePathname: () => pathname.current,
+  useRouter: () => ({ refresh: vi.fn() }),
+}));
 
 beforeEach(() => {
   pathname.current = "/";
@@ -39,4 +43,42 @@ describe.each([
       expect(link.hasAttribute("aria-current")).toBe(false);
     }
   });
+});
+
+describe("BottomNav の真ん中のボタン", () => {
+  test("「穴場を探す」「穴場を教える」「AI旅プラン」の順に並び、真ん中はリンクではなくボタン", () => {
+    render(<BottomNav />);
+
+    const nav = screen.getByRole("navigation");
+    const items = [...nav.querySelectorAll("a, button")].map((el) => [
+      el.tagName,
+      el.textContent,
+    ]);
+    expect(items).toEqual([
+      ["A", "穴場を探す"],
+      ["BUTTON", "穴場を教える"],
+      ["A", "AI旅プラン"],
+    ]);
+    const button = within(nav).getByRole("button", { name: "穴場を教える" });
+    expect(button.getAttribute("aria-haspopup")).toBe("dialog");
+    expect(button.hasAttribute("aria-current")).toBe(false);
+  });
+
+  test.each(["/", "/planner", "/credits", "/no-such-page"])(
+    "%s でも、押すと「穴場を教える」のダイアログが開く",
+    async (path) => {
+      pathname.current = path;
+      render(
+        <SpotSubmissionProvider loadAreas={() => Promise.resolve(null)}>
+          <BottomNav />
+        </SpotSubmissionProvider>,
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "穴場を教える" }));
+      });
+
+      expect(screen.getByRole("dialog", { name: "穴場を教える" })).toBeTruthy();
+    },
+  );
 });

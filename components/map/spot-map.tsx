@@ -8,6 +8,7 @@ import {
   Marker,
   NavigationControl,
   setWorkerUrl,
+  type ControlPosition,
   type GeoJSONSource,
   type MapMouseEvent,
 } from "maplibre-gl";
@@ -84,7 +85,28 @@ export type SpotMapProps = {
    * 地図を作るときにだけ読む（あとから変えても反映しない）
    */
   cooperativeGestures?: boolean;
+  /**
+   * 表示範囲の余白（px）。地図の上にパネルを重ねるとき（「穴場を探す」の PC）に、ピンや境界がパネルの下に隠れないよう広げる。
+   * 省くと既定の余白
+   */
+  fitPadding?: FitPadding;
+  /**
+   * 表示範囲に含める点（[経度, 緯度]）。ピンは出さない。
+   * 絞り込みで0件のときに、全地域が入る範囲を出すのに使う（docs/spec.md 画面-3）
+   */
+  fitPoints?: [number, number][];
+  /** ＋−ボタンの位置。地図を作るときにだけ読む（既定は右上） */
+  controlPosition?: ControlPosition;
+  /** 左上の表示（地域名と凡例）の位置を変えるクラス。地図の上に重ねたパネルと重ならないようにする */
+  labelClassName?: string;
   className?: string;
+};
+
+export type FitPadding = {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
 };
 
 export type MapPoint = { lat: number; lng: number };
@@ -107,7 +129,8 @@ const JAPAN_ZOOM = 4;
 const SINGLE_SPOT_ZOOM = 14;
 
 /** 表示範囲の余白。右は＋−ボタン、下は帰属表示の分を広めに取る */
-const FIT_PADDING = { top: 40, right: 56, bottom: 64, left: 40 };
+const FIT_PADDING: FitPadding = { top: 40, right: 56, bottom: 64, left: 40 };
+const NO_FIT_POINTS: [number, number][] = [];
 
 const ROUTE_COLOR = "#c0432b";
 /**
@@ -185,6 +208,10 @@ export function SpotMap({
   animateMove = false,
   emptyPlaceholder = true,
   cooperativeGestures = true,
+  fitPadding = FIT_PADDING,
+  fitPoints = NO_FIT_POINTS,
+  controlPosition = "top-right",
+  labelClassName,
   className,
 }: SpotMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -196,6 +223,7 @@ export function SpotMap({
 
   // 地図を作るときの値だけを使う（作り直さないので、あとから変わっても反映しない）
   const initialCooperativeGestures = useRef(cooperativeGestures);
+  const initialControlPosition = useRef(controlPosition);
 
   // 地図は effect の中で作り、後始末で消す。cacheComponents で前のページが <Activity> に隠れると
   // 後始末が走り、表示に戻ると作り直すので、壊れた地図を再利用しない
@@ -221,10 +249,10 @@ export function SpotMap({
     });
     instance.touchZoomRotate.disableRotation();
     instance.keyboard.disableRotation();
-    // 地域名のバッジと重ならないよう右上に置く
+    // 地域名のバッジと重ならないよう、既定は右上に置く
     instance.addControl(
       new NavigationControl({ showCompass: false }),
-      "top-right",
+      initialControlPosition.current,
     );
     let loaded = false;
     let collapseTimer: ReturnType<typeof setTimeout> | undefined;
@@ -260,6 +288,7 @@ export function SpotMap({
     (s): [number, number] => [s.lng, s.lat],
   );
   const pointsKey = points.map((p) => p.join(",")).join(";");
+  const fitKey = `${fitPoints.map((p) => p.join(",")).join(";")}|${fitPadding.top},${fitPadding.right},${fitPadding.bottom},${fitPadding.left}`;
   const routeKey = routes
     .map(
       (r) =>
@@ -275,7 +304,7 @@ export function SpotMap({
     if (!map) return;
     const animate = animateMove && fittedMap.current === map;
     fittedMap.current = map;
-    const box = computeBounds(points, boundary);
+    const box = computeBounds([...points, ...fitPoints], boundary);
     const boundaryBox = boundary ? computeBounds([], boundary) : null;
     // essential を付けないので、「視差効果を減らす」なら MapLibre が即時に切り替える
     const move = { animate, duration: MOVE_DURATION_MS };
@@ -284,11 +313,11 @@ export function SpotMap({
     } else if (points.length === 1 && !boundaryBox) {
       map.easeTo({ ...move, center: points[0], zoom: SINGLE_SPOT_ZOOM });
     } else {
-      map.fitBounds(box, { ...move, padding: FIT_PADDING, maxZoom: 15 });
+      map.fitBounds(box, { ...move, padding: fitPadding, maxZoom: 15 });
     }
-    // points は pointsKey で比較する
+    // points は pointsKey、fitPoints と fitPadding は fitKey で比較する
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, pointsKey, boundary, animateMove]);
+  }, [map, pointsKey, fitKey, boundary, animateMove]);
 
   // ハイライトのピンのずらす量（px。スポットの id ごと）。ずらさないピンは入れない
   const [highlightOffsets, setHighlightOffsets] =
@@ -498,7 +527,12 @@ export function SpotMap({
 
       {(areaName || showLegend) && (
         // 左上の表示（地域名と凡例）。両方あるときは縦に並べ、重ならないようにする
-        <div className="pointer-events-none absolute left-3 right-14 top-3 z-10 flex flex-col items-start gap-1.5">
+        <div
+          className={cn(
+            "pointer-events-none absolute left-3 right-14 top-3 z-10 flex flex-col items-start gap-1.5",
+            labelClassName,
+          )}
+        >
           {areaName && (
             <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-ink shadow-sm">
               <MapPin aria-hidden className="h-3.5 w-3.5" />
