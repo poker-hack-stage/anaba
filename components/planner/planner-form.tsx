@@ -25,6 +25,12 @@ import {
   TRANSPORTS,
 } from "@/lib/planner/options";
 import { generateCandidates, type PlannableArea } from "@/lib/planner/generate";
+import {
+  MAX_NOTE_LENGTH,
+  normalizeNote,
+  noteLength,
+  truncateNote,
+} from "@/lib/planner/note";
 import type {
   PlanCandidate,
   PlanConditions,
@@ -56,9 +62,15 @@ const DEFAULT_CONDITIONS: PlanConditions = {
 /** URL のクエリで「おまかせ」を表す値（地域の id と重ならない） */
 const ANY_AREA_QUERY = "any";
 
+/** 希望（#114）を送る形にする。改行・制御文字を空白にし、長さで切る。空なら undefined（書かなかった） */
+function toNote(text: string): string | undefined {
+  const note = truncateNote(normalizeNote(text));
+  return note || undefined;
+}
+
 /**
- * 条件を URL のクエリにする（例: ?area=<地域の id>&duration=1n2d&interests=食&interests=温泉&…）。
- * 「クエリがない = タブやリンクから来た」と見分けるため、既定値も含めて書く
+ * 条件を URL のクエリにする（例: ?area=<地域の id>&duration=1n2d&interests=食&interests=温泉&…&note=…）。
+ * 「クエリがない = タブやリンクから来た」と見分けるため、既定値も含めて書く（希望は書いたときだけ）
  */
 function toQuery(conditions: PlanConditions) {
   const params = new URLSearchParams({
@@ -70,11 +82,19 @@ function toQuery(conditions: PlanConditions) {
   for (const interest of conditions.interests) {
     params.append("interests", interest);
   }
+  if (conditions.note) params.set("note", conditions.note);
   return params.toString();
 }
 
 /** 条件のクエリのキー（toQuery と同じ並び） */
-const QUERY_KEYS = ["area", "duration", "companion", "transport", "interests"];
+const QUERY_KEYS = [
+  "area",
+  "duration",
+  "companion",
+  "transport",
+  "interests",
+  "note",
+];
 
 /** URL のクエリのうち、条件のキーだけを toQuery と同じ並びで取り出す */
 function pickConditionQuery(params: URLSearchParams) {
@@ -107,6 +127,7 @@ function fromQuery(
     interests: INTERESTS.filter((i) => params.getAll("interests").includes(i)),
     companion: pick("companion", COMPANIONS, DEFAULT_CONDITIONS.companion),
     transport: pick("transport", TRANSPORTS, DEFAULT_CONDITIONS.transport),
+    note: toNote(params.get("note") ?? ""),
   };
 }
 
@@ -136,6 +157,10 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
     selectCandidate,
   } = usePlannerState();
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
+  // 入力中の希望（#114）。null なら、URL の条件の希望を出す。
+  // 1文字ごとに URL を書き換えると Safari の replaceState の回数制限に当たるので、
+  // URL に書くのはフォーカスが外れたときと「絞る」を押したときだけにする
+  const [noteDraft, setNoteDraft] = useState<string | null>(null);
 
   const areaIds = useMemo(() => areas.map((area) => area.id), [areas]);
   const queryConditions = useMemo(
@@ -170,10 +195,28 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
     }
   }, [searchParams, queryConditions, savedConditions, saveConditions]);
 
+  // URL の希望が、入力中の文と違うものに変わったら（ブラウザの「戻る」など）、入力中の文を捨てて URL に合わせる。
+  // 書いた希望が URL に反映されるまでの間は、入力中の文を出したままにする
+  const [noteInUrl, setNoteInUrl] = useState(conditions.note);
+  if (noteInUrl !== conditions.note) {
+    setNoteInUrl(conditions.note);
+    if (noteDraft !== null && toNote(noteDraft) !== conditions.note) {
+      setNoteDraft(null);
+    }
+  }
+
   const set = <K extends keyof PlanConditions>(
     key: K,
     value: PlanConditions[K],
   ) => replaceQuery({ ...conditions, [key]: value });
+
+  /** 入力中の希望を URL の条件に書き、書いたあとの条件を返す */
+  const commitNote = (): PlanConditions => {
+    if (noteDraft === null) return conditions;
+    const next = { ...conditions, note: toNote(noteDraft) };
+    if (toQuery(next) !== toQuery(conditions)) replaceQuery(next);
+    return next;
+  };
 
   const toggleInterest = (interest: string) =>
     set(
@@ -219,7 +262,7 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
   const submit = async () => {
     // 結果は Context に入れるので、読み込み中に別のタブへ移動しても戻ると表示される
     // 結果には、送ったときの条件を付けておく（あとで条件が変わってもずれが分かるように）
-    const requested = conditions;
+    const requested = commitNote();
     setResult({ status: "loading", candidates, conditions: requested, mode });
     try {
       setResult(await fetchPlan(requested));
@@ -323,6 +366,11 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
           selected={[conditions.transport]}
           onSelect={(v) => set("transport", v)}
         />
+        <NoteField
+          value={noteDraft ?? conditions.note ?? ""}
+          onChange={setNoteDraft}
+          onBlur={commitNote}
+        />
         <button
           type="button"
           onClick={submit}
@@ -352,6 +400,7 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
           candidates={candidates}
           mode={mode}
           rateLimited={rateLimited}
+          hasNote={result.conditions?.note !== undefined}
           rebuildError={result.rebuildError}
           selectedCandidate={selectedCandidate}
           onSelectCandidate={selectCandidate}
@@ -373,6 +422,7 @@ function Result({
   candidates,
   mode,
   rateLimited,
+  hasNote,
   rebuildError,
   selectedCandidate,
   onSelectCandidate,
@@ -382,6 +432,8 @@ function Result({
   candidates: PlanCandidate[];
   mode: PlanResponse["mode"] | null;
   rateLimited: boolean;
+  /** 候補を出したときの条件に、自由記述の希望（#114）があったか */
+  hasNote: boolean;
   rebuildError?: string;
   selectedCandidate: number;
   onSelectCandidate: (index: number) => void;
@@ -448,6 +500,8 @@ function Result({
               ? "短い時間に何度も作ったため、デモモードで作成しました。しばらくしてから絞り直すと、AI で作れます。"
               : "デモモードで作成しました。"}
             AI を使わず、興味に合うスポットを穴場度の高い順に選んでいます。
+            {hasNote &&
+              "希望は、デモモードでは一部（雨・屋内、ゆっくり・のんびり、子ども）だけ反映しています。"}
           </span>
         </p>
       )}
@@ -518,6 +572,43 @@ function AreaField({
           ))}
         </Select>
       </div>
+    </div>
+  );
+}
+
+/** 自由記述の希望（#114）。100字まで、残りの文字数を出す */
+function NoteField({
+  value,
+  onChange,
+  onBlur,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onBlur: () => void;
+}) {
+  const id = useId();
+  const remaining = Math.max(0, MAX_NOTE_LENGTH - noteLength(value));
+  return (
+    <div>
+      <label
+        htmlFor={id}
+        className="mb-1.5 block text-xs font-bold text-stone-700"
+      >
+        ほかに希望があれば（任意）
+      </label>
+      <textarea
+        id={id}
+        value={value}
+        onChange={(e) => onChange(truncateNote(e.target.value))}
+        onBlur={onBlur}
+        rows={2}
+        placeholder="例: 雨でも楽しめる所がいい、ゆっくり回りたい"
+        aria-describedby={`${id}-count`}
+        className="block w-full resize-none rounded-xl border border-stone-200 bg-white px-3 py-2 text-base text-stone-900 transition-colors placeholder:text-stone-400 hover:border-stone-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:text-sm"
+      />
+      <p id={`${id}-count`} className="mt-1 text-right text-xs text-stone-500">
+        残り{remaining}文字
+      </p>
     </div>
   );
 }

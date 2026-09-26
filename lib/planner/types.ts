@@ -15,6 +15,8 @@ export type PlanConditions = {
   transport: string;
   /** どの候補にも必ず経路に入れるスポットの id（「このスポットを経路に加えて作り直す」、#32）。URL のクエリには持たない */
   includeSpotId?: string;
+  /** 自由記述の希望（#114）。100字まで。書かなければ undefined */
+  note?: string;
 };
 
 /** 1日ぶんの経路 */

@@ -75,6 +75,33 @@ describe("POST /api/plan", () => {
     );
   });
 
+  test("自由記述の希望（#114）を、改行を空白にして条件に付けて渡す", async () => {
+    const res = await post({ ...valid, note: " 雨でも\n楽しめる所 " });
+
+    expect(res.status).toBe(200);
+    expect(createPlan).toHaveBeenCalledWith(
+      [],
+      { ...valid, note: "雨でも 楽しめる所" },
+      { useAi: true },
+    );
+  });
+
+  test("希望が100字を超えたら 400", async () => {
+    const res = await post({ ...valid, note: "あ".repeat(101) });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid_request" });
+    expect(createPlan).not.toHaveBeenCalled();
+  });
+
+  test("希望が長すぎて本文が上限（MAX_REQUEST_BYTES）を超えたら 413", async () => {
+    const res = await post({ ...valid, note: "あ".repeat(3000) });
+
+    expect(res.status).toBe(413);
+    expect(await res.json()).toEqual({ error: "request_too_large" });
+    expect(createPlan).not.toHaveBeenCalled();
+  });
+
   test("上限を超えたら、本文を読まずに 429 と Retry-After を返す", async () => {
     mock.state.rateLimitAllowed = false;
 

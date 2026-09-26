@@ -48,12 +48,60 @@ describe("planConditionsSchema", () => {
     ["必ず入れるスポットの id が長すぎる", { includeSpotId: "a".repeat(65) }],
     ["必ず入れるスポットの id が文字列でない", { includeSpotId: 1 }],
     ["地域名で送っている（古い形）", { areaId: undefined, area: "松本市" }],
-    ["余計な項目がある", { note: "よろしく" }],
+    ["余計な項目がある", { pace: "ゆったり" }],
+    ["希望が101字", { note: "あ".repeat(101) }],
+    ["希望が家族の絵文字101字", { note: "👨‍👩‍👧‍👦".repeat(101) }],
+    ["希望が文字列でない", { note: 1 }],
     ["型が違う", { interests: "温泉" }],
   ])("%s なら受け付けない", (_, overrides) => {
     expect(
       planConditionsSchema.safeParse({ ...valid, ...overrides }).success,
     ).toBe(false);
+  });
+
+  test("希望（#114）は任意で、100字まで受け付ける", () => {
+    expect(planConditionsSchema.parse(valid).note).toBeUndefined();
+    expect(
+      planConditionsSchema.parse({ ...valid, note: "あ".repeat(100) }).note,
+    ).toBe("あ".repeat(100));
+    // 絵文字（サロゲートペア）も1文字と数える
+    expect(
+      planConditionsSchema.safeParse({ ...valid, note: "🌧".repeat(100) })
+        .success,
+    ).toBe(true);
+    // ZWJ でつないだ家族の絵文字・国旗も、見た目どおり1文字と数える
+    expect(
+      planConditionsSchema.parse({ ...valid, note: "👨‍👩‍👧‍👦".repeat(100) }).note,
+    ).toBe("👨‍👩‍👧‍👦".repeat(100));
+    expect(
+      planConditionsSchema.safeParse({ ...valid, note: "🇯🇵".repeat(100) })
+        .success,
+    ).toBe(true);
+  });
+
+  test("希望が空・空白だけなら、書かなかったことにする", () => {
+    expect(planConditionsSchema.parse({ ...valid, note: "" }).note).toBe(
+      undefined,
+    );
+    expect(planConditionsSchema.parse({ ...valid, note: " \n " }).note).toBe(
+      undefined,
+    );
+  });
+
+  test("希望の改行・制御文字は空白にし、前後の空白を取ってから長さを数える", () => {
+    expect(
+      planConditionsSchema.parse({
+        ...valid,
+        note: "  雨でも\r\n楽しめる\u0000所\u2028がいい  ",
+      }).note,
+    ).toBe("雨でも 楽しめる 所 がいい");
+    // 前後の空白は数えない
+    expect(
+      planConditionsSchema.safeParse({
+        ...valid,
+        note: ` ${"あ".repeat(100)}\n`,
+      }).success,
+    ).toBe(true);
   });
 
   test("項目が欠けていたら受け付けない", () => {

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { DAY_COUNTS } from "./duration";
 import { MAX_CANDIDATES, MAX_DAY_SPOTS, MIN_DAY_SPOTS } from "./generate";
+import { MAX_NOTE_LENGTH, normalizeNote, noteLength } from "./note";
 import { COMPANIONS, DURATIONS, INTERESTS, TRANSPORTS } from "./options";
 
 // /api/plan の入力の検証と、Gemini に返させる JSON の形（#18）
@@ -24,6 +25,13 @@ export const planConditionsSchema = z.strictObject({
   transport: z.enum(TRANSPORTS),
   // 「このスポットを経路に加えて作り直す」（#32）で、どの候補にも必ず入れるスポットの id。知らない id なら候補は0件になる
   includeSpotId: z.string().trim().min(1).max(64).optional(),
+  // 自由記述の希望（#114）。改行・制御文字を空白にしてから、100字（見た目の1文字）まで。空なら書かなかったことにする
+  note: z
+    .string()
+    .transform(normalizeNote)
+    .refine((note) => noteLength(note) <= MAX_NOTE_LENGTH)
+    .transform((note) => note || undefined)
+    .optional(),
 });
 
 /**
