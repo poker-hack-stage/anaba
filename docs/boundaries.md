@@ -4,13 +4,13 @@
 
 ## 出典とライセンス
 
-| 項目       | 内容                                                                                                                                                 |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| データ     | OpenStreetMap の市町村の境界（`boundary=administrative`・`admin_level=7` の relation）。Overpass API（<https://overpass-api.de/>）で取得             |
-| 著作権     | © OpenStreetMap contributors（<https://www.openstreetmap.org/copyright>）                                                                            |
-| ライセンス | Open Database License（ODbL 1.0）                                                                                                                    |
-| 加工       | relation の way をつないで輪郭にし（osmtogeojson）、mapshaper で頂点を間引き、座標の桁を丸めた                                                       |
-| 表示       | 地図や画面に出すときは「© OpenStreetMap contributors」を出す。背景の地図（OpenFreeMap）の帰属表示にも OpenStreetMap が入っている（地図の部品は #14） |
+| 項目       | 内容                                                                                                                                                                                                 |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| データ     | OpenStreetMap の市町村の境界（`boundary=administrative`・`admin_level=7` の relation）。Overpass API（<https://overpass-api.de/>）で取得                                                             |
+| 著作権     | © OpenStreetMap contributors（<https://www.openstreetmap.org/copyright>）                                                                                                                            |
+| ライセンス | Open Database License（ODbL 1.0）                                                                                                                                                                    |
+| 加工       | relation の way をつないで輪郭にし（osmtogeojson）、mapshaper で頂点を間引き、座標の桁を丸めた                                                                                                       |
+| 表示       | 地図や画面に出すときは「© OpenStreetMap contributors」を出す。地図の帰属表示（`components/map/spot-map.tsx`）に足している（#14）。背景の地図（OpenFreeMap）の帰属表示にも OpenStreetMap が入っている |
 
 ### ODbL で守ること
 
