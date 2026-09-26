@@ -211,13 +211,13 @@ Vercel の Hobby プランの制限:
 
 環境変数（値は Vercel の Settings → Environment Variables だけに入れ、ここには書かない）:
 
-| 環境変数                               | Production   | Preview      | 内容                                                                                                                                                               |
-| -------------------------------------- | ------------ | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `NEXT_PUBLIC_SUPABASE_URL`             | 入れる       | 入れる       | 本番の Supabase の Project URL                                                                                                                                     |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | 入れる       | 入れる       | 本番の Supabase の Publishable key                                                                                                                                 |
-| `RATE_LIMIT_SALT`                      | 入れる       | 入れる       | 必須。空だと口コミ・スポットの投稿が 503 になり、旅プランは Gemini を使わずデモモードになる。`openssl rand -hex 32` などで作り、変えると同じ送信元の数え直しになる |
-| `GEMINI_API_KEY`                       | #25 で入れる | #25 で入れる | 本番用に持ち主が別に作る（開発のキーは使わない）。入れるまでは旅プランはデモモード                                                                                 |
-| `GEMINI_MODEL`                         | 任意         | 任意         | 空なら既定の `gemini-3.5-flash-lite`                                                                                                                               |
+| 環境変数                               | Production | Preview | 内容                                                                                                                                                               |
+| -------------------------------------- | ---------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `NEXT_PUBLIC_SUPABASE_URL`             | 入れる     | 入れる  | 本番の Supabase の Project URL                                                                                                                                     |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | 入れる     | 入れる  | 本番の Supabase の Publishable key                                                                                                                                 |
+| `RATE_LIMIT_SALT`                      | 入れる     | 入れる  | 必須。空だと口コミ・スポットの投稿が 503 になり、旅プランは Gemini を使わずデモモードになる。`openssl rand -hex 32` などで作り、変えると同じ送信元の数え直しになる |
+| `GEMINI_API_KEY`                       | 入れる     | 入れる  | 本番用に持ち主が別に作る（開発のキーは使わない）。空なら旅プランはデモモード                                                                                       |
+| `GEMINI_MODEL`                         | 任意       | 任意    | 空なら既定の `gemini-3.5-flash-lite`                                                                                                                               |
 
 環境変数を変えたら、Deployments の一番上の `…` → Redeploy で反映する。
 
