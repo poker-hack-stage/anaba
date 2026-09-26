@@ -525,3 +525,19 @@ describe("スマホのおすすめのカード（#142）", () => {
     expect(currentArea()).toBe("松本市");
   });
 });
+
+describe("スマホの写真の出典（#155）", () => {
+  test("フッターを出さないスマホでも、地図の枠の中から写真の出典へたどれる（sm 以上では出さない）", () => {
+    render(<AreaRotator areas={areas} />);
+    const link = screen.getByRole("link", { name: "写真の出典" });
+    expect(link.getAttribute("href")).toBe("/credits");
+    expect(link.className).toMatch(/\bsm:hidden\b/);
+  });
+
+  test("絞り込みで0件のときも出す", () => {
+    render(<AreaRotator areas={areas} />);
+    fireEvent.change(searchBox(), { target: { value: "該当なし" } });
+    act(() => vi.advanceTimersByTime(300));
+    expect(screen.getByRole("link", { name: "写真の出典" })).toBeTruthy();
+  });
+});

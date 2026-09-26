@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { PanelRightClose, PanelRightOpen, SearchX } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { SpotDetailDialog } from "@/components/spots/spot-detail-dialog";
@@ -213,6 +214,16 @@ export function AreaRotator({ areas }: { areas: AreaWithSpots[] }) {
 
         <SpotDetailDialog spot={selectedSpot} onClose={closeDetail} />
       </section>
+
+      {/* スマホ（sm 未満）はページをスクロールさせずフッターを出さないので（app/globals.css、#155）、
+          フッターの「写真の出典」（CC BY・CC BY-SA の表示の条件、#67）へのリンクを、情報パネルの下の右端に出す。
+          真ん中は下部ナビの＋ボタンが飛び出すので、右に寄せる。押せる範囲は高さ 24px（WCAG 2.5.8） */}
+      <Link
+        href="/credits"
+        className="absolute bottom-1.5 right-3 z-10 flex min-h-6 items-center rounded-full bg-white/85 px-2 text-[11px] text-stone-600 underline underline-offset-2 shadow-sm backdrop-blur-sm hover:text-shu focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:hidden"
+      >
+        写真の出典
+      </Link>
     </div>
   );
 }

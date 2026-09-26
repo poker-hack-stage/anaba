@@ -5,10 +5,11 @@ import { AreaRotator } from "@/components/discover/area-rotator";
 import { SpotSubmissionTrigger } from "@/components/submit/spot-submission";
 import { getAreasWithSpots } from "@/lib/data/areas";
 
-// 穴場を探す（トップページ）
+// 穴場を探す（トップページ）。
+// data-fullscreen-map を付けると、スマホ（sm 未満）ではページ全体を縦にスクロールさせない（app/globals.css、#155）
 export default function DiscoverPage() {
   return (
-    <div className="flex flex-col gap-6">
+    <div data-fullscreen-map className="flex flex-col gap-6">
       <Hero />
       <Suspense fallback={<DiscoverSkeleton />}>
         <Discover />

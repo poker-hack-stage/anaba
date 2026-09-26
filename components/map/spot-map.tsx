@@ -87,7 +87,7 @@ export type SpotMapProps = {
   /**
    * ページのスクロールを奪わない操作にするか（既定は true）。true ならホイールは Ctrl / ⌘ を押したときだけズーム、
    * タッチ端末では2本指で地図を動かす。地図だけを出すダイアログ（候補の大きな地図、#31）では false にして、1本指・ホイールで動かせるようにする。
-   * 地図を作るときにだけ読む（あとから変えても反映しない）
+   * あとから変えると、作った地図の操作を切り替える（「穴場を探す」で画面の幅が sm をまたいだとき、#155）
    */
   cooperativeGestures?: boolean;
   /**
@@ -304,6 +304,14 @@ export function SpotMap({
         `${routeColor(r)}:${r.spots.map((s) => `${s.lng},${s.lat}`).join(";")}`,
     )
     .join("|");
+
+  // 作ったあとに cooperativeGestures が変わったら、地図の操作を切り替える（作るときの値と同じなら何もしない）
+  useEffect(() => {
+    if (!map || map.cooperativeGestures.isEnabled() === cooperativeGestures)
+      return;
+    if (cooperativeGestures) map.cooperativeGestures.enable();
+    else map.cooperativeGestures.disable();
+  }, [map, cooperativeGestures]);
 
   // 範囲を合わせたことのある地図。作り直した地図の最初の表示は即時にする
   const fittedMap = useRef<MapLibreMap | null>(null);

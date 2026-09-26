@@ -41,6 +41,7 @@ const SpotMap = dynamic(
  * area がない（絞り込みで0件）ときは、`allAreas` の全地域が入る範囲を出す（docs/spec.md 画面-3、K-6）。
  * PC（lg 以上）では地図の上に左右のパネルが重なるので、その幅だけ表示範囲の余白を広げ、
  * 地域名のバッジを左のパネルの右に置く。＋−ボタンは、スマホ・PC とも左下に置く。
+ * スマホ（sm 未満）では、1本指で地図を動かせるようにする（ページはスクロールしないため、#155）。
  * 地図コンポーネントの読み込みはこのファイルだけで行う。
  */
 export function AreaMap({
@@ -92,6 +93,7 @@ export function AreaMap({
     [area, allAreas],
   );
 
+  const sm = useMediaQuery("(min-width: 640px)");
   const lg = useMediaQuery("(min-width: 1024px)");
   const xl = useMediaQuery("(min-width: 1280px)");
   const insetTop = overlayInsets?.top ?? 0;
@@ -126,6 +128,9 @@ export function AreaMap({
       fitPadding={fitPadding}
       // ＋−ボタンは、スマホ・PC とも左下に置く（PC では右上に情報パネルが重なるため。地図を作るときにだけ読む）
       controlPosition="bottom-left"
+      // スマホ（sm 未満）はページをスクロールさせず地図を画面いっぱいに出すので（#155）、1本指で地図を動かす。
+      // タブレット・PC はページのスクロールを奪わないよう、今までどおり2本指（ホイールは Ctrl / ⌘）
+      cooperativeGestures={sm}
       labelClassName="max-lg:hidden lg:left-[332px] xl:left-[372px]"
       onSpotClick={onSpotClick}
       onSpotHover={onSpotHover}

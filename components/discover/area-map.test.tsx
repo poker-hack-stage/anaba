@@ -207,3 +207,36 @@ describe("AreaMap のスマホの全面表示（#142）", () => {
     expect(props.style).toBeUndefined();
   });
 });
+
+/** 画面の幅を決める。`(min-width: Npx)` のクエリに、幅が N 以上なら当たる */
+function stubWidth(width: number) {
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn((query: string) => ({
+      matches: width >= Number(/min-width: (\d+)px/.exec(query)?.[1]),
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    })),
+  );
+}
+
+describe("AreaMap の地図の操作（#155）", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  test("スマホ（sm 未満）はページがスクロールしないので、1本指で地図を動かす", () => {
+    stubWidth(375);
+    render(<AreaMap area={area("hakuba", polygon)} onSpotClick={() => {}} />);
+    expect(lastProps().cooperativeGestures).toBe(false);
+  });
+
+  test.each([640, 768, 1280])(
+    "%ipx ではページのスクロールを奪わない（2本指で地図を動かす）",
+    (width) => {
+      stubWidth(width);
+      render(<AreaMap area={area("hakuba", polygon)} onSpotClick={() => {}} />);
+      expect(lastProps().cooperativeGestures).toBe(true);
+    },
+  );
+});
