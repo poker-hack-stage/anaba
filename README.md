@@ -132,7 +132,7 @@ npm run db:types                  # 型を再生成してコミット
 | 項目         | 内容                                                                         |
 | ------------ | ---------------------------------------------------------------------------- |
 | 持ち主       | hayato-psg（Organization の Owner）                                          |
-| メンバー     | 招待しない（本番の DB は持ち主だけが触る）                                   |     |
+| メンバー     | 招待しない（本番の DB は持ち主だけが触る）                                   |
 | プロジェクト | HACK-STAGE（ref: `keiqxofwbvvreowgihjx`、リージョン: 東京 `ap-northeast-1`） |
 | プラン       | Free。自動バックアップはなく、1週間アクセスがないと一時停止する              |
 
@@ -192,12 +192,39 @@ Vercel の Hobby プランの制限:
 
 ## デプロイ（Vercel）
 
-1. Vercel で GitHub リポジトリをインポート（リポジトリ直下でない場合は **Root Directory** にこのディレクトリを指定）
-2. Environment Variables に以下を設定
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-   - `GEMINI_API_KEY`・`GEMINI_MODEL`（任意。空なら既定の `gemini-3.5-flash-lite`）
-   - `RATE_LIMIT_SALT`（必須。Production と Preview の両方に入れる。空だと口コミ・スポットの投稿が 503 になり、旅プランは Gemini を使わずデモモードになる。`openssl rand -hex 32` などで作り、変えると同じ送信元の数え直しになる）
+| 項目              | 内容                                                                |
+| ----------------- | ------------------------------------------------------------------- |
+| 持ち主            | hayato-psg（Hobby。メンバーは招待できない。「外部サービス」を参照） |
+| プロジェクト      | `anaba`（GitHub の poker-hack-stage/anaba と連携）                  |
+| Production Branch | `main`                                                              |
+
+プレビューと本番:
+
+| 種類       | いつできるか                                                | 使う DB             |
+| ---------- | ----------------------------------------------------------- | ------------------- |
+| Preview    | `main` 以外のブランチへの push と PR ごと。PR に URL が付く | 本番と同じ Supabase |
+| Production | `main` へのマージ                                           | 本番の Supabase     |
+
+- メンバーは GitHub に push するだけでよい。Vercel のアカウントは要らない
+- Preview も本番と同じ DB を使う。プレビューで投稿や口コミを試すと本番に残るので、試したあとは消す（docs/moderation.md）
+- マイグレーションと `seed.sql` の変更は、本番の DB に自動では入らない。DB の変更を含む PR をマージしたら持ち主に知らせ、持ち主が「本番の Supabase」の手順で入れる
+
+環境変数（値は Vercel の Settings → Environment Variables だけに入れ、ここには書かない）:
+
+| 環境変数                               | Production   | Preview      | 内容                                                                                                                                                               |
+| -------------------------------------- | ------------ | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `NEXT_PUBLIC_SUPABASE_URL`             | 入れる       | 入れる       | 本番の Supabase の Project URL                                                                                                                                     |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | 入れる       | 入れる       | 本番の Supabase の Publishable key                                                                                                                                 |
+| `RATE_LIMIT_SALT`                      | 入れる       | 入れる       | 必須。空だと口コミ・スポットの投稿が 503 になり、旅プランは Gemini を使わずデモモードになる。`openssl rand -hex 32` などで作り、変えると同じ送信元の数え直しになる |
+| `GEMINI_API_KEY`                       | #25 で入れる | #25 で入れる | 本番用に持ち主が別に作る（開発のキーは使わない）。入れるまでは旅プランはデモモード                                                                                 |
+| `GEMINI_MODEL`                         | 任意         | 任意         | 空なら既定の `gemini-3.5-flash-lite`                                                                                                                               |
+
+環境変数を変えたら、Deployments の一番上の `…` → Redeploy で反映する。
+
+作り直すとき:
+
+1. Vercel で GitHub リポジトリをインポートする（Root Directory はリポジトリ直下のまま）
+2. 上の環境変数を Production と Preview の両方に入れる
 3. Install Command と Build Command は既定（`npm install` / `npm run build`）のまま使う。地図のワーカーを install のあと（`postinstall`）に写すため、`--ignore-scripts` を付けない（詳しくは「地図タイル」）
 
 ## 地図タイル
