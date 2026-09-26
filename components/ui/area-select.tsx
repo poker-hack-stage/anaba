@@ -16,10 +16,10 @@ export interface AreaSelectProps {
   onPrefectureChange: (prefecture: string) => void;
   onAreaChange: (areaId: string) => void;
   shape?: SelectProps["shape"];
-  /** 市区町村の select に渡す属性（id・aria-invalid・aria-describedby など） */
+  /** 市区町村の select に渡す属性（id・aria-required・aria-invalid・aria-describedby など） */
   areaSelectProps?: Pick<
     SelectProps,
-    "id" | "aria-invalid" | "aria-describedby"
+    "id" | "aria-required" | "aria-invalid" | "aria-describedby"
   >;
   /** 値を選んでいる select に付けるクラス（旅プランでは、選択中の Chip と同じ濃い枠にする） */
   selectedClassName?: string;

@@ -207,6 +207,8 @@ export function SpotSubmissionForm({
           labelClassName="font-normal text-stone-600"
           areaSelectProps={{
             id: `${id}-areaId`,
+            // 送る値は市区町村なので、必須であることを読み上げに伝える（ブラウザの検証は使わないので required ではなく aria-required）
+            "aria-required": true,
             "aria-invalid": fieldErrors.areaId ? true : undefined,
             "aria-describedby": describedBy("areaId"),
           }}

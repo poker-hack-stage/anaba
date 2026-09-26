@@ -168,6 +168,8 @@ describe("穴場を教えるフォーム", () => {
     // 登録済みの地域がある県だけを、display_order の順に出す（案 A）
     expect(texts(prefecture)).toEqual(["選ぶ", "長野県", "北海道"]);
     expect(municipality.disabled).toBe(true);
+    // 送る値は市区町村なので、必須であることを読み上げに伝える
+    expect(municipality.getAttribute("aria-required")).toBe("true");
 
     fireEvent.change(prefecture, { target: { value: "長野県" } });
     expect(municipality.disabled).toBe(false);
