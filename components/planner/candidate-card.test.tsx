@@ -16,8 +16,17 @@ import { getDayColor } from "./day-colors";
 
 // 地図（MapLibre）は jsdom で描けないので、渡された経路を文字で出し、ピンをボタンで出す部品に差し替える
 vi.mock("@/components/map/spot-map", () => ({
-  SpotMap: ({ routes = [], others = [], onSpotClick }: SpotMapProps) => (
-    <div role="group" aria-label="地図の経路">
+  SpotMap: ({
+    routes = [],
+    others = [],
+    onSpotClick,
+    cooperativeGestures = true,
+  }: SpotMapProps) => (
+    <div
+      role="group"
+      aria-label="地図の経路"
+      data-cooperative={String(cooperativeGestures)}
+    >
       {routes.map((r, i) => (
         <p key={i}>
           {[r.name ?? "（名前なし）", r.color ?? "（既定の色）"]
@@ -218,6 +227,15 @@ describe("CandidateCard", () => {
       });
       return { dialog, map };
     }
+
+    test("カードの地図はページのスクロールを優先し、大きな地図は1本指・ホイールで動かせる", async () => {
+      renderCard(twoDays());
+      const cardMap = await screen.findByRole("group", { name: "地図の経路" });
+      expect(cardMap.dataset.cooperative).toBe("true");
+
+      const { map } = await openLargeMap();
+      expect(map.dataset.cooperative).toBe("false");
+    });
 
     test("はじめは開いていない", () => {
       renderCard(candidate());

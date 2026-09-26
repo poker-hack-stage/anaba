@@ -77,6 +77,8 @@ export function CandidateMapDialog({
             routes={routes}
             others={others}
             onSpotClick={onSpotClick}
+            // 地図だけの画面なので、ページのスクロールと取り合わない。1本指・ホイールで動かせるようにする
+            cooperativeGestures={false}
             className={MAP_CLASS_NAME}
           />
         </DialogPrimitive.Content>
