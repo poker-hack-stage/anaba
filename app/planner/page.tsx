@@ -16,7 +16,7 @@ export default function PlannerPage() {
           条件を選ぶだけで、旅の候補を提案します。
         </h1>
         <p className="mt-1 text-sm text-ink-light">
-          エリアや興味を選んで「絞る」を押すと、おすすめの地域と経路が地図で見られます。
+          エリアや興味を選んで「旅プランをつくる」を押すと、おすすめの地域と経路が地図で見られます。
         </p>
       </section>
 

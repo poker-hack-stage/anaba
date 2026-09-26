@@ -10,7 +10,7 @@ import { COMPANIONS, DURATIONS, INTERESTS, TRANSPORTS } from "./options";
 export const MAX_REQUEST_BYTES = 8_000;
 
 /**
- * 「絞る」で送られてくる条件（PlanConditions）。選択肢にない値や、余計な項目は受け付けない。
+ * 「旅プランをつくる」で送られてくる条件（PlanConditions）。選択肢にない値や、余計な項目は受け付けない。
  * 地域とスポットの id は、ここでは長さだけを確かめる（知らない地域の id は「おまかせ」として扱う、generate.ts・ai-prompt.ts。
  * 知らないスポットの id は、どの候補にも入れられないので候補を0件にする、include-spot.ts）
  */

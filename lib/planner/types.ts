@@ -5,7 +5,7 @@ import type { Spot } from "@/lib/data/spots";
 /** 日程 */
 export type PlanDuration = "day" | "1n2d" | "2n3d";
 
-/** 「絞る」で送る条件（docs/spec.md のデータ-4） */
+/** 「旅プランをつくる」で送る条件（docs/spec.md のデータ-4） */
 export type PlanConditions = {
   /** 地域の id。null なら「おまかせ」 */
   areaId: string | null;

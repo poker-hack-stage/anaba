@@ -1,14 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useSearchParams } from "next/navigation";
 import {
   AlertCircle,
   FlaskConical,
   Loader2,
+  RefreshCw,
   Route,
-  Search,
   SearchX,
+  Sparkles,
 } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { SpotDetailDialog } from "@/components/spots/spot-detail-dialog";
@@ -58,6 +66,11 @@ const DEFAULT_CONDITIONS: PlanConditions = {
   companion: COMPANIONS[0],
   transport: TRANSPORTS[0],
 };
+
+/** 条件と結果が横に並ぶ幅（Tailwind の lg）。これより狭いと、条件の下に結果が縦に並ぶ */
+const WIDE_LAYOUT_QUERY = "(min-width: 1024px)";
+
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
 /** URL のクエリで「おまかせ」を表す値（地域の id と重ならない） */
 const ANY_AREA_QUERY = "any";
@@ -159,8 +172,11 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   // 入力中の希望（#114）。null なら、URL の条件の希望を出す。
   // 1文字ごとに URL を書き換えると Safari の replaceState の回数制限に当たるので、
-  // URL に書くのはフォーカスが外れたときと「絞る」を押したときだけにする
+  // URL に書くのはフォーカスが外れたときと「旅プランをつくる」（「この条件でつくり直す」）を押したときだけにする
   const [noteDraft, setNoteDraft] = useState<string | null>(null);
+  const submitRef = useRef<HTMLButtonElement>(null);
+  const resultRef = useRef<HTMLElement>(null);
+  const resultHeadingRef = useRef<HTMLHeadingElement>(null);
 
   const areaIds = useMemo(() => areas.map((area) => area.id), [areas]);
   const queryConditions = useMemo(
@@ -175,6 +191,32 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
     status === "done" &&
     result.conditions !== null &&
     toQuery(result.conditions) !== toQuery(conditions);
+  const isLoading = status === "loading";
+  // 候補を出したあと（作り直している間も）は、作り直すボタンにする
+  const hasCandidates = status === "done" || candidates.length > 0;
+
+  const previousStatus = useRef(status);
+  /** 押したときに true にする。作り直し（#32）では動かさない */
+  const shouldScrollToResult = useRef(false);
+  // 押して作っている状態（スケルトン）を描いてから、結果の欄まで動かす（押した直後はまだ結果の欄が短く、ページの下端に当たって途中で止まるため）。
+  // 作っている状態から結果が出た状態に変わったら、結果の見出しにフォーカスを移して、結果が出たことを伝える。
+  // 作っている間にフォームのほかの欄へ移っていたら、入力の邪魔をしないようフォーカスは奪わない
+  useEffect(() => {
+    const wasLoading = previousStatus.current === "loading";
+    previousStatus.current = status;
+    if (status === "loading" && shouldScrollToResult.current) {
+      shouldScrollToResult.current = false;
+      scrollToResult(resultRef.current);
+    }
+    if (!wasLoading || status === "loading") return;
+    const active = document.activeElement;
+    const canMoveFocus =
+      active === null ||
+      active === document.body ||
+      active === submitRef.current ||
+      resultRef.current?.contains(active) === true;
+    if (canMoveFocus) resultHeadingRef.current?.focus();
+  }, [status]);
 
   useEffect(() => {
     if (queryConditions) {
@@ -260,6 +302,9 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
   };
 
   const submit = async () => {
+    // 作っている間はボタンを aria-disabled にしている（フォーカスを残すため disabled にしない）ので、ここで止める
+    if (isLoading) return;
+    shouldScrollToResult.current = true;
     // 結果は Context に入れるので、読み込み中に別のタブへ移動しても戻ると表示される
     // 結果には、送ったときの条件を付けておく（あとで条件が変わってもずれが分かるように）
     const requested = commitNote();
@@ -372,27 +417,54 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
           onBlur={commitNote}
         />
         <button
+          ref={submitRef}
           type="button"
           onClick={submit}
-          disabled={status === "loading"}
-          className="mt-2 flex items-center justify-center gap-1.5 rounded-xl bg-ink py-3 text-sm font-bold text-white transition-all hover:bg-ink/90 active:scale-[0.98] disabled:opacity-60"
+          aria-disabled={isLoading}
+          className="mt-2 flex items-center justify-center gap-1.5 rounded-xl bg-ink py-3 text-sm font-bold text-white transition-all hover:bg-ink/90 active:scale-[0.98] aria-disabled:cursor-not-allowed aria-disabled:opacity-60 aria-disabled:hover:bg-ink aria-disabled:active:scale-100"
         >
-          {status === "loading" ? (
+          {isLoading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
+          ) : hasCandidates ? (
+            <RefreshCw className="h-4 w-4" />
           ) : (
-            <Search className="h-4 w-4" />
+            <Sparkles className="h-4 w-4" />
           )}
-          {status === "done" ? "この条件で絞り直す" : "絞る"}
+          {hasCandidates ? "この条件でつくり直す" : "旅プランをつくる"}
         </button>
       </section>
 
-      <section className="flex flex-col gap-4">
+      {/* スマホで押したときに、上に固定したヘッダー（高さ 56px）に隠れない位置まで動かす */}
+      <section ref={resultRef} className="flex scroll-mt-20 flex-col gap-4">
+        {status !== "idle" && (
+          <h2
+            ref={resultHeadingRef}
+            tabIndex={-1}
+            className="font-extrabold text-stone-900 focus:outline-none"
+          >
+            旅の候補
+          </h2>
+        )}
+        {/*
+          作っている間と結果を読み上げで伝える。読み上げられるよう、中身が変わる前から置いておく。
+          見せるのは作っている間だけ。結果の文は、見た目では候補そのもので伝わるので隠す（余白も取らない）
+        */}
+        <div role="status" className={cn(!isLoading && "sr-only")}>
+          {isLoading ? (
+            <p className="flex items-center gap-2 text-sm font-bold text-stone-700">
+              <Loader2 className="h-4 w-4 animate-spin text-shu" />
+              旅プランをつくっています
+            </p>
+          ) : (
+            resultAnnouncement(status, candidates, result.rebuildError)
+          )}
+        </div>
         {isStale && (
           <p
             role="status"
             className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
           >
-            条件が変わっています。「この条件で絞り直す」で更新できます。
+            条件が変わっています。「この条件でつくり直す」で更新できます。
           </p>
         )}
         <Result
@@ -415,6 +487,29 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
       />
     </div>
   );
+}
+
+/** 条件の下に結果が縦に並ぶ幅（スマホ）なら、結果の欄まで動かす。動きを減らす設定ならアニメーションしない */
+function scrollToResult(result: HTMLElement | null) {
+  if (!result || window.matchMedia(WIDE_LAYOUT_QUERY).matches) return;
+  const reduceMotion = window.matchMedia(REDUCED_MOTION_QUERY).matches;
+  result.scrollIntoView({
+    behavior: reduceMotion ? "auto" : "smooth",
+    block: "start",
+  });
+}
+
+/** 結果が出たときに読み上げる文。作り直しの失敗は role="alert" で伝えるので、ここでは読まない */
+function resultAnnouncement(
+  status: PlannerStatus,
+  candidates: PlanCandidate[],
+  rebuildError: string | undefined,
+): string {
+  if (status === "error") return "候補を取得できませんでした。";
+  if (status !== "done" || rebuildError) return "";
+  return candidates.length > 0
+    ? `旅の候補を${candidates.length}件つくりました。`
+    : "この条件では候補を組めませんでした。";
 }
 
 function Result({
@@ -444,7 +539,7 @@ function Result({
       <EmptyState
         icon={Route}
         title="旅の候補がここに表示されます"
-        description="左の条件を選んで「絞る」を押すと、おすすめの地域とルートを地図つきで提案します。"
+        description="条件を選んで「旅プランをつくる」を押すと、おすすめの地域とルートを地図つきで提案します。"
         className="h-full min-h-72"
       />
     );
@@ -463,7 +558,7 @@ function Result({
       <EmptyState
         icon={SearchX}
         title="候補を取得できませんでした"
-        description="時間をおいて、もう一度「絞る」を押してください。"
+        description="時間をおいて、もう一度「旅プランをつくる」を押してください。"
         className="min-h-72"
       />
     );
@@ -497,7 +592,7 @@ function Result({
           <FlaskConical className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
             {rateLimited
-              ? "短い時間に何度も作ったため、デモモードで作成しました。しばらくしてから絞り直すと、AI で作れます。"
+              ? "短い時間に何度も作ったため、デモモードで作成しました。しばらくしてからつくり直すと、AI で作れます。"
               : "デモモードで作成しました。"}
             AI を使わず、興味に合うスポットを穴場度の高い順に選んでいます。
             {hasNote &&
@@ -514,6 +609,9 @@ function Result({
     </>
   );
 }
+
+/** スマホでは指で押しやすいよう、チップを縦に広げる（点検 B-12） */
+const CHIP_TOUCH_CLASS = "max-sm:py-2.5";
 
 /** 日程の表示の文言から、日程のコードに戻す */
 function toDuration(label: string): PlanDuration {
@@ -534,16 +632,22 @@ function AreaField({
   onChange: (areaId: string | null) => void;
 }) {
   const selectId = useId();
+  const labelId = useId();
   return (
-    <div>
+    <div role="group" aria-labelledby={labelId}>
       <label
+        id={labelId}
         htmlFor={selectId}
         className="mb-1.5 block text-xs font-bold text-stone-700"
       >
         エリア
       </label>
       <div className="flex flex-wrap items-center gap-1.5">
-        <Chip active={areaId === null} onClick={() => onChange(null)}>
+        <Chip
+          active={areaId === null}
+          onClick={() => onChange(null)}
+          className={CHIP_TOUCH_CLASS}
+        >
           {ANY_AREA_LABEL}
         </Chip>
         <Select
@@ -624,15 +728,19 @@ function Choice({
   selected: string[];
   onSelect: (value: string) => void;
 }) {
+  const labelId = useId();
   return (
-    <div>
-      <p className="mb-1.5 text-xs font-bold text-stone-700">{label}</p>
+    <div role="group" aria-labelledby={labelId}>
+      <p id={labelId} className="mb-1.5 text-xs font-bold text-stone-700">
+        {label}
+      </p>
       <div className="flex flex-wrap gap-1.5">
         {options.map((option) => (
           <Chip
             key={option}
             active={selected.includes(option)}
             onClick={() => onSelect(option)}
+            className={CHIP_TOUCH_CLASS}
           >
             {option}
           </Chip>
