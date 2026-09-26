@@ -75,6 +75,12 @@ export type SpotMapProps = {
   animateMove?: boolean;
   /** スポットも境界もないときに「地図」のプレースホルダーを出すか（既定は出す） */
   emptyPlaceholder?: boolean;
+  /**
+   * ページのスクロールを奪わない操作にするか（既定は true）。true ならホイールは Ctrl / ⌘ を押したときだけズーム、
+   * タッチ端末では2本指で地図を動かす。地図だけを出すダイアログ（候補の大きな地図、#31）では false にして、1本指・ホイールで動かせるようにする。
+   * 地図を作るときにだけ読む（あとから変えても反映しない）
+   */
+  cooperativeGestures?: boolean;
   className?: string;
 };
 
@@ -164,6 +170,7 @@ export function SpotMap({
   pin,
   animateMove = false,
   emptyPlaceholder = true,
+  cooperativeGestures = true,
   className,
 }: SpotMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -172,6 +179,9 @@ export function SpotMap({
   const [styleLoaded, setStyleLoaded] = useState(false);
   // スタイルを読めなかった（OpenFreeMap が落ちている、オフラインなど）。背景は描けないが、ピンは使える
   const [styleFailed, setStyleFailed] = useState(false);
+
+  // 地図を作るときの値だけを使う（作り直さないので、あとから変わっても反映しない）
+  const initialCooperativeGestures = useRef(cooperativeGestures);
 
   // 地図は effect の中で作り、後始末で消す。cacheComponents で前のページが <Activity> に隠れると
   // 後始末が走り、表示に戻ると作り直すので、壊れた地図を再利用しない
@@ -185,9 +195,9 @@ export function SpotMap({
       zoom: JAPAN_ZOOM,
       minZoom: MIN_ZOOM,
       maxZoom: MAX_ZOOM,
-      // 1ページに地図が複数並ぶので、ページのスクロールを奪わない。
+      // 1ページに地図が複数並ぶので、既定ではページのスクロールを奪わない。
       // ホイールは Ctrl / ⌘ を押したときだけズーム、タッチ端末では1本指でページをスクロールし2本指で地図を動かす
-      cooperativeGestures: true,
+      cooperativeGestures: initialCooperativeGestures.current,
       // 回転・傾きは使わない（北が上のまま）
       dragRotate: false,
       pitchWithRotate: false,

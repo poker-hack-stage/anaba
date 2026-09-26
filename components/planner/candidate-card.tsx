@@ -3,13 +3,19 @@
 import dynamic from "next/dynamic";
 import { BedDouble, Clock, Lightbulb, MapPin } from "lucide-react";
 import { SpotMapSkeleton } from "@/components/map/spot-map-skeleton";
+import type { SpotRoute } from "@/components/map/spot-map";
 import type { Spot } from "@/lib/data/spots";
 import { formatMinutes } from "@/lib/planner/duration";
 import type { PlanCandidate, PlanDay } from "@/lib/planner/types";
 import { cn } from "@/lib/utils";
+import { CandidateMapDialog } from "./candidate-map-dialog";
 import { getDayColor } from "./day-colors";
 
-const MAP_CLASS_NAME = "h-56 rounded-none border-0 border-b";
+/**
+ * 地図の枠（カードの先頭の子）。candidate-tabs.tsx はこの枠の高さを上書きするので、地図は枠いっぱいに広げる
+ */
+const MAP_FRAME_CLASS_NAME = "relative h-56";
+const MAP_CLASS_NAME = "h-full rounded-none border-0 border-b";
 
 // 地図（MapLibre）は window と WebGL を使うので、サーバーでは描画しない
 const SpotMap = dynamic(
@@ -30,23 +36,26 @@ export function CandidateCard({
   onSpotClick: (spot: Spot) => void;
 }) {
   const multiDay = candidate.days.length > 1;
+  const routes = candidateRoutes(candidate);
   return (
     <article className="flex flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white">
-      <SpotMap
-        routes={candidate.days.map((day) =>
-          // 日帰りは今までどおり1本の朱の経路にし、凡例も出さない
-          multiDay
-            ? {
-                spots: day.route,
-                color: getDayColor(day.day).hex,
-                name: `${day.day}日目`,
-              }
-            : { spots: day.route },
-        )}
-        others={candidate.otherSpots}
-        onSpotClick={onSpotClick}
-        className={MAP_CLASS_NAME}
-      />
+      <div className={MAP_FRAME_CLASS_NAME}>
+        <SpotMap
+          routes={routes}
+          others={candidate.otherSpots}
+          onSpotClick={onSpotClick}
+          className={MAP_CLASS_NAME}
+        />
+        {/* カードの中にはスポット名やピンのボタンがあるので、カード全体ではなくこのボタンで開く（#31）。
+            地図の＋−ボタン（右上）のすぐ下に置く */}
+        <CandidateMapDialog
+          title={candidate.title}
+          routes={routes}
+          others={candidate.otherSpots}
+          onSpotClick={onSpotClick}
+          className="absolute right-[10px] top-[78px] z-10"
+        />
+      </div>
       <div className="flex flex-col gap-4 p-4">
         <div>
           {candidate.nearby && (
@@ -107,6 +116,23 @@ export function CandidateCard({
         )}
       </div>
     </article>
+  );
+}
+
+/**
+ * 地図に渡す経路。カードと大きな地図（candidate-map-dialog.tsx）で同じものを使う。
+ * 日帰りは1本の朱の経路にし、凡例も出さない。複数日は日の見出しと同じ色・名前（n日目）にする
+ */
+function candidateRoutes(candidate: PlanCandidate): SpotRoute[] {
+  const multiDay = candidate.days.length > 1;
+  return candidate.days.map((day) =>
+    multiDay
+      ? {
+          spots: day.route,
+          color: getDayColor(day.day).hex,
+          name: `${day.day}日目`,
+        }
+      : { spots: day.route },
   );
 }
 
