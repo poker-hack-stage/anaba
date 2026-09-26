@@ -1,5 +1,5 @@
 import { render } from "@testing-library/react";
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import type { SpotMapProps } from "@/components/map/spot-map";
 import type { AreaWithSpots } from "@/lib/data/areas";
@@ -131,4 +131,112 @@ describe("AreaMap（#14）", () => {
     );
     expect(lastProps().fitPoints).toBeUndefined();
   });
+});
+
+/** 画面の幅を決める（useMediaQuery は matchMedia で読む）。`pc` なら lg・xl に当たる */
+function stubScreen(pc: boolean) {
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn(() => ({
+      matches: pc,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    })),
+  );
+}
+
+describe("AreaMap のスマホの全面表示（#142）", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  test("スマホでは、表示中のカードのスポットを目立たせ、浮かべた検索欄・パネルの高さだけ表示範囲の上下を空ける", () => {
+    stubScreen(false);
+    render(
+      <AreaMap
+        area={area("hakuba", polygon)}
+        overlayInsets={{ top: 64, bottom: 300 }}
+        activeSpotId="hakuba-2"
+        onSpotClick={() => {}}
+      />,
+    );
+    const props = lastProps();
+    expect(props.activeSpotId).toBe("hakuba-2");
+    expect(props.fitPadding).toEqual({
+      top: 80,
+      right: 24,
+      bottom: 316,
+      left: 24,
+    });
+    // ＋−ボタンと帰属表示は、下のパネルの上に持ち上げる
+    expect(props.style).toEqual({ "--map-controls-bottom": "300px" });
+    // 地域名はパネルに出るので、地図のバッジは出さない
+    expect(props.labelClassName).toMatch(/\bmax-lg:hidden\b/);
+  });
+
+  test("スマホでも、パネルの高さを測る前は既定の余白のまま", () => {
+    stubScreen(false);
+    render(
+      <AreaMap
+        area={area("hakuba", polygon)}
+        overlayInsets={{ top: 0, bottom: 0 }}
+        onSpotClick={() => {}}
+      />,
+    );
+    expect(lastProps().fitPadding).toBeUndefined();
+  });
+
+  test("PC では目立たせるピンも、スマホの余白も渡さない（見た目を変えない）", () => {
+    stubScreen(true);
+    render(
+      <AreaMap
+        area={area("hakuba", polygon)}
+        overlayInsets={{ top: 64, bottom: 300 }}
+        activeSpotId="hakuba-2"
+        onSpotClick={() => {}}
+      />,
+    );
+    const props = lastProps();
+    expect(props.activeSpotId).toBeUndefined();
+    expect(props.fitPadding).toEqual({
+      top: 40,
+      right: 420 + 40,
+      bottom: 64,
+      left: 340 + 40,
+    });
+    expect(props.style).toBeUndefined();
+  });
+});
+
+/** 画面の幅を決める。`(min-width: Npx)` のクエリに、幅が N 以上なら当たる */
+function stubWidth(width: number) {
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn((query: string) => ({
+      matches: width >= Number(/min-width: (\d+)px/.exec(query)?.[1]),
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    })),
+  );
+}
+
+describe("AreaMap の地図の操作（#155）", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  test("スマホ（sm 未満）はページがスクロールしないので、1本指で地図を動かす", () => {
+    stubWidth(375);
+    render(<AreaMap area={area("hakuba", polygon)} onSpotClick={() => {}} />);
+    expect(lastProps().cooperativeGestures).toBe(false);
+  });
+
+  test.each([640, 768, 1280])(
+    "%ipx ではページのスクロールを奪わない（2本指で地図を動かす）",
+    (width) => {
+      stubWidth(width);
+      render(<AreaMap area={area("hakuba", polygon)} onSpotClick={() => {}} />);
+      expect(lastProps().cooperativeGestures).toBe(true);
+    },
+  );
 });

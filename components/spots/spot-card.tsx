@@ -33,7 +33,10 @@ export function preloadSpotCardImages(
 /**
  * 情報パネルに並べるスポットカード（写真・カテゴリ・名前・評価・穴場度・キャッチコピー・タグ）。クリックで詳細を開く。
  * 口コミの件数・平均はカードには出さない（詳細の口コミ欄だけ、#53）。
- * `variant="panel"` は PC（lg 以上）で写真を上に大きく出し、その下に文字を並べる
+ * `variant="panel"` は PC（lg 以上）で写真を上に大きく出し、その下に文字を並べる。
+ * スマホ・タブレット（lg 未満）では地図の下に浮かべた横スクロールのカードになるので（#142）、地図を隠しすぎないよう
+ * 写真を少し小さくし、評価と穴場度を1行に、キャッチコピーを2行まで（長い文は「…」）にして、タグとおすすめの時間帯は出さない。
+ * 横に並べたカードの高さは、並びの側（spot-panel.tsx）でいちばん高いカードにそろえる（#155）
  */
 export function SpotCard({
   spot,
@@ -63,7 +66,8 @@ export function SpotCard({
         sizes={CARD_IMAGE_SIZES[variant]}
         className={cn(
           "h-24 w-24 shrink-0 rounded-xl",
-          panel && "lg:aspect-[16/10] lg:h-auto lg:w-full",
+          panel &&
+            "max-lg:h-20 max-lg:w-20 lg:aspect-[16/10] lg:h-auto lg:w-full",
         )}
       />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -78,7 +82,13 @@ export function SpotCard({
         </h3>
         {(rating !== null || hiddenGemScore !== null) && (
           // 狭い幅では穴場度の数でカードごとに折り返しがばらつくので、最初から2行にする
-          <div className="flex flex-col items-start gap-y-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3">
+          <div
+            className={cn(
+              "flex flex-col items-start gap-y-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3",
+              panel &&
+                "max-lg:flex-row max-lg:flex-wrap max-lg:items-center max-lg:gap-x-3",
+            )}
+          >
             <Rating value={rating} />
             <HiddenGemScore score={hiddenGemScore} />
           </div>
@@ -88,7 +98,12 @@ export function SpotCard({
             {spot.catchphrase}
           </p>
         )}
-        <div className="mt-auto flex flex-wrap items-center gap-1 pt-1">
+        <div
+          className={cn(
+            "mt-auto flex flex-wrap items-center gap-1 pt-1",
+            panel && "max-lg:hidden",
+          )}
+        >
           {spot.tags.slice(0, 3).map((tag) => (
             <span
               key={tag}
@@ -106,13 +121,5 @@ export function SpotCard({
         </div>
       </div>
     </button>
-  );
-}
-
-export function SpotCardSkeleton() {
-  return (
-    // 高さはカードの実測に合わせて幅で分ける。スマホは評価・穴場度が2行になり 204〜242px
-    // （375px の中央値 242px・414px の中央値 204px の間を取る）、sm〜lg は1列で約 146px、lg 以上は約 184px
-    <div className="h-[228px] animate-pulse rounded-2xl bg-stone-200/60 sm:h-[146px] lg:h-[184px]" />
   );
 }
