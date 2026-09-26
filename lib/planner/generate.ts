@@ -195,8 +195,11 @@ function compareForRoute(
   );
 }
 
-/** 先頭のスポットから、まだ通っていちばん近いスポットを順につなぐ（地図で経路が行ったり来たりしないように） */
-function orderByProximity(spots: readonly Spot[]): Spot[] {
+/**
+ * 先頭のスポットから、まだ通っていちばん近いスポットを順につなぐ（地図で経路が行ったり来たりしないように）。
+ * Gemini の経路にも使う（ai-candidates.ts、#113）
+ */
+export function orderByProximity(spots: readonly Spot[]): Spot[] {
   if (spots.length === 0) return [];
   const [first, ...rest] = spots;
   const ordered = [first];

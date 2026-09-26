@@ -100,6 +100,7 @@ describe("createPlan", () => {
       contents: expect.stringContaining("# 旅の条件"),
       config: {
         systemInstruction: expect.stringContaining("旅のプランナー"),
+        temperature: 0.4,
         responseMimeType: "application/json",
         responseJsonSchema: AI_PLAN_JSON_SCHEMA,
       },

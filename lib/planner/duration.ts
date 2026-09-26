@@ -27,6 +27,17 @@ export const MOVE_MINUTES: Record<string, number> = {
 /** 移動手段が分からないときの移動の目安（分）。短く見積もらないよう、いちばん長いものにする */
 const UNKNOWN_MOVE_MINUTES = Math.max(...Object.values(MOVE_MINUTES));
 
+/**
+ * 1日の所要時間の上限の目安（分）。Gemini に詰め込みすぎの日を作らせないよう、プロンプトで伝える（#113）。
+ * サーバーでは切らない（デモモードの経路は最大4件で、この目安に収まる）
+ */
+export const MAX_DAY_MINUTES = 480;
+
+/** 移動手段ごとのスポット間の移動の目安（分）。知らない移動手段なら、いちばん長いもの */
+export function getMoveMinutes(transport: string): number {
+  return MOVE_MINUTES[transport] ?? UNKNOWN_MOVE_MINUTES;
+}
+
 /** stay_minutes がないスポットの滞在の目安（分） */
 export const DEFAULT_STAY_MINUTES = 60;
 
@@ -43,8 +54,7 @@ export function calcDayMinutes(
     (sum, spot) => sum + (spot.stay_minutes ?? DEFAULT_STAY_MINUTES),
     0,
   );
-  const move = MOVE_MINUTES[transport] ?? UNKNOWN_MOVE_MINUTES;
-  return stay + move * (route.length - 1);
+  return stay + getMoveMinutes(transport) * (route.length - 1);
 }
 
 /**

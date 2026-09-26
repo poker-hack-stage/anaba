@@ -78,12 +78,32 @@ describe("toPlanCandidates", () => {
       duration: "day",
       nearby: false,
     });
+    // 経路は Gemini の1件目（3）から近い順に並べ直す（#113）
     expect(names(candidate.days[0].route)).toEqual(
-      names([3, 0, 5].map((i) => matsumoto.spots[i])),
+      names([3, 5, 0].map((i) => matsumoto.spots[i])),
     );
     // 所要時間はサーバーで計算する: 滞在60分×3＋自転車の移動30分×2
     expect(candidate.days[0].durationMinutes).toBe(60 * 3 + 30 * 2);
     expect(candidate.otherSpots).toHaveLength(8 - 3);
+  });
+
+  test("どの日の経路も、1件目から近い順に並べ直す（#113）", () => {
+    // fixtures のスポットは、地域の中心から北へ i × 0.01 度ずつ並ぶ
+    const [candidate] = run(request({ duration: "2n3d" }), [
+      {
+        days: [
+          { area: matsumoto, spots: [0, 7, 2, 5] },
+          { area: matsumoto, spots: [6, 1, 4] },
+          { area: azumino, spots: [3, 0, 7, 1] },
+        ],
+      },
+    ]);
+
+    expect(candidate.days.map((d) => names(d.route))).toEqual([
+      names([0, 2, 5, 7].map((i) => matsumoto.spots[i])),
+      names([6, 4, 1].map((i) => matsumoto.spots[i])),
+      names([3, 1, 0, 7].map((i) => azumino.spots[i])),
+    ]);
   });
 
   test("存在しないスポットは取り除く", () => {
