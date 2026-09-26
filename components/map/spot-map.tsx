@@ -9,6 +9,7 @@ import {
   NavigationControl,
   setWorkerUrl,
   type GeoJSONSource,
+  type MapMouseEvent,
 } from "maplibre-gl";
 import type {
   Feature,
@@ -60,6 +61,13 @@ export type SpotMapProps = {
   onSpotClick?: (spot: Spot) => void;
   /** ピンにマウスが乗ったらそのスポット、離れたら null を渡す */
   onSpotHover?: (spot: Spot | null) => void;
+  /** 地図をクリック・タップした場所（スポットの投稿で場所を選ぶ、#54） */
+  onMapClick?: (point: MapPoint) => void;
+  /**
+   * 置いたピン（スポットの投稿で選んだ場所、#54）。スポットのピンと見分けられる形で1つ出す。
+   * 表示範囲の計算には含めない（ピンを置き直すたびに拡大が戻らないように）
+   */
+  pin?: MapPoint | null;
   /**
    * 表示範囲が変わったら、なめらかに移動する（既定は即時）。最初の表示は即時。
    * OS の「視差効果を減らす」が有効なら即時（MapLibre が切り替える）
@@ -69,6 +77,8 @@ export type SpotMapProps = {
   emptyPlaceholder?: boolean;
   className?: string;
 };
+
+export type MapPoint = { lat: number; lng: number };
 
 /**
  * 地図のスタイル。OpenFreeMap の Bright（ベクトル地図。無料・API キー不要）。
@@ -150,6 +160,8 @@ export function SpotMap({
   boundary,
   onSpotClick,
   onSpotHover,
+  onMapClick,
+  pin,
   animateMove = false,
   emptyPlaceholder = true,
   className,
@@ -321,6 +333,26 @@ export function SpotMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, styleLoaded, routeKey]);
 
+  // 地図のクリック・タップ。関数が毎回作り直されても付け直さないよう、最新のものを ref で持つ
+  const onMapClickRef = useRef(onMapClick);
+  useEffect(() => {
+    onMapClickRef.current = onMapClick;
+  });
+  const clickable = onMapClick !== undefined;
+  useEffect(() => {
+    if (!map || !clickable) return;
+    const handleClick = (event: MapMouseEvent) => {
+      onMapClickRef.current?.({
+        lat: event.lngLat.lat,
+        lng: event.lngLat.lng,
+      });
+    };
+    map.on("click", handleClick);
+    return () => {
+      map.off("click", handleClick);
+    };
+  }, [map, clickable]);
+
   const markerProps = { onSpotClick, onSpotHover };
   // 経路が2本以上で名前があれば凡例を出す
   const showLegend = routes.length > 1 && routes.some((r) => r.name);
@@ -378,6 +410,7 @@ export function SpotMap({
               />
             )),
           )}
+          {pin && <PinMarker map={map} lat={pin.lat} lng={pin.lng} />}
         </>
       )}
 
@@ -517,4 +550,43 @@ function SpotMarker({
 
 function routeColor(route: SpotRoute): string {
   return route.color ?? ROUTE_COLOR;
+}
+
+/**
+ * 置いたピン（#54）。スポットの丸いピンと見分けられるよう、しずく形にして先端を場所に合わせる。
+ * 押すものではないので button にせず、ピンの上をタップしても地図のクリックとして置き直せるようにする
+ */
+function PinMarker({
+  map,
+  lat,
+  lng,
+}: {
+  map: MapLibreMap;
+  lat: number;
+  lng: number;
+}) {
+  const [element] = useState(() => {
+    const el = document.createElement("div");
+    el.style.zIndex = "4";
+    el.style.pointerEvents = "none";
+    return el;
+  });
+
+  useEffect(() => {
+    const marker = new Marker({ element, anchor: "bottom" })
+      .setLngLat([lng, lat])
+      .addTo(map);
+    return () => {
+      marker.remove();
+    };
+  }, [map, element, lat, lng]);
+
+  return createPortal(
+    <MapPin
+      aria-hidden
+      className="h-10 w-10 fill-shu text-white drop-shadow-md"
+      strokeWidth={1.5}
+    />,
+    element,
+  );
 }
