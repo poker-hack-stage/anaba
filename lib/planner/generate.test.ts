@@ -66,6 +66,44 @@ describe("generateCandidates", () => {
     expect(candidates.map((c) => c.id)).toEqual(["遠い町"]);
   });
 
+  test("県だけ選ぶと（#147）、その県の地域だけで「おまかせ」と同じように選ぶ", () => {
+    const candidates = generateCandidates(
+      areas,
+      request({ prefecture: "長野県", interests: ["温泉"] }),
+    );
+
+    expect(candidates).toHaveLength(MAX_CANDIDATES);
+    expect(candidates.every((c) => c.id !== "遠い町")).toBe(true);
+    expect(candidates.map((c) => c.nearby)).toEqual([false, false, false]);
+  });
+
+  test("地域が1つしかない県だけを選ぶと、その地域の候補だけになる", () => {
+    const candidates = generateCandidates(
+      areas,
+      request({ prefecture: "北海道" }),
+    );
+
+    expect(candidates.map((c) => c.id)).toEqual(["遠い町"]);
+  });
+
+  test("知らない県なら「おまかせ」として扱う", () => {
+    const candidates = generateCandidates(
+      areas,
+      request({ prefecture: "大阪府" }),
+    );
+
+    expect(candidates).toHaveLength(MAX_CANDIDATES);
+  });
+
+  test("地域を選んでいれば、県は使わない", () => {
+    const candidates = generateCandidates(
+      areas,
+      request({ areaId: "遠い町", prefecture: "長野県" }),
+    );
+
+    expect(candidates.map((c) => c.id)).toEqual(["遠い町"]);
+  });
+
   test("知らない地域の id なら「おまかせ」として扱う", () => {
     const candidates = generateCandidates(
       areas,

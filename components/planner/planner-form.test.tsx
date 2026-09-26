@@ -103,9 +103,46 @@ function renderForm({
     fireEvent.click(screen.getByRole("button", { name: "旅プランをつくる" }));
 }
 
-/** エリアの select（「エリア」はチップと select をまとめた group の名前でもあるので、role で探す） */
+/** エリアの都道府県・市区町村の select（#147） */
+const prefectureSelect = () =>
+  screen.getByRole<HTMLSelectElement>("combobox", { name: "都道府県" });
 const areaSelect = () =>
-  screen.getByRole<HTMLSelectElement>("combobox", { name: "エリア" });
+  screen.getByRole<HTMLSelectElement>("combobox", { name: "市区町村" });
+
+/** 県 → 市区町村の順に選ぶ */
+function chooseArea(prefecture: string, areaId?: string) {
+  fireEvent.change(prefectureSelect(), { target: { value: prefecture } });
+  if (areaId) fireEvent.change(areaSelect(), { target: { value: areaId } });
+}
+
+/** 長野県に2地域、北海道に1地域（県だけ選んだときの候補を確かめる、#147） */
+const twoPrefectures: PlannableArea[] = [
+  areas[0],
+  {
+    id: "azumino",
+    name: "安曇野市",
+    prefecture: "長野県",
+    catchphrase: null,
+    center_lat: 36.304,
+    center_lng: 137.906,
+    spots: [
+      spot("azumino", "わさび田", "nature"),
+      spot("azumino", "美術館", "craft"),
+    ],
+  },
+  {
+    id: "higashikawa",
+    name: "東川町",
+    prefecture: "北海道",
+    catchphrase: null,
+    center_lat: 43.699,
+    center_lng: 142.512,
+    spots: [
+      spot("higashikawa", "旭岳", "view"),
+      spot("higashikawa", "湧き水", "nature"),
+    ],
+  },
+];
 
 /** fetch に送った本文 */
 function sentBody(fetchMock: ReturnType<typeof vi.fn>) {
@@ -233,9 +270,7 @@ describe("PlannerForm", () => {
       const fetchMock = stubFetch();
       renderForm({ submit: false });
 
-      fireEvent.change(areaSelect(), {
-        target: { value: "matsumoto" },
-      });
+      chooseArea("長野県", "matsumoto");
       fireEvent.click(screen.getByRole("button", { name: "1泊2日" }));
       fireEvent.click(screen.getByRole("button", { name: "温泉" }));
       fireEvent.click(screen.getByRole("button", { name: "旅プランをつくる" }));
@@ -246,40 +281,102 @@ describe("PlannerForm", () => {
         duration: "1n2d",
         interests: ["温泉"],
       });
+      expect(sentBody(fetchMock)).not.toHaveProperty("prefecture");
       expect(query.get()).toContain("area=matsumoto");
+      expect(query.get()).not.toContain("prefecture=");
       expect(query.get()).toContain("duration=1n2d");
     });
 
-    test("地域を選ぶと「おまかせ」が外れ、「おまかせ」を押すと地域の選択が外れる", () => {
+    test("県だけ選ぶと、県の名前を送り、URL にも持つ（#147）", async () => {
+      const fetchMock = stubFetch();
+      renderForm({ submit: false, areas: twoPrefectures });
+
+      chooseArea("長野県");
+      fireEvent.click(screen.getByRole("button", { name: "旅プランをつくる" }));
+      await screen.findByText("この条件では候補を組めませんでした");
+
+      expect(sentBody(fetchMock)).toMatchObject({
+        areaId: null,
+        prefecture: "長野県",
+      });
+      expect(new URLSearchParams(query.get()).get("prefecture")).toBe("長野県");
+      expect(
+        screen
+          .getByRole("button", { name: "おまかせ" })
+          .getAttribute("aria-pressed"),
+      ).toBe("false");
+    });
+
+    test("地域を選ぶと「おまかせ」が外れ、「おまかせ」を押すと県と地域の選択が外れる", () => {
       renderForm({ submit: false });
-      const select = areaSelect();
       const any = screen.getByRole("button", { name: "おまかせ" });
       expect(any.getAttribute("aria-pressed")).toBe("true");
 
-      fireEvent.change(select, { target: { value: "matsumoto" } });
+      chooseArea("長野県", "matsumoto");
       expect(any.getAttribute("aria-pressed")).toBe("false");
-      expect(select.value).toBe("matsumoto");
+      expect(prefectureSelect().value).toBe("長野県");
+      expect(areaSelect().value).toBe("matsumoto");
 
       fireEvent.click(any);
       expect(any.getAttribute("aria-pressed")).toBe("true");
-      expect(select.value).toBe("");
+      expect(prefectureSelect().value).toBe("");
+      expect(areaSelect().value).toBe("");
     });
 
-    test("地域は都道府県ごとの optgroup にまとめる", () => {
-      renderForm({ submit: false });
-      const select = areaSelect();
+    test("県 → 市区町村の2段で選ぶ。市区町村は、選んだ県の地域だけを出す（#147）", () => {
+      renderForm({ submit: false, areas: twoPrefectures });
 
-      const groups = [...select.querySelectorAll("optgroup")];
-      expect(groups.map((g) => g.label)).toEqual(["長野県"]);
-      expect(
-        [...groups[0].querySelectorAll("option")].map((o) => o.textContent),
-      ).toEqual(["松本市（長野県）"]);
+      // 県は登録済みの地域がある県だけを、display_order の順に出す（案 A）
+      expect([...prefectureSelect().options].map((o) => o.textContent)).toEqual(
+        ["選ぶ", "長野県", "北海道"],
+      );
+      // 県を選ぶまで、市区町村は選べない
+      expect(areaSelect().disabled).toBe(true);
+
+      chooseArea("長野県");
+      expect(areaSelect().disabled).toBe(false);
+      expect([...areaSelect().options].map((o) => o.textContent)).toEqual([
+        "選ぶ",
+        "松本市",
+        "安曇野市",
+      ]);
+
+      chooseArea("長野県", "azumino");
+      // 県を変えると、市区町村の選択は外れる
+      chooseArea("北海道");
+      expect(areaSelect().value).toBe("");
+      expect([...areaSelect().options].map((o) => o.textContent)).toEqual([
+        "選ぶ",
+        "東川町",
+      ]);
+    });
+
+    test("市区町村を「市区町村を選ぶ」に戻すと、県だけ選んだ状態になる", () => {
+      renderForm({ submit: false, areas: twoPrefectures });
+
+      chooseArea("長野県", "matsumoto");
+      fireEvent.change(areaSelect(), { target: { value: "" } });
+
+      expect(prefectureSelect().value).toBe("長野県");
+      const params = new URLSearchParams(query.get());
+      expect(params.get("area")).toBe("any");
+      expect(params.get("prefecture")).toBe("長野県");
+    });
+
+    test("URL のクエリの県を読む（地域を選んでいれば、県のクエリは使わない）", () => {
+      query.set(
+        "?area=any&prefecture=北海道&duration=day&companion=友人&transport=車",
+      );
+      renderForm({ submit: false, areas: twoPrefectures });
+      expect(prefectureSelect().value).toBe("北海道");
+      expect(areaSelect().value).toBe("");
     });
 
     test("URL のクエリの条件を読む", () => {
       query.set("?area=matsumoto&duration=2n3d&companion=友人&transport=車");
       renderForm({ submit: false });
 
+      expect(prefectureSelect().value).toBe("長野県");
       expect(areaSelect().value).toBe("matsumoto");
       expect(
         screen
@@ -289,9 +386,12 @@ describe("PlannerForm", () => {
     });
 
     test("URL のクエリの知らない地域・日程は、おまかせ・日帰りにする", () => {
-      query.set("?area=unknown&duration=9n10d&companion=友人&transport=車");
+      query.set(
+        "?area=unknown&prefecture=大阪府&duration=9n10d&companion=友人&transport=車",
+      );
       renderForm({ submit: false });
 
+      expect(prefectureSelect().value).toBe("");
       expect(areaSelect().value).toBe("");
       expect(
         screen
@@ -749,6 +849,105 @@ describe("PlannerForm", () => {
         `「${name}」を経路に入れた候補を組めませんでした。元の候補のままです。`,
       );
       expect(screen.getByText("松本市をめぐる日帰りプラン")).toBeTruthy();
+    });
+
+    const previousPlanButton = () =>
+      screen.queryByRole("button", { name: "前のプランに戻る" });
+
+    /** 経路外のピンを押して、そのスポットで作り直す。作り直した候補が出るまで待つ */
+    async function rebuildWithFirstOffRouteSpot() {
+      const [pin] = screen.getAllByRole("button", { name: /^経路外のピン: / });
+      const name = pin.textContent!.replace("経路外のピン: ", "");
+      fireEvent.click(pin);
+      fireEvent.click(rebuildButton()!);
+      await within(await screen.findByRole("list")).findByRole("button", {
+        name: (accessibleName) => accessibleName.startsWith(name),
+      });
+      return name;
+    }
+
+    describe("前のプランに戻る（#149）", () => {
+      test("作り直したあとに押すと、作り直す前と同じ経路に戻り、加えたスポットが外れたことを出す", async () => {
+        stubPlanApi();
+        renderForm({ areas: sixSpots });
+        const routeBefore = (await screen.findByRole("list")).textContent;
+        expect(previousPlanButton()).toBeNull();
+
+        const name = await rebuildWithFirstOffRouteSpot();
+        expect(screen.getByRole("list").textContent).not.toBe(routeBefore);
+        expect(
+          screen.getByText(`「${name}」を経路に加える前のプラン`),
+        ).toBeTruthy();
+
+        fireEvent.click(previousPlanButton()!);
+
+        expect(screen.getByRole("list").textContent).toBe(routeBefore);
+        expect(
+          screen.getByRole("button", { name: `経路外のピン: ${name}` }),
+        ).toBeTruthy();
+        expect(
+          screen.getByText(
+            `「${name}」を経路から外し、加える前のプランに戻しました。`,
+          ),
+        ).toBeTruthy();
+        // 戻れるのは作り直した回数（1回）ぶんだけ。ボタンが消えるので、フォーカスは結果の見出しへ
+        expect(previousPlanButton()).toBeNull();
+        expect(document.activeElement).toBe(
+          screen.getByRole("heading", { name: "旅の候補" }),
+        );
+      });
+
+      test("2回作り直したら、2回ぶん1つずつ戻れる。呼び直さない", async () => {
+        const sentBodies = stubPlanApi();
+        renderForm({ areas: sixSpots });
+        const route0 = (await screen.findByRole("list")).textContent;
+        const first = await rebuildWithFirstOffRouteSpot();
+        const route1 = screen.getByRole("list").textContent;
+        const second = await rebuildWithFirstOffRouteSpot();
+        expect(sentBodies()).toHaveLength(3);
+
+        fireEvent.click(previousPlanButton()!);
+        expect(screen.getByRole("list").textContent).toBe(route1);
+        expect(
+          screen.getByText(
+            `「${second}」を経路から外し、加える前のプランに戻しました。`,
+          ),
+        ).toBeTruthy();
+        expect(
+          screen.getByText(`「${first}」を経路に加える前のプラン`),
+        ).toBeTruthy();
+
+        fireEvent.click(previousPlanButton()!);
+        expect(screen.getByRole("list").textContent).toBe(route0);
+        expect(previousPlanButton()).toBeNull();
+        expect(sentBodies()).toHaveLength(3);
+      });
+
+      test("作り直しに失敗したときは、履歴に積まない", async () => {
+        stubPlanApi(() => Promise.reject(new TypeError("offline")));
+        await openOffRouteSpot();
+
+        fireEvent.click(rebuildButton()!);
+
+        await screen.findByRole("alert");
+        expect(previousPlanButton()).toBeNull();
+      });
+
+      test("「この条件でつくり直す」で新しく作ると、履歴を捨てる", async () => {
+        stubPlanApi();
+        renderForm({ areas: sixSpots });
+        await screen.findByRole("list");
+        await rebuildWithFirstOffRouteSpot();
+        expect(previousPlanButton()).toBeTruthy();
+
+        fireEvent.click(
+          screen.getByRole("button", { name: "この条件でつくり直す" }),
+        );
+
+        await screen.findByRole("heading", { name: "旅の候補" });
+        await screen.findByRole("list");
+        expect(previousPlanButton()).toBeNull();
+      });
     });
 
     test("経路に入っているスポットの詳細には、ボタンを出さない", async () => {

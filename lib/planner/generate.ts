@@ -2,6 +2,7 @@ import type { Area } from "@/lib/data/areas";
 import type { Spot } from "@/lib/data/spots";
 import type { SpotCategory } from "@/lib/spots/categories";
 import { compareByHiddenGemScore, compareByRating } from "@/lib/spots/score";
+import { findPrefectureAreas } from "./area-groups";
 import { calcDayMinutes, DAY_COUNTS, DURATION_LABELS } from "./duration";
 import {
   canInclude,
@@ -41,7 +42,8 @@ export const RELAXED_DAY_SPOTS = 3;
  * 決まりは docs/spec.md のデータ-2・データ-4・画面-2:
  *
  * - 地域の選び方: 「おまかせ」なら、興味に合うスポットの多い地域から最大3つ。
- *   地域を選んだら、1件目はその地域、2・3件目は中心どうしが 80km 以内の地域から近い順に
+ *   地域を選んだら、1件目はその地域、2・3件目は中心どうしが 80km 以内の地域から近い順に。
+ *   県だけ選んだら（#147）、その県の地域の中で「おまかせ」と同じ選び方をする
  * - 1日の経路: 1つの地域のスポット2〜4件。興味に合うカテゴリ → 穴場度 → 評価の順で選び、近い順につなぐ
  * - 2日目以降: 候補の地域に未使用のスポットが2件以上あればその地域、なければ近い地域（80km 以内、近い順）。
  *   近い地域で残りの日をまかなえないときは、残りの日のぶんを候補の地域に残しておく
@@ -75,7 +77,7 @@ export function generateCandidates(
           nearby: true,
         })),
       ]
-    : [...areas]
+    : [...(findPrefectureAreas(areas, request.prefecture) ?? areas)]
         // sort は安定なので、興味に合うスポットの数が同じなら display_order の順のまま
         .sort((a, b) => countWanted(b, wanted) - countWanted(a, wanted))
         .map((area) => ({ area, nearby: false }));

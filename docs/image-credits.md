@@ -157,6 +157,19 @@ Commons・Openverse で見つからなかった32件について、自治体・�
 | ラムネ温泉館               | 竹田市   | `/images/spots/taketa-05.jpg`         | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:ラムネ温泉_-_panoramio.jpg)・sk01（題名「ラムネ温泉」、位置情報がスポットから約30m、看板「ラムネ温泉」）                                                                                                     | CC BY-SA 3.0       | 用意済み          |
 | くじゅう花公園             | 竹田市   | `/images/spots/taketa-06.jpg`         | [Wikimedia Commons](<https://commons.wikimedia.org/wiki/File:Kuju_Flower_Park(3553982332).jpg>)・TANAKA Juuyoh (田中十洋)（カテゴリ Kuju Flower Park、説明「Shot at Kuju Hanakoen.」、位置情報がスポットから約210m）                                                     | CC BY 2.0          | 用意済み          |
 
+### 津和野町（#161、2026-09-26）
+
+試しに足す3地域（#161）の一つ。上と同じ探し方で、Wikimedia Commons と Openverse を探した（2026-09-26）。6件中4件が Commons で見つかった。見つからなかった2件は `image_path` を `null` にし、あとで #158 の AI の画像の流れで付ける。
+
+| スポット                     | 地域     | 予定の `image_path`            | 出典（URL・撮影者）                                                                                                                                                                                       | ライセンス         | 状態                          |
+| ---------------------------- | -------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ----------------------------- |
+| 津和野城跡                   | 津和野町 | `/images/spots/tsuwano-01.jpg` | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:TsuwanoJo.JPG)・Mocchy（カテゴリ Tsuwano Castle、説明「Hitojichi-kuruwa and San-no-maru, Tsuwano castle」、山上の石垣と曲輪）                 | パブリックドメイン | 用意済み                      |
+| 太皷谷稲成神社               | 津和野町 | `/images/spots/tsuwano-02.jpg` | [Wikimedia Commons](<https://commons.wikimedia.org/wiki/File:Taikodani_Inari-jinja_(559443222).jpg>)・sean from Osaka, Japan（カテゴリ Taikodani Inari-jinja、説明「太皷谷稲成神社」、山腹の社殿と参道）  | CC BY-SA 2.0       | 用意済み                      |
+| 堀庭園                       | 津和野町 | `/images/spots/tsuwano-03.jpg` | Commons・Openverse で「堀庭園」「旧堀氏庭園」「Hori garden Tsuwano」「Hori Teien」「楽山荘」「畑迫」、座標から500m以内を探したが、庭園の写真はない                                                        |                    | なし（AI の画像の予定。#158） |
+| 古橋酒造                     | 津和野町 | `/images/spots/tsuwano-04.jpg` | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Furuhashi_Brewery_in_Tsuwano-cho,_Kanoashi-gun,_Shimane_001.jpg)・Naokijp（カテゴリ Furuhashi Sake Brewery、看板「初陣」）                    | CC BY-SA 4.0       | 用意済み                      |
+| 山田竹風軒 本町店            | 津和野町 | `/images/spots/tsuwano-05.jpg` | Commons・Openverse で「竹風軒」「山田竹風軒」「Chikufuken」、座標から500m以内を探したが、お店の写真はない（源氏巻そのものの写真はあるが、お店と確かめられない）                                           |                    | なし（AI の画像の予定。#158） |
+| 道の駅 津和野温泉 なごみの里 | 津和野町 | `/images/spots/tsuwano-06.jpg` | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Michinoeki_Tsuwano-onsen.JPG)・アラツク（カテゴリ Michinoeki in Shimane prefecture、説明「Roadsaide station Tsuwano-spring Nagomi no Sato」） | CC BY-SA 4.0       | 用意済み                      |
+
 ### AI で生成したイメージ画像（#158、2026-09-26）
 
 上の表で「AI の画像（#158）」とした29件は、許可のいらない写真が見つからなかったので、AI で生成したイメージ画像を付けた。画面（カード・詳細・経路のカード）では画像に「イメージ（AI で生成）」と添え、`/credits` にモデルとプロンプトの要旨を出す（元のデータは `lib/photo-credits.ts` の `AI_IMAGE_CREDITS`）。
