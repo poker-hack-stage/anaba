@@ -28,6 +28,11 @@ describe("planConditionsSchema", () => {
     ).toEqual({ ...valid, includeSpotId: "spot-1" });
   });
 
+  test("県だけ選んだときの県の名前（#147）は任意で受け付ける", () => {
+    const withPrefecture = { ...valid, areaId: null, prefecture: "長野県" };
+    expect(planConditionsSchema.parse(withPrefecture)).toEqual(withPrefecture);
+  });
+
   test("興味の重なりは1つにまとめる", () => {
     expect(
       planConditionsSchema.parse({ ...valid, interests: ["温泉", "温泉"] })
@@ -44,6 +49,8 @@ describe("planConditionsSchema", () => {
     ["移動手段が選択肢にない", { transport: "飛行機" }],
     ["地域の id が空", { areaId: " " }],
     ["地域の id が長すぎる", { areaId: "a".repeat(65) }],
+    ["県の名前が空", { prefecture: " " }],
+    ["県の名前が長すぎる", { prefecture: "県".repeat(17) }],
     ["必ず入れるスポットの id が空", { includeSpotId: " " }],
     ["必ず入れるスポットの id が長すぎる", { includeSpotId: "a".repeat(65) }],
     ["必ず入れるスポットの id が文字列でない", { includeSpotId: 1 }],
