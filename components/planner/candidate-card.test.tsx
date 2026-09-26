@@ -245,6 +245,12 @@ describe("CandidateCard", () => {
       expect(card.queryByText("地元の人が通う小さな湯")).toBeNull();
     });
 
+    test("ボタンの中は phrasing content だけ（div・p・見出しを入れない）", () => {
+      routeCard(richSpot());
+      const button = screen.getByRole("button", { name: /^湯小屋/ });
+      expect(button.querySelector("div, p, h1, h2, h3, h4, h5, h6")).toBeNull();
+    });
+
     test("カード全体が1つのボタンで、押すとそのスポットを渡す", () => {
       const onSpotClick = renderCard(candidate());
 

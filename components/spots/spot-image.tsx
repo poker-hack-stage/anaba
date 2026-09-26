@@ -69,8 +69,9 @@ export function SpotImage({
   const [failedPath, setFailedPath] = useState<string | null>(null);
   const showPhoto = isSpotImagePath(imagePath) && imagePath !== failedPath;
 
+  // ルートは span にする（経路のカードでは button の中に置くので、phrasing content だけにする。flex で見た目は div と同じ）
   return (
-    <div
+    <span
       className={cn(
         "relative flex items-center justify-center overflow-hidden text-4xl",
         className,
@@ -96,6 +97,6 @@ export function SpotImage({
           onError={() => setFailedPath(imagePath)}
         />
       )}
-    </div>
+    </span>
   );
 }
