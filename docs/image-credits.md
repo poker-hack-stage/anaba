@@ -157,6 +157,19 @@ Commons・Openverse で見つからなかった32件について、自治体・�
 | ラムネ温泉館               | 竹田市   | `/images/spots/taketa-05.jpg`         | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:ラムネ温泉_-_panoramio.jpg)・sk01（題名「ラムネ温泉」、位置情報がスポットから約30m、看板「ラムネ温泉」）                                                                                                     | CC BY-SA 3.0       | 用意済み          |
 | くじゅう花公園             | 竹田市   | `/images/spots/taketa-06.jpg`         | [Wikimedia Commons](<https://commons.wikimedia.org/wiki/File:Kuju_Flower_Park(3553982332).jpg>)・TANAKA Juuyoh (田中十洋)（カテゴリ Kuju Flower Park、説明「Shot at Kuju Hanakoen.」、位置情報がスポットから約210m）                                                     | CC BY 2.0          | 用意済み          |
 
+### 遠野市（岩手県、#161）
+
+上と同じ探し方（Wikimedia Commons、なければ Openverse。CC BY・CC BY-SA・CC0・パブリックドメインだけ）で探した（2026-09-26）。6件中4件が Commons で見つかった。長辺を1200px以下に縮小し、JPEG で圧縮して `public/images/spots/` に置いた。地域の写真（`/images/areas/tono.jpg` の予定）は、ほかの全国の地域と同じくまだない。
+
+| スポット           | 地域   | 予定の `image_path`         | 出典（URL・撮影者）                                                                                                                                                                                                                                    | ライセンス   | 状態                          |
+| ------------------ | ------ | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ | ----------------------------- |
+| 荒川高原牧場       | 遠野市 | `/images/spots/tono-01.jpg` | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:荒川高原牧場_03.jpg)・Indiana jo（カテゴリ Cultural Landscape in Tōno、説明「重要文化的景観選定「荒川高原牧場」（岩手県遠野市）」。牧場の草原）                                            | CC BY-SA 4.0 | 用意済み                      |
+| 続石               | 遠野市 | `/images/spots/tono-02.jpg` | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:続石.jpg)・Ty19080914（カテゴリ Tsuzukiishi、説明「遠野市にある巨岩・続石」。「続石」の石碑と標柱が写る）                                                                                  | CC BY-SA 4.0 | 用意済み                      |
+| 五百羅漢           | 遠野市 | `/images/spots/tono-03.jpg` | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Tono_500rakan02s3872.jpg)・663highland（カテゴリ 500-Rakan, Tono、説明「500-Rakan in Tono, Iwate prefecture, Japan」。苔むした石）                                                         | CC BY 2.5    | 用意済み                      |
+| たかむろ水光園     | 遠野市 | `/images/spots/tono-04.jpg` | Commons・Openverse で「たかむろ水光園」「水光園」「Takamuro」「Suikoen」、座標から800m以内を探したが、施設の写真はない                                                                                                                                 |              | なし（AI の画像の予定。#146） |
+| じんぎすかんあんべ | 遠野市 | `/images/spots/tono-05.jpg` | Commons・Openverse で「じんぎすかんあんべ」「あんべ 遠野」「Anbe Tono」「遠野 ジンギスカン」、座標から300m以内を探したが、お店の写真はない（バケツジンギスカンの一般の写真だけ）                                                                       |              | なし（AI の画像の予定。#146） |
+| 道の駅 遠野風の丘  | 遠野市 | `/images/spots/tono-06.jpg` | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Michinoeki_Tono.JPG)・アラツク（カテゴリ Michinoeki in Iwate prefecture、説明「Road to station Tono Kazenooka」、位置情報がスポットから約70m。2012年の撮影で、2021年のリニューアルより前） | CC BY-SA 4.0 | 用意済み                      |
+
 ### 津和野町（#161、2026-09-26）
 
 試しに足す3地域（#161）の一つ。上と同じ探し方で、Wikimedia Commons と Openverse を探した（2026-09-26）。6件中4件が Commons で見つかった。見つからなかった2件は `image_path` を `null` にし、あとで #158 の AI の画像の流れで付ける。
