@@ -1,12 +1,17 @@
 // アプリで使う写真の出典（撮影者・ライセンス・元の場所）。「写真の出典」ページ（app/credits）がこれを表示する。
 // 写真を足したら、public/images/ にファイルを置き、supabase/seed.sql の image_path と、ここに1件ずつ足す。
-// CC BY・CC BY-SA は、撮影者とライセンスを見る人に分かる形で示すことが条件なので、必ずここに書く（#67）
+// CC BY・CC BY-SA は、撮影者・ライセンス・元の題名を見る人に分かる形で示すことが条件なので、必ずここに書く（#67）
 
 export type PhotoCredit = {
   /** public/ からのパス（spots.image_path と同じ値） */
   path: string;
   /** 写っているもの（スポット名） */
   subject: string;
+  /**
+   * 元の写真の題名。CC BY・CC BY-SA は題名が付いていれば表示を求めるので、必ず書く。
+   * Flickr は写真のページの題名、Commons はファイルページの名前（`File:` を除き、`_` を空白にしたもの）
+   */
+  title: string;
   /** 撮影者（元の写真のページの表記） */
   author: string;
   /** ライセンスの短い名前 */
@@ -37,6 +42,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/hakuba-01.jpg",
     subject: "白馬塩の道温泉 倉下の湯",
+    title: "Kurashita no yu.jpg",
     author: "Qurren",
     license: "CC BY-SA 4.0",
     licenseUrl: BY_SA_4,
@@ -46,6 +52,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/hakuba-02.jpg",
     subject: "青鬼集落",
+    title: "青鬼集落 - panoramio.jpg",
     author: "くろふね",
     license: "CC BY 3.0",
     licenseUrl: BY_3,
@@ -55,6 +62,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/hakuba-03.jpg",
     subject: "大出公園",
+    title: "大出吊橋 - panoramio (4).jpg",
     author: "くろふね",
     license: "CC BY 3.0",
     licenseUrl: BY_3,
@@ -64,6 +72,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/hakuba-04.jpg",
     subject: "姫川源流自然探勝園",
+    title: "姫川源流 - panoramio.jpg",
     author: "くろふね",
     license: "CC BY 3.0",
     licenseUrl: BY_3,
@@ -73,6 +82,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/hakuba-06.jpg",
     subject: "貞麟寺",
+    title: "桜@貞麟寺",
     author: "wakaba-shinshu",
     license: "CC BY 2.0",
     licenseUrl: BY_2,
@@ -82,6 +92,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/omachi-01.jpg",
     subject: "塩の道ちょうじや",
+    title: "Hirabayashi-ke Jyutaku Shuoku.jpg",
     author: "Suikotei",
     license: "CC BY 4.0",
     licenseUrl: BY_4,
@@ -91,6 +102,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/omachi-02.jpg",
     subject: "若一王子神社",
+    title: "若一王子神社鳥居と三重塔.jpg",
     author: "Furudanuki",
     license: "CC BY-SA 4.0",
     licenseUrl: BY_SA_4,
@@ -100,6 +112,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/omachi-03.jpg",
     subject: "ぽかぽかランド美麻",
+    title: "Road Station Poka-Poka Land Miasa 01.jpg",
     author: "小石川人晃",
     license: "CC BY-SA 4.0",
     licenseUrl: BY_SA_4,
@@ -109,6 +122,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/omachi-06.jpg",
     subject: "居谷里湿原",
+    title: "リュウキンカ@居谷里湿原",
     author: "wakaba-shinshu",
     license: "CC BY 2.0",
     licenseUrl: BY_2,
@@ -118,6 +132,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/omachi-07.jpg",
     subject: "中綱湖",
+    title: "中綱湖 - panoramio.jpg",
     author: "くろふね",
     license: "CC BY 3.0",
     licenseUrl: BY_3,
@@ -127,6 +142,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/omachi-08.jpg",
     subject: "鷹狩山",
+    title: "Japan North Alps",
     author: "wakanmuri",
     license: "CC BY 2.0",
     licenseUrl: BY_2,
@@ -136,6 +152,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/ikeda-01.jpg",
     subject: "池田八幡神社",
+    title: "池田八幡神社社殿.jpg",
     author: "At1973",
     license: "CC BY-SA 4.0",
     licenseUrl: BY_SA_4,
@@ -145,6 +162,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/ikeda-04.jpg",
     subject: "夢農場",
+    title: "桜@池田町 夢農場",
     author: "wakaba-shinshu",
     license: "CC BY 2.0",
     licenseUrl: BY_2,
@@ -154,6 +172,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/ikeda-05.jpg",
     subject: "花紋大雪渓",
+    title: "Daisekkei Sake Brewing 1.jpg",
     author: "Qurren",
     license: "CC BY-SA 4.0",
     licenseUrl: BY_SA_4,
@@ -163,6 +182,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/azumino-02.jpg",
     subject: "ほりでーゆ〜四季の郷",
+    title: "Holiday You Shikinosato.jpg",
     author: "Qurren",
     license: "CC BY-SA 3.0",
     licenseUrl: BY_SA_3,
@@ -172,6 +192,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/azumino-04.jpg",
     subject: "貞享義民記念館",
+    title: "Kinenkan.JPG",
     author: "小松宏彰",
     license: "パブリックドメイン",
     licenseUrl: null,
@@ -181,6 +202,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/azumino-06.jpg",
     subject: "御宝田遊水池",
+    title: "御宝田遊水池.jpg",
     author: "アポロ2",
     license: "CC BY-SA 4.0",
     licenseUrl: BY_SA_4,
@@ -190,6 +212,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/azumino-07.jpg",
     subject: "烏川渓谷緑地",
+    title: "Karasu River view from Karasugawakeikokubashi-bridge.jpg",
     author: "Qurren",
     license: "CC BY-SA 3.0",
     licenseUrl: BY_SA_3,
@@ -199,6 +222,8 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/matsumoto-01.jpg",
     subject: "松本市はかり資料館",
+    title:
+      "250425 Matsumoto City Hakari Museum Matsumoto Nagano pref Japan01s3.jpg",
     author: "663highland",
     license: "CC BY-SA 4.0",
     licenseUrl: BY_SA_4,
@@ -208,6 +233,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/matsumoto-05.jpg",
     subject: "源智の井戸",
+    title: "源智の井戸.jpg",
     author: "深志",
     license: "CC BY-SA 3.0",
     licenseUrl: BY_SA_3,
@@ -217,6 +243,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/matsumoto-06.jpg",
     subject: "馬場家住宅",
+    title: "Babake house 2010.jpg",
     author: "Wiiii",
     license: "CC BY-SA 3.0",
     licenseUrl: BY_SA_3,
@@ -226,6 +253,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/matsumoto-07.jpg",
     subject: "弘法山古墳",
+    title: "Koboyama Kofun zenkei.JPG",
     author: "Saigen Jiro",
     license: "CC0",
     licenseUrl: CC0,
@@ -235,6 +263,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/higashikawa-01.jpg",
     subject: "旭岳",
+    title: "Asahi-dake (9099317042).jpg",
     author: "nAok0",
     license: "CC BY 2.0",
     licenseUrl: BY_2,
@@ -244,6 +273,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/higashikawa-02.jpg",
     subject: "忠別湖",
+    title: "忠別湖（Lake Tyubetsu） - panoramio.jpg",
     author: "pakku",
     license: "CC BY 3.0",
     licenseUrl: BY_3,
@@ -253,6 +283,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/marumori-01.jpg",
     subject: "蔵の郷土館 齋理屋敷",
+    title: "Sairi Residence storehouse.jpg",
     author: "Mukasora",
     license: "CC BY-SA 3.0",
     licenseUrl: BY_SA_3,
@@ -262,6 +293,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/nakanojo-02.jpg",
     subject: "奥四万湖",
+    title: "Shimagawa Dam-Lake.jpg",
     author: "Neruru",
     license: "パブリックドメイン",
     licenseUrl: null,
@@ -271,6 +303,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/nakanojo-03.jpg",
     subject: "沢渡温泉 共同浴場",
+    title: "Sawatari Onsen public bath.jpg",
     author: "Qurren",
     license: "CC BY-SA 4.0",
     licenseUrl: BY_SA_4,
@@ -280,6 +313,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/nakanojo-04.jpg",
     subject: "旧太子駅",
+    title: "Oshi Station 2017-08 1.jpg",
     author: "Qurren",
     license: "CC BY-SA 3.0",
     licenseUrl: BY_SA_3,
@@ -289,6 +323,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/nakanojo-05.jpg",
     subject: "野反湖",
+    title: "Lake Nozori 2011-07-23 (5989960888).jpg",
     author: "Kohei Fujii",
     license: "CC BY-SA 2.0",
     licenseUrl: BY_SA_2,
@@ -298,6 +333,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/nakanojo-06.jpg",
     subject: "道の駅 霊山たけやま",
+    title: "R145-2020-102.jpg",
     author: "Puchi-masashi",
     license: "CC BY-SA 4.0",
     licenseUrl: BY_SA_4,
@@ -307,6 +343,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/ono-01.jpg",
     subject: "御清水",
+    title: "Echizen-Ono Oshozu 2021-07 ac.jpg",
     author: "Asturio Cantabrio",
     license: "CC BY-SA 4.0",
     licenseUrl: BY_SA_4,
@@ -316,6 +353,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/ono-02.jpg",
     subject: "武家屋敷旧内山家",
+    title: "Former Uchiyama House 2021-07 ac.jpg",
     author: "Asturio Cantabrio",
     license: "CC BY-SA 4.0",
     licenseUrl: BY_SA_4,
@@ -325,6 +363,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/ono-03.jpg",
     subject: "亀山湯",
+    title: "Echizen-Ono Kameyama-yu 2021-07 ac.jpg",
     author: "Asturio Cantabrio",
     license: "CC BY-SA 4.0",
     licenseUrl: BY_SA_4,
@@ -334,6 +373,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/ono-04.jpg",
     subject: "真名鶴酒造",
+    title: "Manatsuru Brewery 2021-07 ac.jpg",
     author: "Asturio Cantabrio",
     license: "CC BY-SA 4.0",
     licenseUrl: BY_SA_4,
@@ -343,6 +383,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/ono-05.jpg",
     subject: "六呂師高原",
+    title: "Rokuroshi Highland s2.jpg",
     author: "Alpsdake",
     license: "CC BY-SA 4.0",
     licenseUrl: BY_SA_4,
@@ -352,6 +393,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/ono-06.jpg",
     subject: "越前大野城",
+    title: "Echizen Ono Castle.jpg",
     author: "Keisuke MAEDA",
     license: "CC BY-SA 4.0",
     licenseUrl: BY_SA_4,
@@ -361,6 +403,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/takashima-01.jpg",
     subject: "白鬚神社",
+    title: "Shirahige-jinja (Takashima) otorii.JPG",
     author: "Saigen Jiro",
     license: "CC0",
     licenseUrl: CC0,
@@ -370,6 +413,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/takashima-02.jpg",
     subject: "メタセコイア並木",
+    title: "Metasequoia Namiki in 2019.jpg",
     author: "Saigen Jiro",
     license: "CC0",
     licenseUrl: CC0,
@@ -379,6 +423,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/takashima-03.jpg",
     subject: "針江生水の郷",
+    title: "Harie20160508a.JPG",
     author: "Kyoww",
     license: "CC BY-SA 4.0",
     licenseUrl: BY_SA_4,
@@ -388,6 +433,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/takashima-04.jpg",
     subject: "道の駅 くつき新本陣",
+    title: "Michinoeki Kutsuki Shinhonjin 20220228 03.jpg",
     author: "先従隗始",
     license: "CC0",
     licenseUrl: CC0,
@@ -397,6 +443,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/takahashi-01.jpg",
     subject: "備中松山城",
+    title: "BitchuMatsuyamaCastleKeep Takahashi Okayama Japan 2015.jpg",
     author: "Ka23 13",
     license: "CC BY-SA 4.0",
     licenseUrl: BY_SA_4,
@@ -406,6 +453,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/takahashi-02.jpg",
     subject: "吹屋ふるさと村",
+    title: "高梁市 吹屋ふるさと村 - panoramio.jpg",
     author: "Yoshio Kohara",
     license: "CC BY 3.0",
     licenseUrl: BY_3,
@@ -415,6 +463,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/takahashi-03.jpg",
     subject: "ベンガラ館",
+    title: "Bengarakan07s3200.jpg",
     author: "663highland",
     license: "CC BY 2.5",
     licenseUrl: BY_2_5,
@@ -424,6 +473,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/takahashi-04.jpg",
     subject: "頼久寺庭園",
+    title: "Raikyuji 20180502 112529.jpg",
     author: "Ka23 13",
     license: "CC BY-SA 4.0",
     licenseUrl: BY_SA_4,
@@ -433,6 +483,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/takahashi-05.jpg",
     subject: "弥高山公園",
+    title: "Yatakayama-unkai002.jpg",
     author: "じぇい☆",
     license: "CC BY-SA 3.0",
     licenseUrl: BY_SA_3,
@@ -442,6 +493,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/taketa-01.jpg",
     subject: "岡城跡",
+    title: "Okajoshi.jpg",
     author: "As6673",
     license: "パブリックドメイン",
     licenseUrl: null,
@@ -451,6 +503,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/taketa-02.jpg",
     subject: "白水ダム",
+    title: "Hakusui-Dam full-view.jpg",
     author: "Tmizuk",
     license: "パブリックドメイン",
     licenseUrl: null,
@@ -460,6 +513,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/taketa-03.jpg",
     subject: "七里田温泉館",
+    title: "七里田温泉下湯 - panoramio.jpg",
     author: "sk01",
     license: "CC BY-SA 3.0",
     licenseUrl: BY_SA_3,
@@ -469,6 +523,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/taketa-05.jpg",
     subject: "ラムネ温泉館",
+    title: "ラムネ温泉 - panoramio.jpg",
     author: "sk01",
     license: "CC BY-SA 3.0",
     licenseUrl: BY_SA_3,
@@ -478,6 +533,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
   {
     path: "/images/spots/taketa-06.jpg",
     subject: "くじゅう花公園",
+    title: "Kuju Flower Park(3553982332).jpg",
     author: "TANAKA Juuyoh (田中十洋)",
     license: "CC BY 2.0",
     licenseUrl: BY_2,
