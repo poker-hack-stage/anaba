@@ -101,4 +101,34 @@ describe("AreaMap（#14）", () => {
     expect(props.highlighted).toBeUndefined();
     expect(props.emptyPlaceholder).toBe(false);
   });
+
+  test("絞り込み中は、条件に合うスポットだけを小さな点で渡す（A-07）", () => {
+    const hakuba = area("hakuba", polygon);
+    const matched = { ...hakuba, matchedSpots: hakuba.recommended };
+    render(<AreaMap area={matched} onSpotClick={() => {}} />);
+    expect(lastProps().others).toEqual([]);
+  });
+
+  test("地域がない（絞り込みで0件）ときは、全地域の中心が入る範囲を出す（K-6）", () => {
+    const all = [
+      { ...area("hakuba", polygon), center_lng: 137.86, center_lat: 36.7 },
+      { ...area("takeda", polygon), center_lng: 131.4, center_lat: 32.98 },
+    ];
+    render(<AreaMap allAreas={all} onSpotClick={() => {}} />);
+    expect(lastProps().fitPoints).toEqual([
+      [137.86, 36.7],
+      [131.4, 32.98],
+    ]);
+  });
+
+  test("地域があるときは、全地域の範囲を渡さない", () => {
+    render(
+      <AreaMap
+        area={area("hakuba", polygon)}
+        allAreas={[area("takeda", polygon)]}
+        onSpotClick={() => {}}
+      />,
+    );
+    expect(lastProps().fitPoints).toBeUndefined();
+  });
 });

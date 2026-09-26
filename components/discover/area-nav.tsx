@@ -9,10 +9,14 @@ const iconButton = cn(
   focusRing,
 );
 
+/** 1行に出すドットの数の上限。情報パネルの幅（PC で 360px）に、前へ／次へと「3 / 12」を並べて収まる数 */
+const MAX_DOTS = 7;
+
 /**
  * 前へ／次へボタンと、今何番目かがわかるドット。
  * ドットの見た目は 8px（今の地域は横長）のまま、押せる範囲は 24×24px にする（WCAG 2.5.8、#120）。
- * 並びきらないときはドットを折り返す。地域が1件以下なら何も出さない。
+ * ドットは1行に収める。地域が MAX_DOTS より多いときは、今の地域のまわりの MAX_DOTS 個だけを出し、
+ * 横に「3 / 12」のように何番目かを出す（地域が増えても2行にならないように）。地域が1件以下なら何も出さない。
  */
 export function AreaNav({
   areas,
@@ -29,8 +33,20 @@ export function AreaNav({
 }) {
   if (areas.length < 2) return null;
 
+  // 出すドットの範囲。今の地域がなるべく真ん中に来るようにし、端では端に寄せる
+  const windowed = areas.length > MAX_DOTS;
+  const start = windowed
+    ? Math.min(
+        Math.max(index - Math.floor(MAX_DOTS / 2), 0),
+        areas.length - MAX_DOTS,
+      )
+    : 0;
+  const visible = areas
+    .map((area, i) => ({ area, i }))
+    .slice(start, start + MAX_DOTS);
+
   return (
-    <div className="mt-auto flex items-center justify-center pt-2">
+    <div className="flex items-center">
       <div className="flex items-center gap-0.5">
         <button
           type="button"
@@ -40,8 +56,8 @@ export function AreaNav({
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
-        <div className="flex flex-wrap justify-center">
-          {areas.map((a, i) => (
+        <div className="flex flex-nowrap justify-center">
+          {visible.map(({ area: a, i }) => (
             <button
               key={a.id}
               type="button"
@@ -71,6 +87,15 @@ export function AreaNav({
         >
           <ChevronRight className="h-4 w-4" />
         </button>
+        {windowed && (
+          // 何番目か（読み上げはドットの aria-current で伝わるので読まない）
+          <span
+            aria-hidden
+            className="ml-1.5 text-xs tabular-nums text-stone-500"
+          >
+            {index + 1} / {areas.length}
+          </span>
+        )}
       </div>
     </div>
   );
