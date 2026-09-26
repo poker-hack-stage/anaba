@@ -23,6 +23,18 @@ export default function CreditsPage() {
         {PHOTO_CREDITS.map((credit) => (
           <li key={credit.path} className="px-4 py-3 text-sm">
             <p className="font-bold text-stone-900">{credit.subject}</p>
+            <p className="mt-0.5 break-words text-stone-600">
+              元の写真:{" "}
+              <a
+                href={credit.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2 hover:text-shu"
+              >
+                「{credit.title}」
+              </a>
+              （{credit.sourceName}）
+            </p>
             <p className="mt-0.5 text-stone-600">
               撮影: {credit.author} ／{" "}
               {credit.licenseUrl ? (
@@ -36,16 +48,7 @@ export default function CreditsPage() {
                 </a>
               ) : (
                 credit.license
-              )}{" "}
-              ／{" "}
-              <a
-                href={credit.sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline underline-offset-2 hover:text-shu"
-              >
-                元の写真（{credit.sourceName}）
-              </a>
+              )}
             </p>
           </li>
         ))}

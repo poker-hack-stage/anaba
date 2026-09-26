@@ -30,7 +30,7 @@
 
 北アルプス山麓の5地域のスポット（#30）の写真を #67 で用意した。Wikimedia Commons で、ライセンスが CC BY・CC BY-SA・CC0・パブリックドメインのものだけを使い、写っているのがそのスポットだと、写真の説明・撮影地・画像そのもので確かめた（2026-09-25）。Commons にないものは、Flickr で撮影者が CC BY を付けた写真を Openverse で探して使った（NC・ND は使わない。題名・タグ・位置情報でスポットを確かめた。2026-09-26）。長辺を1200px以下に縮小し、300KB 以下に圧縮して `public/images/spots/` に置いた（パスの番号は `spots.id` の末尾2桁と同じ）。
 
-- 撮影者とライセンスは、アプリの「写真の出典」ページ（`/credits`、フッターからリンク）に出す。元のデータは `lib/photo-credits.ts`。写真を足すときは、ここと `lib/photo-credits.ts`・`supabase/seed.sql` の `image_path` を同じコミットで直す
+- 撮影者・ライセンス・元の写真の題名は、アプリの「写真の出典」ページ（`/credits`、フッターからリンク）に出す（CC BY・CC BY-SA は、題名が付いていればその表示も求める）。題名は、Flickr は写真のページの題名（2026-09-26 に4件とも確かめた）、Commons はファイルページの名前（`File:` を除き `_` を空白にしたもの）を書く。元のデータは `lib/photo-credits.ts`。写真を足すときは、ここと `lib/photo-credits.ts`・`supabase/seed.sql` の `image_path` を同じコミットで直す
 - 見つからないスポットは `image_path` を `null` のまま（表示側はカテゴリのイラスト）にし、理由を下の表に書いた
 - スポットの事実の出典は docs/spot-sources.md。全国のほかの地域のスポット（#58）は写真がなくてよい
 
@@ -51,7 +51,7 @@
 | 創舎 わちがい              | 大町市   | `/images/spots/omachi-05.jpg`    | Commons・Openverse で「わちがい」「Wachigai Omachi」、座標から600m以内を探したが、お店の写真はない（「輪違屋」は京都の別の店）                                                                          |                    | なし     |
 | 居谷里湿原                 | 大町市   | `/images/spots/omachi-06.jpg`    | [Flickr](https://www.flickr.com/photos/154568645@N04/34011672963)・wakaba-shinshu（題名「リュウキンカ@居谷里湿原」。湿原のリュウキンカ）                                                                | CC BY 2.0          | 用意済み |
 | 中綱湖                     | 大町市   | `/images/spots/omachi-07.jpg`    | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:中綱湖_-_panoramio.jpg)・くろふね                                                                                                           | CC BY 3.0          | 用意済み |
-| 鷹狩山                     | 大町市   | `/images/spots/omachi-08.jpg`    | [Flickr](https://www.flickr.com/photos/13217899@N08/3507257327)・wakanmuri（位置情報が山頂の展望台。大町の市街地と北アルプス）                                                                          | CC BY 2.0          | 用意済み |
+| 鷹狩山                     | 大町市   | `/images/spots/omachi-08.jpg`    | [Flickr](https://www.flickr.com/photos/13217899@N08/3507257327)・wakanmuri（題名「Japan North Alps」。位置情報が山頂の展望台。大町の市街地と北アルプス）                                                | CC BY 2.0          | 用意済み |
 | 池田八幡神社               | 池田町   | `/images/spots/ikeda-01.jpg`     | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:池田八幡神社社殿.jpg)・At1973                                                                                                               | CC BY-SA 4.0       | 用意済み |
 | あづみ野池田クラフトパーク | 池田町   | `/images/spots/ikeda-02.jpg`     | Commons・Openverse で「クラフトパーク 池田」「Azumino Ikeda Craft Park」、座標から600m以内を探したが、園内の石碑（上原良司の碑）だけ                                                                    |                    | なし     |
 | 北アルプス展望美術館       | 池田町   | `/images/spots/ikeda-03.jpg`     | Commons・Openverse で「北アルプス展望美術館」「池田町立美術館」「展望美術館」を探したが、美術館の写真はない                                                                                             |                    | なし     |
