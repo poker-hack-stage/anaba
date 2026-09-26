@@ -80,23 +80,28 @@ function stubFetch(...responses: (Response | Error)[]) {
   return fetchMock;
 }
 
-function renderEntry(areas: Promise<SubmittableArea[] | null>) {
+function renderEntry(loadAreas: () => Promise<SubmittableArea[] | null>) {
   render(
-    <SpotSubmissionProvider areas={areas}>
+    <SpotSubmissionProvider loadAreas={loadAreas}>
       <SpotSubmissionTrigger />
     </SpotSubmissionProvider>,
   );
 }
 
 /**
- * ボタンからダイアログを開く。地域の Promise を読むまで待つ
+ * ボタンを押し、地域の Promise を読むまで待つ
  * （act の外で解決すると、React が中断していた描画を続けないため）
  */
-async function open(areas: SubmittableArea[] | null) {
-  renderEntry(Promise.resolve(areas));
+async function clickTrigger() {
   await act(async () => {
     fireEvent.click(screen.getByRole("button", { name: "穴場を教える" }));
   });
+}
+
+/** ボタンからダイアログを開く */
+async function open(areas: SubmittableArea[] | null) {
+  renderEntry(() => Promise.resolve(areas));
+  await clickTrigger();
 }
 
 /** ダイアログを開き、フォームを返す */
@@ -349,6 +354,37 @@ describe("穴場を教えるフォーム", () => {
     expect(screen.getByRole("alert").textContent).toContain(
       "地域を読み込めませんでした",
     );
+  });
+
+  test("地域は初めて開いたときに1回だけ読み、開き直しても読み直さない", async () => {
+    const loadAreas = vi.fn(() => Promise.resolve(AREAS));
+    renderEntry(loadAreas);
+    expect(loadAreas).not.toHaveBeenCalled();
+
+    await clickTrigger();
+    fireEvent.click(screen.getByRole("button", { name: "やめる" }));
+    await clickTrigger();
+
+    expect(screen.getByRole("form", { name: "穴場を教える" })).toBeTruthy();
+    expect(loadAreas).toHaveBeenCalledTimes(1);
+  });
+
+  test("地域を読めなかったら、次に開いたときに読み直す", async () => {
+    const loadAreas = vi
+      .fn<() => Promise<SubmittableArea[] | null>>()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(AREAS);
+    renderEntry(loadAreas);
+
+    await clickTrigger();
+    expect(screen.getByRole("alert").textContent).toContain(
+      "地域を読み込めませんでした",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
+    await clickTrigger();
+
+    expect(screen.getByRole("form", { name: "穴場を教える" })).toBeTruthy();
+    expect(loadAreas).toHaveBeenCalledTimes(2);
   });
 
   test("「やめる」で閉じる", async () => {
