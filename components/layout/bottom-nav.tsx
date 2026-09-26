@@ -68,7 +68,10 @@ function Tab({
   );
 }
 
-/** 丸いプラスのボタン。ほかのタブと見分けがつくよう朱色にし、ナビの上に少し飛び出させる */
+/**
+ * 「穴場を教える」のボタン。ほかのタブと同じ高さ・大きさにそろえ、ナビの上に飛び出させない（#163。目立ちすぎていたため）。
+ * 何のボタンかが分かるよう、＋の小さな丸と文字はブランドの朱色のまま残す
+ */
 function SubmitButton() {
   const open = useOpenSpotSubmission();
   return (
@@ -76,17 +79,15 @@ function SubmitButton() {
       type="button"
       onClick={() => open?.()}
       aria-haspopup="dialog"
-      className="group -mt-6 flex flex-col items-center justify-self-center rounded-2xl px-2 focus-visible:outline-none"
+      className="flex min-h-11 flex-col items-center justify-center justify-self-center rounded-xl border border-transparent px-6 py-1 text-shu focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink active:scale-95"
     >
       <span
         aria-hidden
-        className="flex h-14 w-14 items-center justify-center rounded-full bg-shu text-white shadow-lg shadow-shu/30 ring-4 ring-white transition-transform group-focus-visible:ring-ink group-active:scale-95"
+        className="flex h-4 w-4 items-center justify-center rounded-full bg-shu text-white"
       >
-        <Plus className="h-7 w-7" strokeWidth={2.5} />
+        <Plus className="h-3 w-3" strokeWidth={3} />
       </span>
-      <span className="mt-0.5 text-[10px] font-bold text-shu">
-        穴場を教える
-      </span>
+      <span className="mt-0.5 text-[10px] font-bold">穴場を教える</span>
     </button>
   );
 }
