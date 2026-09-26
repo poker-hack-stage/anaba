@@ -13,7 +13,7 @@
 
 ```sql
 -- 口コミ（新しい順。非表示のものも出る）
-select r.id, r.created_at at time zone 'Asia/Tokyo' as created_at_jst, r.status, s.name as spot, r.nickname, r.rating, r.body, r.client_hash
+select r.id, r.created_at at time zone 'Asia/Tokyo' as created_at_jst, r.status, s.name as spot, r.nickname, r.rating, r.body, r.client_hash, r.is_sample
 from reviews r
 join spots s on s.id = r.spot_id
 order by r.created_at desc
@@ -29,7 +29,7 @@ order by s.created_at desc
 limit 50;
 ```
 
-`client_hash` は、送信元の IP と `RATE_LIMIT_SALT` から作ったハッシュ（生の IP は残していない）。同じ IP からの口コミと投稿には、同じ値が入る。空（`null`）の行は、API を通らずに公開キーで直接書き込まれたもの（下の「API を通らない書き込み」）。
+`client_hash` は、送信元の IP と `RATE_LIMIT_SALT` から作ったハッシュ（生の IP は残していない）。同じ IP からの口コミと投稿には、同じ値が入る。空（`null`）の行は、API を通らずに公開キーで直接書き込まれたもの（下の「API を通らない書き込み」）。ただし `is_sample` が `true` の行は、`seed.sql` で入れたサンプルの口コミ（#152）なので `client_hash` がなくてよい。
 
 ## 2. 口コミ
 
@@ -46,7 +46,26 @@ delete from reviews where id = '<口コミの id>';
 -- 同じ送信元（client_hash）の口コミをまとめて非表示にする
 update reviews set status = 'hidden'
 where client_hash = (select client_hash from reviews where id = '<荒らしの口コミの id>');
+
 ```
+
+### サンプルの口コミ（#152）
+
+`seed.sql` で入れたサンプルの口コミ（`is_sample = true`）は、画面で「サンプル」の印と説明を出している（`docs/spec.md` の「サンプルの口コミ」）。本物の口コミが集まってきたら、まとめて非表示にするか消す。**下の2つのブロックは、どちらか一方だけを実行する**（まとめて実行すると、非表示にしたつもりでも消える）。
+
+非表示にする（戻せる。戻すときは `status = 'published'` にする）:
+
+```sql
+update reviews set status = 'hidden' where is_sample;
+```
+
+消す（戻せない）:
+
+```sql
+delete from reviews where is_sample;
+```
+
+消したあとに `seed.sql` を SQL Editor で流すと、サンプルの口コミがまた入る（同じ id で入れ直すだけで、消す前の状態が戻るわけではない）。入れ直したくないときは、`seed.sql` からもサンプルの口コミの insert を消す。
 
 ## 3. 投稿されたスポット
 

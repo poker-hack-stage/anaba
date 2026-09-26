@@ -14,6 +14,8 @@ export type PublicReview = {
   rating: number;
   body: string;
   created_at: string;
+  /** 運営が表示の確かめのために入れたサンプルの口コミなら true（#152）。画面で「サンプル」と出す */
+  is_sample: boolean;
 };
 
 export type SpotReviews = {
@@ -23,6 +25,8 @@ export type SpotReviews = {
   count: number;
   /** 星の平均（小数1桁）。口コミがなければ null */
   average: number | null;
+  /** count のうち、サンプルの口コミの件数（#152）。件数・平均にサンプルが入っていることを画面で知らせる */
+  sampleCount: number;
 };
 
 export const REVIEWS_LIMIT = 20;
@@ -39,14 +43,19 @@ export async function getSpotReviews(
 ): Promise<
   { data: SpotReviews; error: null } | { data: null; error: DbError }
 > {
-  const [list, ...counts] = await Promise.all([
+  const [list, samples, ...counts] = await Promise.all([
     supabase
       .from("published_reviews")
-      .select("id, spot_id, nickname, rating, body, created_at")
+      .select("id, spot_id, nickname, rating, body, created_at, is_sample")
       .eq("spot_id", spotId)
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
       .limit(REVIEWS_LIMIT),
+    supabase
+      .from("published_reviews")
+      .select("*", { count: "exact", head: true })
+      .eq("spot_id", spotId)
+      .eq("is_sample", true),
     ...RATINGS.map((rating) =>
       supabase
         .from("published_reviews")
@@ -56,7 +65,8 @@ export async function getSpotReviews(
     ),
   ]);
 
-  const error = list.error ?? counts.find((result) => result.error)?.error;
+  const error =
+    list.error ?? samples.error ?? counts.find((result) => result.error)?.error;
   if (error) return { data: null, error };
 
   return {
@@ -64,6 +74,7 @@ export async function getSpotReviews(
       // ビューの列は型の上では null になりうるが、元の reviews の列はすべて not null
       reviews: list.data as PublicReview[],
       ...summarizeRatings(counts.map((result) => result.count ?? 0)),
+      sampleCount: samples.count ?? 0,
     },
     error: null,
   };
