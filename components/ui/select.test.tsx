@@ -57,4 +57,25 @@ describe("Select", () => {
         .disabled,
     ).toBe(true);
   });
+
+  test("pill の形は、iOS で拡大されないよう sm 未満だけ 16px にする", () => {
+    render(
+      <>
+        <Select aria-label="ピル" shape="pill">
+          <option>松本市</option>
+        </Select>
+        <Select aria-label="既定">
+          <option>松本市</option>
+        </Select>
+      </>,
+    );
+    const pill = screen.getByRole("combobox", { name: "ピル" }).className;
+    const base = screen.getByRole("combobox", { name: "既定" }).className;
+
+    expect(pill).toContain("text-xs");
+    expect(pill).toContain("max-sm:text-base");
+    // 既定の形は、もとから 16px（md 以上で 14px）
+    expect(base).toContain("text-base");
+    expect(base).not.toContain("max-sm:text-base");
+  });
 });

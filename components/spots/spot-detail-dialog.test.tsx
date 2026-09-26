@@ -107,4 +107,25 @@ describe("SpotDetailDialog", () => {
     rerender(<SpotDetailDialog spot={s} onClose={() => {}} />);
     expect(screen.queryByRole("button", { name })).toBeNull();
   });
+
+  test("閉じるボタンは、スクロールしても上に残る sticky の行にあり、押すと onClose を呼ぶ", () => {
+    const onClose = vi.fn();
+    render(
+      <SpotDetailDialog
+        spot={spot("hakuba", "姫川源流", "nature")}
+        onClose={onClose}
+      />,
+    );
+    const dialog = screen.getByRole("dialog");
+    const close = screen.getByRole("button", { name: "閉じる" });
+
+    // スクロールするのはダイアログ自身なので、sticky の行はその直下に置く（写真の中に置くと一緒に流れる）
+    const row = close.parentElement;
+    expect(row?.parentElement).toBe(dialog);
+    expect(row?.className).toContain("sticky");
+    expect(row?.className).toContain("top-0");
+
+    fireEvent.click(close);
+    expect(onClose).toHaveBeenCalledOnce();
+  });
 });
