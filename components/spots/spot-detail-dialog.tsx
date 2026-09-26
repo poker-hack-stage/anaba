@@ -95,6 +95,7 @@ export function SpotDetailDialog({
               imagePath={shown.image_path}
               sizes={DETAIL_IMAGE_SIZES}
               className="h-56 w-full text-6xl sm:h-72"
+              aiLabelClassName="bottom-3 right-3 rounded-full px-2.5 py-0.5 text-xs"
             />
             <span
               className={`absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-bold ${meta.badge}`}
