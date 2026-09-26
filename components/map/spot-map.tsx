@@ -1,7 +1,13 @@
 "use client";
 
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { createPortal } from "react-dom";
 import {
   Map as MapLibreMap,
@@ -51,6 +57,11 @@ export type SpotMapProps = {
    * 幅の狭い地図（640px 未満）では、重なるピンを少しずらしてどれも押せるようにする（#109）
    */
   highlighted?: Spot[];
+  /**
+   * ハイライトのうち、さらに目立たせるスポットの id（「穴場を探す」のスマホで、表示中のカードのスポット、#142）。
+   * ピンを一回り大きくし、枠を付けて前に出す
+   */
+  activeSpotId?: string | null;
   /** 経路。日ごとに分けるときは複数渡し、線とピンを色分けする。経路どうしは線でつながない */
   routes?: SpotRoute[];
   /** そのほかのスポット。小さく表示 */
@@ -88,7 +99,7 @@ export type SpotMapProps = {
   /**
    * ページのスクロールを奪わない操作にするか（既定は true）。true ならホイールは Ctrl / ⌘ を押したときだけズーム、
    * タッチ端末では2本指で地図を動かす。地図だけを出すダイアログ（候補の大きな地図、#31）では false にして、1本指・ホイールで動かせるようにする。
-   * 地図を作るときにだけ読む（あとから変えても反映しない）
+   * あとから変えると、作った地図の操作を切り替える（「穴場を探す」で画面の幅が sm をまたいだとき、#155）
    */
   cooperativeGestures?: boolean;
   /**
@@ -106,6 +117,8 @@ export type SpotMapProps = {
   /** 左上の表示（地域名と凡例）の位置を変えるクラス。地図の上に重ねたパネルと重ならないようにする */
   labelClassName?: string;
   className?: string;
+  /** 外側の枠の style（CSS 変数を渡すときなど） */
+  style?: CSSProperties;
 };
 
 export type FitPadding = {
@@ -203,6 +216,7 @@ const LOCALE = {
 /** スポットを載せる地図（MapLibre ＋ OpenFreeMap） */
 export function SpotMap({
   highlighted = [],
+  activeSpotId,
   routes = [],
   others = [],
   areaName,
@@ -220,6 +234,7 @@ export function SpotMap({
   controlPosition = "top-right",
   labelClassName,
   className,
+  style,
 }: SpotMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<MapLibreMap | null>(null);
@@ -295,13 +310,22 @@ export function SpotMap({
     (s): [number, number] => [s.lng, s.lat],
   );
   const pointsKey = points.map((p) => p.join(",")).join(";");
-  const fitKey = `${fitPoints.map((p) => p.join(",")).join(";")}|${fitPadding.top},${fitPadding.right},${fitPadding.bottom},${fitPadding.left}`;
+  const fitPointsKey = fitPoints.map((p) => p.join(",")).join(";");
+  const paddingKey = `${fitPadding.top},${fitPadding.right},${fitPadding.bottom},${fitPadding.left}`;
   const routeKey = routes
     .map(
       (r) =>
         `${routeColor(r)}:${r.spots.map((s) => `${s.lng},${s.lat}`).join(";")}`,
     )
     .join("|");
+
+  // 作ったあとに cooperativeGestures が変わったら、地図の操作を切り替える（作るときの値と同じなら何もしない）
+  useEffect(() => {
+    if (!map || map.cooperativeGestures.isEnabled() === cooperativeGestures)
+      return;
+    if (cooperativeGestures) map.cooperativeGestures.enable();
+    else map.cooperativeGestures.disable();
+  }, [map, cooperativeGestures]);
 
   // 境界は表示範囲に外枠（範囲）しか使わないので、範囲で比べる。親が描き直して別のオブジェクトを渡しても、
   // 同じ範囲なら合わせ直さない（利用者が拡大・移動した表示を戻さない、#151）
@@ -313,12 +337,27 @@ export function SpotMap({
 
   // 範囲を合わせたことのある地図。作り直した地図の最初の表示は即時にする
   const fittedMap = useRef<MapLibreMap | null>(null);
+  // 最後に範囲を合わせた見る対象（スポット・境界）と、そのあと利用者が地図を動かしたか
+  const fittedTarget = useRef<string | null>(null);
+  const userMoved = useRef(false);
 
   // 表示範囲を合わせる。見る対象（スポット・境界・余白）が変わったときだけ動かす
   useEffect(() => {
     if (!map) return;
+    // 見る対象はそのままで余白だけが変わったとき（スマホで浮かべた検索欄・パネルの高さが変わったとき）は、
+    // 利用者が拡大・移動していたら合わせ直さない（チップを開け閉めしただけで表示が戻らないように、#151・#155）
+    const target = `${pointsKey}|${fitPointsKey}|${boundaryKey}`;
+    if (
+      fittedMap.current === map &&
+      fittedTarget.current === target &&
+      userMoved.current
+    ) {
+      return;
+    }
     const animate = animateMove && fittedMap.current === map;
     fittedMap.current = map;
+    fittedTarget.current = target;
+    userMoved.current = false;
     const box = computeBounds([
       ...points,
       ...fitPoints,
@@ -333,9 +372,9 @@ export function SpotMap({
     } else {
       map.fitBounds(box, { ...move, padding: fitPadding, maxZoom: 15 });
     }
-    // points は pointsKey、fitPoints と fitPadding は fitKey、boundaryBox は boundaryKey で比較する
+    // points は pointsKey、fitPoints は fitPointsKey、fitPadding は paddingKey、boundaryBox は boundaryKey で比較する
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, pointsKey, fitKey, boundaryKey, animateMove]);
+  }, [map, pointsKey, fitPointsKey, paddingKey, boundaryKey, animateMove]);
 
   // ハイライトのピンのずらす量（px。スポットの id ごと）。ずらさないピンは入れない
   const [highlightOffsets, setHighlightOffsets] =
@@ -470,7 +509,9 @@ export function SpotMap({
   useEffect(() => {
     if (!map) return;
     const handleMoveStart = (event: { originalEvent?: unknown }) => {
-      if (event.originalEvent) onUserMoveRef.current?.();
+      if (!event.originalEvent) return;
+      userMoved.current = true;
+      onUserMoveRef.current?.();
     };
     map.on("movestart", handleMoveStart);
     return () => {
@@ -490,6 +531,7 @@ export function SpotMap({
         "relative isolate overflow-hidden rounded-2xl border border-stone-200 bg-emerald-50/60 [&_.maplibregl-control-container>div]:z-[5]",
         className,
       )}
+      style={style}
     >
       {/* MapLibre が地図の要素に position: relative を付けるので、外側の枠で大きさを決める */}
       <div className="absolute inset-0">
@@ -517,7 +559,8 @@ export function SpotMap({
               spot={spot}
               size="lg"
               title={spot.name}
-              zIndex={2}
+              zIndex={spot.id === activeSpotId ? 3 : 2}
+              active={spot.id === activeSpotId}
               offset={highlightOffsets.get(spot.id)}
             />
           ))}
@@ -625,6 +668,7 @@ function SpotMarker({
   color,
   title,
   zIndex,
+  active = false,
   offset,
   onSpotClick,
   onSpotHover,
@@ -639,6 +683,8 @@ function SpotMarker({
   title: string;
   /** 重なり順。経路 > ハイライト > そのほか */
   zIndex: number;
+  /** 目立たせる（表示中のカードのスポット、#142） */
+  active?: boolean;
   /** 本当の場所からずらして描く量（px）。重なるピンを離すとき（#109） */
   offset?: PixelPoint;
   onSpotClick?: (spot: Spot) => void;
@@ -673,6 +719,12 @@ function SpotMarker({
     };
   }, [map, element, spot.lng, spot.lat]);
 
+  // 重なり順は、目立たせるピンが変わるたびに付け直す（Marker の要素は作るときに渡した element）
+  useEffect(() => {
+    const el = markerRef.current?.getElement();
+    if (el) el.style.zIndex = String(zIndex);
+  }, [zIndex]);
+
   useEffect(() => {
     offsetRef.current = [offsetX, offsetY];
     markerRef.current?.setOffset([offsetX, offsetY]);
@@ -687,6 +739,7 @@ function SpotMarker({
       type="button"
       title={title}
       aria-label={title}
+      data-active={active || undefined}
       onClick={() => onSpotClick?.(spot)}
       // マウスだけを「乗せた」に数える。タッチのタップは詳細を開くだけにする（離れたことが分からず、強調が残るため）
       onPointerEnter={(e) => e.pointerType === "mouse" && onSpotHover?.(spot)}
@@ -706,6 +759,9 @@ function SpotMarker({
         size === "sm" && "text-[10px] opacity-70",
         size === "md" && "text-xs",
         size === "lg" && "text-lg",
+        // 表示中のカードのスポット。大きくし、濃い枠で囲む（色だけに頼らない）
+        active &&
+          "scale-125 shadow-lg ring-[3px] ring-ink hover:scale-[1.35] motion-reduce:transition-none",
       )}
     >
       {label ??

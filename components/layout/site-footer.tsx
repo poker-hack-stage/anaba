@@ -3,7 +3,8 @@ import { PAGE_CONTAINER } from "./page-width";
 
 /**
  * 画面の一番下のフッター。写真の出典（CC BY・CC BY-SA の表示の条件、#67）へリンクする。
- * スマホでは下部ナビ（bottom-nav.tsx）が画面の下に重なるので、その高さぶん下に余白をとる
+ * スマホでは下部ナビ（bottom-nav.tsx）が画面の下に重なるので、その高さぶん下に余白をとる。
+ * スマホの「穴場を探す」では出さず、地図の右下のリンクから写真の出典へたどる（app/globals.css、#155）
  */
 export function SiteFooter() {
   return (
