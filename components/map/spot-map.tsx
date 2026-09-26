@@ -33,11 +33,21 @@ import { cn } from "@/lib/utils";
   );
 */
 
+/** 経路の1本（旅プランの1日ぶんなど） */
+export type SpotRoute = {
+  /** めぐる順のスポット。番号付きのピン（1から）と線でつなぐ */
+  spots: Spot[];
+  /** 線とピンの色（CSS の色）。省略すると朱 */
+  color?: string;
+  /** 凡例とピンの読み上げに出す名前（例: 「1日目」）。2本以上あるときは凡例を出す */
+  name?: string;
+};
+
 export type SpotMapProps = {
   /** ハイライトするスポット（おすすめ3件など）。大きく強調して表示 */
   highlighted?: Spot[];
-  /** 経路（めぐる順）。番号付きのピンと線でつなぐ */
-  route?: Spot[];
+  /** 経路。日ごとに分けるときは複数渡し、線とピンを色分けする。経路どうしは線でつながない */
+  routes?: SpotRoute[];
   /** そのほかのスポット。小さく表示 */
   others?: Spot[];
   /** ハイライトする地域名（地図の左上に出す） */
@@ -118,7 +128,7 @@ const LOCALE = {
 /** スポットを載せる地図（MapLibre ＋ OpenFreeMap） */
 export function SpotMap({
   highlighted = [],
-  route = [],
+  routes = [],
   others = [],
   areaName,
   boundary,
@@ -193,11 +203,17 @@ export function SpotMap({
   }, []);
 
   // 配列は毎回作り直されるので、中身が変わったときだけ描き直す
-  const points = [...highlighted, ...route, ...others].map(
+  const routeSpots = routes.flatMap((r) => r.spots);
+  const points = [...highlighted, ...routeSpots, ...others].map(
     (s): [number, number] => [s.lng, s.lat],
   );
   const pointsKey = points.map((p) => p.join(",")).join(";");
-  const routeKey = route.map((s) => `${s.lng},${s.lat}`).join(";");
+  const routeKey = routes
+    .map(
+      (r) =>
+        `${routeColor(r)}:${r.spots.map((s) => `${s.lng},${s.lat}`).join(";")}`,
+    )
+    .join("|");
 
   // 表示範囲を合わせる
   useEffect(() => {
@@ -249,7 +265,8 @@ export function SpotMap({
       layout: { "line-cap": "round", "line-join": "round" },
       // 破線の長さは線の太さの倍数（8px と 6px の間隔）
       paint: {
-        "line-color": ROUTE_COLOR,
+        // 経路ごとの色（setData で properties.color に入れる）
+        "line-color": ["get", "color"],
         "line-width": 3,
         "line-dasharray": [8 / 3, 6 / 3],
       },
@@ -267,19 +284,21 @@ export function SpotMap({
 
   useEffect(() => {
     if (!map || !styleLoaded) return;
-    const line: Feature | null =
-      route.length > 1
-        ? {
-            type: "Feature",
-            properties: {},
-            geometry: {
-              type: "LineString",
-              coordinates: route.map((s) => [s.lng, s.lat]),
-            },
-          }
-        : null;
-    map.getSource<GeoJSONSource>(ROUTE_SOURCE)?.setData(line ?? EMPTY);
-    // route は routeKey で比較する
+    const lines: FeatureCollection = {
+      type: "FeatureCollection",
+      features: routes
+        .filter((r) => r.spots.length > 1)
+        .map((r): Feature => ({
+          type: "Feature",
+          properties: { color: routeColor(r) },
+          geometry: {
+            type: "LineString",
+            coordinates: r.spots.map((s) => [s.lng, s.lat]),
+          },
+        })),
+    };
+    map.getSource<GeoJSONSource>(ROUTE_SOURCE)?.setData(lines);
+    // routes は routeKey で比較する
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, styleLoaded, routeKey]);
 
@@ -304,6 +323,8 @@ export function SpotMap({
   }, [map, clickable]);
 
   const markerProps = { onSpotClick, onSpotHover };
+  // 経路が2本以上で名前があれば凡例を出す
+  const showLegend = routes.length > 1 && routes.some((r) => r.name);
 
   return (
     // isolate: 地図の中の z-index がヘッダーやダイアログより前に出ないようにする。
@@ -343,18 +364,21 @@ export function SpotMap({
               zIndex={2}
             />
           ))}
-          {route.map((spot, i) => (
-            <SpotMarker
-              key={`route-${spot.id}`}
-              {...markerProps}
-              map={map}
-              spot={spot}
-              size="md"
-              label={String(i + 1)}
-              title={`${i + 1}. ${spot.name}`}
-              zIndex={3}
-            />
-          ))}
+          {routes.flatMap((r, ri) =>
+            r.spots.map((spot, i) => (
+              <SpotMarker
+                key={`route-${ri}-${spot.id}`}
+                {...markerProps}
+                map={map}
+                spot={spot}
+                size="md"
+                label={String(i + 1)}
+                color={routeColor(r)}
+                title={`${r.name ? `${r.name} ` : ""}${i + 1}. ${spot.name}`}
+                zIndex={3}
+              />
+            )),
+          )}
           {pin && <PinMarker map={map} lat={pin.lat} lng={pin.lng} />}
         </>
       )}
@@ -378,11 +402,34 @@ export function SpotMap({
         </p>
       )}
 
-      {areaName && (
-        <span className="pointer-events-none absolute left-3 top-3 z-10 inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-ink shadow-sm">
-          <MapPin aria-hidden className="h-3.5 w-3.5" />
-          {areaName}
-        </span>
+      {(areaName || showLegend) && (
+        // 左上の表示（地域名と凡例）。両方あるときは縦に並べ、重ならないようにする
+        <div className="pointer-events-none absolute left-3 right-14 top-3 z-10 flex flex-col items-start gap-1.5">
+          {areaName && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-ink shadow-sm">
+              <MapPin aria-hidden className="h-3.5 w-3.5" />
+              {areaName}
+            </span>
+          )}
+          {showLegend && (
+            // 凡例。ピンの番号は経路ごとに1からなので、色でどの日か分かるようにする
+            <ul aria-label="凡例" className="flex flex-wrap gap-1.5">
+              {routes.map((r, i) => (
+                <li
+                  key={i}
+                  className="inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-xs font-bold text-stone-700 shadow-sm"
+                >
+                  <span
+                    aria-hidden
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{ background: routeColor(r) }}
+                  />
+                  {r.name}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </div>
   );
@@ -399,6 +446,7 @@ function SpotMarker({
   spot,
   size,
   label,
+  color,
   title,
   zIndex,
   onSpotClick,
@@ -409,6 +457,8 @@ function SpotMarker({
   size: keyof typeof PIN_SIZE;
   /** 経路の番号。あればアイコンの代わりに出す */
   label?: string;
+  /** 経路のピンの色。省略するとカテゴリの色 */
+  color?: string;
   title: string;
   /** 重なり順。経路 > ハイライト > そのほか */
   zIndex: number;
@@ -447,7 +497,7 @@ function SpotMarker({
       style={{
         width: px,
         height: px,
-        background: label ? ROUTE_COLOR : meta.color,
+        background: color ?? meta.color,
       }}
       className={cn(
         "flex cursor-pointer items-center justify-center rounded-full border-2 border-white font-bold text-white shadow-md transition-transform hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink",
@@ -462,6 +512,10 @@ function SpotMarker({
     </button>,
     element,
   );
+}
+
+function routeColor(route: SpotRoute): string {
+  return route.color ?? ROUTE_COLOR;
 }
 
 /**
