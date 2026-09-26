@@ -1,8 +1,8 @@
 import { Clock } from "lucide-react";
 import { Rating } from "@/components/ui/rating";
 import type { Spot } from "@/lib/data/spots";
-import { getCategory } from "@/lib/spots/categories";
 import { getHiddenGemScore, getRating } from "@/lib/spots/score";
+import { CategoryBadge } from "./category-badge";
 import { HiddenGemScore } from "./hidden-gem-score";
 import { SpotImage, preloadSpotImage } from "./spot-image";
 
@@ -25,7 +25,6 @@ export function SpotCard({
   spot: Spot;
   onSelect?: (spot: Spot) => void;
 }) {
-  const meta = getCategory(spot.category);
   const rating = getRating(spot);
   const hiddenGemScore = getHiddenGemScore(spot);
 
@@ -42,12 +41,7 @@ export function SpotCard({
         className="h-24 w-24 shrink-0 rounded-xl"
       />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <span
-          className={`inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${meta.badge}`}
-        >
-          <meta.icon aria-hidden className="h-3 w-3 shrink-0" />
-          {meta.label}
-        </span>
+        <CategoryBadge category={spot.category} />
         <h3 className="truncate font-extrabold text-stone-900">{spot.name}</h3>
         {(rating !== null || hiddenGemScore !== null) && (
           // 狭い幅では穴場度の数でカードごとに折り返しがばらつくので、最初から2行にする
