@@ -1,6 +1,10 @@
 import { describe, expect, test } from "vitest";
 
-import { aiPlanSchema, planConditionsSchema } from "./schema";
+import {
+  AI_PLAN_JSON_SCHEMA,
+  aiPlanSchema,
+  planConditionsSchema,
+} from "./schema";
 
 const valid = {
   areaId: "10000000-0000-4000-8000-000000000005",
@@ -80,5 +84,17 @@ describe("aiPlanSchema", () => {
         ],
       }).success,
     ).toBe(true);
+  });
+});
+
+describe("AI_PLAN_JSON_SCHEMA", () => {
+  test("候補・日・スポットの件数の範囲を伝える（#113）", () => {
+    const candidates = AI_PLAN_JSON_SCHEMA.properties.candidates;
+    const days = candidates.items.properties.days;
+    const spotIds = days.items.properties.spotIds;
+
+    expect(candidates).toMatchObject({ minItems: 1, maxItems: 3 });
+    expect(days).toMatchObject({ minItems: 1, maxItems: 3 });
+    expect(spotIds).toMatchObject({ minItems: 2, maxItems: 4 });
   });
 });
