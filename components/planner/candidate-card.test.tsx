@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 
 import type { Spot } from "@/lib/data/spots";
@@ -8,9 +14,9 @@ import type { SpotMapProps } from "@/components/map/spot-map";
 import { CandidateCard } from "./candidate-card";
 import { getDayColor } from "./day-colors";
 
-// 地図（MapLibre）は jsdom で描けないので、渡された経路を文字で出す部品に差し替える
+// 地図（MapLibre）は jsdom で描けないので、渡された経路を文字で出し、ピンをボタンで出す部品に差し替える
 vi.mock("@/components/map/spot-map", () => ({
-  SpotMap: ({ routes = [] }: SpotMapProps) => (
+  SpotMap: ({ routes = [], others = [], onSpotClick }: SpotMapProps) => (
     <div role="group" aria-label="地図の経路">
       {routes.map((r, i) => (
         <p key={i}>
@@ -19,9 +25,19 @@ vi.mock("@/components/map/spot-map", () => ({
             .join(" / ")}
         </p>
       ))}
+      {[...routes.flatMap((r) => r.spots), ...others].map((s) => (
+        <button key={s.id} type="button" onClick={() => onSpotClick?.(s)}>
+          ピン {s.name}
+        </button>
+      ))}
     </div>
   ),
 }));
+
+/** 地図の経路の表示（mock の文字）を、上から順に返す */
+function routeTexts(map: HTMLElement) {
+  return [...map.querySelectorAll("p")].map((p) => p.textContent);
+}
 
 /** 名前を id に使うスポット（地域は使わないので固定） */
 function spot(name: string, stay: number | null = 60): Spot {
@@ -179,5 +195,92 @@ describe("CandidateCard", () => {
     expect(onSpotClick).toHaveBeenCalledWith(
       expect.objectContaining({ name: "湧き水" }),
     );
+  });
+
+  describe("大きな地図", () => {
+    const twoDays = () =>
+      candidate({
+        duration: "1n2d",
+        days: [
+          day(1, "安曇野市", [spot("わさび田"), spot("湧き水")], 240),
+          day(2, "松本市", [spot("城"), spot("縄手通り")], 180),
+        ],
+        otherSpots: [spot("美術館")],
+      });
+
+    async function openLargeMap() {
+      fireEvent.click(screen.getByRole("button", { name: "地図を大きく見る" }));
+      const dialog = await screen.findByRole("dialog", {
+        name: "安曇野の湧き水めぐり",
+      });
+      const map = await within(dialog).findByRole("group", {
+        name: "地図の経路",
+      });
+      return { dialog, map };
+    }
+
+    test("はじめは開いていない", () => {
+      renderCard(candidate());
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    test("拡大ボタンで開き、カードと同じ日ごとの経路・色・経路外のスポットを出す", async () => {
+      renderCard(twoDays());
+      const cardMap = await screen.findByRole("group", { name: "地図の経路" });
+
+      const { map } = await openLargeMap();
+
+      expect(routeTexts(map)).toEqual(routeTexts(cardMap));
+      expect(routeTexts(map)).toEqual([
+        `1日目 / ${getDayColor(1).hex} / わさび田 / 湧き水`,
+        `2日目 / ${getDayColor(2).hex} / 城 / 縄手通り`,
+      ]);
+      within(map).getByRole("button", { name: "ピン 美術館" });
+    });
+
+    test("日帰りは、カードと同じく1本の経路を既定の色で出す", async () => {
+      renderCard(candidate());
+
+      const { map } = await openLargeMap();
+
+      expect(routeTexts(map)).toEqual([
+        "（名前なし） / （既定の色） / わさび田 / 湧き水",
+      ]);
+    });
+
+    test("Esc で閉じ、フォーカスを拡大ボタンに戻す", async () => {
+      renderCard(candidate());
+      const { dialog } = await openLargeMap();
+
+      fireEvent.keyDown(dialog, { key: "Escape" });
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: "地図を大きく見る" }),
+      );
+    });
+
+    test("閉じるボタンで閉じ、フォーカスを拡大ボタンに戻す", async () => {
+      renderCard(candidate());
+      const { dialog } = await openLargeMap();
+
+      fireEvent.click(within(dialog).getByRole("button", { name: "閉じる" }));
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: "地図を大きく見る" }),
+      );
+    });
+
+    test("ピンを押すと、カードと同じくそのスポットを渡す", async () => {
+      const onSpotClick = renderCard(twoDays());
+      const { map } = await openLargeMap();
+
+      fireEvent.click(within(map).getByRole("button", { name: "ピン 城" }));
+
+      expect(onSpotClick).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "城" }),
+      );
+    });
   });
 });
