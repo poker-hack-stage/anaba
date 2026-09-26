@@ -547,12 +547,14 @@ function Result({
   onSpotClick: (spot: Spot) => void;
 }) {
   if (status === "idle") {
+    // 条件の下に結果が縦に並ぶ幅（スマホ）では、空の枠で画面を縦に長くしないよう出さない（#163）。
+    // 押したら「旅プランをつくっています」と結果が出て、結果の欄まで動く（#123）
     return (
       <EmptyState
         icon={Route}
         title="旅の候補がここに表示されます"
         description="条件を選んで「旅プランをつくる」を押すと、おすすめの地域とルートを地図つきで提案します。"
-        className="h-full min-h-72"
+        className="h-full min-h-72 max-lg:hidden"
       />
     );
   }
