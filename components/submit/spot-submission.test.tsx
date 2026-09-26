@@ -110,11 +110,19 @@ async function openForm(areas: SubmittableArea[] | null = AREAS) {
   return screen.getByRole("form", { name: "穴場を教える" });
 }
 
+/** 県 → 市区町村の順に地域を選ぶ（#147） */
+function chooseArea(form: HTMLElement, area: SubmittableArea) {
+  fireEvent.change(within(form).getByLabelText("都道府県"), {
+    target: { value: area.prefecture },
+  });
+  fireEvent.change(within(form).getByLabelText("市区町村"), {
+    target: { value: area.id },
+  });
+}
+
 /** 地域を選び、地図のボタン（テスト用）を押してピンを置く */
 async function selectAreaAndPin(form: HTMLElement) {
-  fireEvent.change(within(form).getByLabelText("地域"), {
-    target: { value: AZUMINO.id },
-  });
+  chooseArea(form, AZUMINO);
   fireEvent.click(await within(form).findByText("地図をタップ"));
 }
 
@@ -145,18 +153,27 @@ function submitButton(form: HTMLElement) {
 }
 
 describe("穴場を教えるフォーム", () => {
-  test("地域は都道府県ごとにまとめ、送る前の注意を出す", async () => {
+  test("地域は県 → 市区町村の2段で選び、送る前の注意を出す（#147）", async () => {
     const form = await openForm();
+    const area = within(form).getByRole("group", { name: "地域" });
+    const prefecture = within(area).getByRole<HTMLSelectElement>("combobox", {
+      name: "都道府県",
+    });
+    const municipality = within(area).getByRole<HTMLSelectElement>("combobox", {
+      name: "市区町村",
+    });
+    const texts = (select: HTMLSelectElement) =>
+      [...select.options].map((o) => o.textContent);
 
-    const groups = within(form).getAllByRole("group");
-    const labels = groups
-      .filter((g) => g.tagName === "OPTGROUP")
-      .map((g) => g.getAttribute("label"));
-    expect(labels).toEqual(["長野県", "北海道"]);
-    const nagano = form.querySelector('optgroup[label="長野県"]')!;
-    expect(
-      [...nagano.querySelectorAll("option")].map((o) => o.textContent),
-    ).toEqual(["白馬村（長野県）", "安曇野市（長野県）"]);
+    // 登録済みの地域がある県だけを、display_order の順に出す（案 A）
+    expect(texts(prefecture)).toEqual(["選ぶ", "長野県", "北海道"]);
+    expect(municipality.disabled).toBe(true);
+    // 送る値は市区町村なので、必須であることを読み上げに伝える
+    expect(municipality.getAttribute("aria-required")).toBe("true");
+
+    fireEvent.change(prefecture, { target: { value: "長野県" } });
+    expect(municipality.disabled).toBe(false);
+    expect(texts(municipality)).toEqual(["選ぶ", "白馬村", "安曇野市"]);
     expect(form.textContent).toContain(
       "ログインは不要です。スポット名・ひとこと・ニックネームはすぐ公開されます。管理者が非表示にすることがあります。",
     );
@@ -180,11 +197,27 @@ describe("穴場を教えるフォーム", () => {
     const form = await openForm();
     await selectAreaAndPin(form);
 
-    fireEvent.change(within(form).getByLabelText("地域"), {
-      target: { value: AREAS[0].id },
-    });
+    chooseArea(form, AREAS[0]);
     expect(within(form).queryByTestId("pin")).toBeNull();
     expect(submitButton(form).disabled).toBe(true);
+  });
+
+  test("県を変えたら、市区町村の選択と置いたピンを外す", async () => {
+    const form = await openForm();
+    await selectAreaAndPin(form);
+
+    fireEvent.change(within(form).getByLabelText("都道府県"), {
+      target: { value: "北海道" },
+    });
+    const municipality =
+      within(form).getByLabelText<HTMLSelectElement>("市区町村");
+    expect(municipality.value).toBe("");
+    expect([...municipality.options].map((o) => o.textContent)).toEqual([
+      "選ぶ",
+      "東川町",
+    ]);
+    expect(within(form).queryByTestId("pin")).toBeNull();
+    expect(within(form).queryByTestId("map")).toBeNull();
   });
 
   test("送ると API に JSON で送り、成功したら「公開しました」を出して読み込み直す", async () => {

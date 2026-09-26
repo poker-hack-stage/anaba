@@ -41,6 +41,26 @@ describe("getPlanScope", () => {
       "白馬村",
     ]);
   });
+
+  test("県だけ選ぶと（#147）、その県の地域だけが候補になる", () => {
+    const scope = getPlanScope(areas, request({ prefecture: "長野県" }));
+
+    expect(scope.selected).toBeUndefined();
+    expect(scope.prefecture).toBe("長野県");
+    expect(ids(scope.bases)).toEqual([
+      "白馬村",
+      "大町市",
+      "安曇野市",
+      "松本市",
+    ]);
+  });
+
+  test("知らない県なら「おまかせ」として扱う", () => {
+    const scope = getPlanScope(areas, request({ prefecture: "大阪府" }));
+
+    expect(scope.prefecture).toBeUndefined();
+    expect(ids(scope.bases)).toEqual(ids(areas));
+  });
 });
 
 describe("buildPlanPrompt", () => {
@@ -117,6 +137,17 @@ describe("buildPlanPrompt", () => {
     expect(prompt.contents).toContain("- だれと: 家族（子連れ）");
     expect(prompt.contents).toContain("- 移動手段: 自転車");
     expect(prompt.contents).toContain("days はちょうど3日分");
+  });
+
+  test("県だけ選んだら、エリアを「県の中でおまかせ」と伝え、県の地域から1日目を選ぶよう頼む（#147）", () => {
+    const prompt = buildPlanPrompt(areas, request({ prefecture: "長野県" }));
+
+    expect(prompt.contents).toContain("- エリア: 長野県の中でおまかせ");
+    expect(prompt.contents).toMatch(
+      /1日目の地域は、条件に合うスポットが多い地域から選ぶ（A\d+・A\d+・A\d+・A\d+）/,
+    );
+    // 日帰りなら、県の外の地域は渡さない
+    expect(prompt.contents).not.toContain("遠い町");
   });
 
   test("移動の目安と1日の所要時間の上限を伝える（#113）", () => {
