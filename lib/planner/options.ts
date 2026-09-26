@@ -1,6 +1,6 @@
 import type { PlanDuration } from "./types";
 
-// 「絞る」のフォームの選択肢（docs/spec.md の画面-1）。フォームと、API の入力の検証（schema.ts）で共有する
+// AI 旅プランのフォームの選択肢（docs/spec.md の画面-1）。フォームと、API の入力の検証（schema.ts）で共有する
 
 /** 「おまかせ」（地域を指定しない）の表示 */
 export const ANY_AREA_LABEL = "おまかせ";

@@ -53,7 +53,7 @@ describe("PlannerStateProvider の選んでいる候補", () => {
     expect(result.current.selectedCandidate).toBe(2);
   });
 
-  test("絞り直して候補の配列が変わったら、同じ中身でも 0 番に戻る", () => {
+  test("つくり直して候補の配列が変わったら、同じ中身でも 0 番に戻る", () => {
     const { result } = renderState();
     act(() => result.current.setResult(done(["a", "b", "c"])));
     act(() => result.current.selectCandidate(2));

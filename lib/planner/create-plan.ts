@@ -9,7 +9,7 @@ import type { PlanCandidate, PlanConditions, PlanResponse } from "./types";
 
 /**
  * Gemini の出力のばらつき（#113）。記号・件数の決まりを守らせたいので低めにし、
- * 同じ条件で「絞る」を押し直したときに少し違う候補が出る程度は残す
+ * 同じ条件で「この条件でつくり直す」を押したときに少し違う候補が出る程度は残す
  */
 const PLAN_TEMPERATURE = 0.4;
 
