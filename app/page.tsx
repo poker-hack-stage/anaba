@@ -54,11 +54,11 @@ function DiscoverSkeleton() {
   return (
     // 地図の枠（components/discover/area-rotator.tsx）と同じ大きさを取り、読み込み後に跳ねないようにする。
     // スマホ・タブレットは地図の上に検索欄、下に情報パネルが浮かぶ（#142）ので、その位置に枠を出す
-    <div className="relative -mx-4 -mt-5 h-[calc(100dvh-3.5rem-1px-62px)] animate-pulse overflow-hidden bg-stone-200/60 sm:mx-0 sm:mt-0 sm:h-[calc(100dvh-4rem-1px-62px-2.5rem)] sm:rounded-2xl md:h-[calc(100dvh-7rem)]">
+    <div className="relative -mx-4 -mt-5 h-[calc(100dvh-3.5rem-1px-57px)] animate-pulse overflow-hidden bg-stone-200/60 sm:mx-0 sm:mt-0 sm:h-[calc(100dvh-4rem-1px-57px-2.5rem)] sm:rounded-2xl md:h-[calc(100dvh-7rem)]">
       {/* 検索欄（components/discover/discover-search.tsx）の高さぶん */}
       <div className="absolute inset-x-3 top-3 h-10 rounded-xl bg-white/80 sm:h-24 sm:rounded-2xl lg:hidden" />
       {/* 情報パネル（components/discover/spot-panel.tsx）。地域の切り替え・地域名・カード1枚ぶん */}
-      <div className="absolute inset-x-3 bottom-9 flex flex-col gap-2 rounded-2xl bg-white/80 p-3 sm:right-auto sm:w-[420px] md:bottom-3 lg:hidden">
+      <div className="absolute inset-x-3 bottom-9 flex flex-col gap-2 rounded-2xl bg-white/80 p-3 sm:bottom-3 sm:right-auto sm:w-[420px] lg:hidden">
         <div className="h-8 w-48 rounded-lg bg-stone-200/60" />
         <div className="h-10 w-40 rounded-lg bg-stone-200/60" />
         <div className="h-7 w-full rounded-lg bg-stone-200/60" />

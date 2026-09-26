@@ -249,7 +249,8 @@ function SpotCarousel({
             data-active={spot.id === activeSpotId || undefined}
             className={cn(
               "rounded-2xl transition-shadow data-[active]:ring-2 data-[active]:ring-ink data-[active]:ring-offset-2",
-              "max-lg:w-[85%] max-lg:shrink-0 max-lg:snap-start max-lg:snap-always",
+              // 中のカードを li の高さまで伸ばし、3枚の高さをいちばん高いカードにそろえる（li は並びの高さまで伸びる、#155）
+              "max-lg:flex max-lg:w-[85%] max-lg:shrink-0 max-lg:snap-start max-lg:snap-always",
               !multiple && "max-lg:w-full",
             )}
           >

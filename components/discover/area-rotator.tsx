@@ -108,11 +108,11 @@ export function AreaRotator({ areas }: { areas: AreaWithSpots[] }) {
     // PC は main の横幅（max-w-7xl）の中で、周りに余白を残して地図を広げる。
     // 高さは画面からヘッダー（h-16）と上下の余白を引いた分に固定し、絞り込んでも地図が縮まないようにする（A-02）。
     // 閉じた右のパネルがはみ出さないよう、枠の外は切る。
-    // スマホ（sm 未満）は、main の左右と上の余白を打ち消して画面の端まで広げ、高さはヘッダー（h-14 と下の枠線 1px）と下部ナビ（62px）のあいだにする。
+    // スマホ（sm 未満）は、main の左右と上の余白を打ち消して画面の端まで広げ、高さはヘッダー（h-14 と下の枠線 1px）と下部ナビ（57px。#163 で＋ボタンを飛び出させなくなった）のあいだにする。
     // タブレットは、sm〜md はヒーローの下に下部ナビの上までの高さで、md 以上（下部ナビがない）は PC と同じ高さで出す
     <div
       ref={frameRef}
-      className="relative -mx-4 -mt-5 h-[calc(100dvh-3.5rem-1px-62px)] overflow-hidden sm:mx-0 sm:mt-0 sm:h-[calc(100dvh-4rem-1px-62px-2.5rem)] sm:rounded-2xl md:h-[calc(100dvh-7rem)]"
+      className="relative -mx-4 -mt-5 h-[calc(100dvh-3.5rem-1px-57px)] overflow-hidden sm:mx-0 sm:mt-0 sm:h-[calc(100dvh-4rem-1px-57px-2.5rem)] sm:rounded-2xl md:h-[calc(100dvh-7rem)]"
     >
       {/* 左のパネル（PC）。幅は area-map.tsx の OVERLAY_PANEL_WIDTH と合わせる。
           スマホ・タブレットでは地図の上端に浮かべる。スマホは検索欄だけが見え、そのまわりで地図を触れるよう、枠は触れないようにする */}
@@ -147,11 +147,11 @@ export function AreaRotator({ areas }: { areas: AreaWithSpots[] }) {
       <section className="contents" {...hoverHandlers} {...focusHandlers}>
         {/* 右のパネル（PC）。下は地図の帰属表示が見えるよう空ける。幅は area-map.tsx の OVERLAY_PANEL_WIDTH と合わせる。
             外側の枠は開閉で横に滑らせるだけで、地図の操作を邪魔しないよう pointer-events を切る。
-            スマホ・タブレットでは地図の下端に浮かべる。下部ナビがある幅（md 未満）は、真ん中の＋ボタン（ナビから 28px 飛び出す）と
-            重ならないよう下を 36px 空ける。低い画面（横向き）では検索欄の下までに収め、中をスクロールさせる */}
+            スマホ・タブレットでは地図の下端に浮かべる。スマホ（sm 未満）は、下に写真の出典のリンクを出すので下を 36px 空ける（#155）。
+            低い画面（横向き）では検索欄の下までに収め、中をスクロールさせる */}
         <div
           ref={panelRef}
-          className={`max-lg:absolute max-lg:inset-x-3 max-lg:bottom-9 max-lg:z-10 max-lg:flex max-lg:max-h-[calc(100%-6.5rem)] max-lg:flex-col sm:max-lg:right-auto sm:max-lg:w-[420px] md:max-lg:bottom-3 lg:pointer-events-none lg:absolute lg:bottom-20 lg:right-4 lg:top-4 lg:z-10 lg:w-[360px] lg:transition-transform lg:duration-500 lg:ease-in-out lg:motion-reduce:transition-none xl:w-[420px] ${panelClosed ? "lg:translate-x-[calc(100%+1rem)]" : ""}`}
+          className={`max-lg:absolute max-lg:inset-x-3 max-lg:bottom-9 max-lg:z-10 max-lg:flex max-lg:max-h-[calc(100%-6.5rem)] max-lg:flex-col sm:max-lg:bottom-3 sm:max-lg:right-auto sm:max-lg:w-[420px] lg:pointer-events-none lg:absolute lg:bottom-20 lg:right-4 lg:top-4 lg:z-10 lg:w-[360px] lg:transition-transform lg:duration-500 lg:ease-in-out lg:motion-reduce:transition-none xl:w-[420px] ${panelClosed ? "lg:translate-x-[calc(100%+1rem)]" : ""}`}
         >
           {/* パネルの左上に付いたタブ（PC）。パネルと一緒に滑るので、閉じると地図の右の端に残る。
               開いているときは「閉じる」、閉じているときは「開く」を縦書きで出す */}
@@ -223,8 +223,8 @@ export function AreaRotator({ areas }: { areas: AreaWithSpots[] }) {
       </section>
 
       {/* スマホ（sm 未満）はページをスクロールさせずフッターを出さないので（app/globals.css、#155）、
-          フッターの「写真の出典」（CC BY・CC BY-SA の表示の条件、#67）へのリンクを、情報パネルの下の右端に出す。
-          真ん中は下部ナビの＋ボタンが飛び出すので、右に寄せる。押せる範囲は高さ 24px（WCAG 2.5.8） */}
+          フッターの「写真の出典」（CC BY・CC BY-SA の表示の条件、#67）へのリンクを、情報パネルの下の右端
+          （地図の帰属表示と同じ右側）に出す。押せる範囲は高さ 24px（WCAG 2.5.8） */}
       <Link
         href="/credits"
         className="absolute bottom-1.5 right-3 z-10 flex min-h-6 items-center rounded-full bg-white/85 px-2 text-[11px] text-stone-600 underline underline-offset-2 shadow-sm backdrop-blur-sm hover:text-shu focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:hidden"

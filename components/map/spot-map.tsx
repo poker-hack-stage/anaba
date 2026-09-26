@@ -310,7 +310,8 @@ export function SpotMap({
     (s): [number, number] => [s.lng, s.lat],
   );
   const pointsKey = points.map((p) => p.join(",")).join(";");
-  const fitKey = `${fitPoints.map((p) => p.join(",")).join(";")}|${fitPadding.top},${fitPadding.right},${fitPadding.bottom},${fitPadding.left}`;
+  const fitPointsKey = fitPoints.map((p) => p.join(",")).join(";");
+  const paddingKey = `${fitPadding.top},${fitPadding.right},${fitPadding.bottom},${fitPadding.left}`;
   const routeKey = routes
     .map(
       (r) =>
@@ -336,12 +337,27 @@ export function SpotMap({
 
   // 範囲を合わせたことのある地図。作り直した地図の最初の表示は即時にする
   const fittedMap = useRef<MapLibreMap | null>(null);
+  // 最後に範囲を合わせた見る対象（スポット・境界）と、そのあと利用者が地図を動かしたか
+  const fittedTarget = useRef<string | null>(null);
+  const userMoved = useRef(false);
 
   // 表示範囲を合わせる。見る対象（スポット・境界・余白）が変わったときだけ動かす
   useEffect(() => {
     if (!map) return;
+    // 見る対象はそのままで余白だけが変わったとき（スマホで浮かべた検索欄・パネルの高さが変わったとき）は、
+    // 利用者が拡大・移動していたら合わせ直さない（チップを開け閉めしただけで表示が戻らないように、#151・#155）
+    const target = `${pointsKey}|${fitPointsKey}|${boundaryKey}`;
+    if (
+      fittedMap.current === map &&
+      fittedTarget.current === target &&
+      userMoved.current
+    ) {
+      return;
+    }
     const animate = animateMove && fittedMap.current === map;
     fittedMap.current = map;
+    fittedTarget.current = target;
+    userMoved.current = false;
     const box = computeBounds([
       ...points,
       ...fitPoints,
@@ -356,9 +372,9 @@ export function SpotMap({
     } else {
       map.fitBounds(box, { ...move, padding: fitPadding, maxZoom: 15 });
     }
-    // points は pointsKey、fitPoints と fitPadding は fitKey、boundaryBox は boundaryKey で比較する
+    // points は pointsKey、fitPoints は fitPointsKey、fitPadding は paddingKey、boundaryBox は boundaryKey で比較する
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, pointsKey, fitKey, boundaryKey, animateMove]);
+  }, [map, pointsKey, fitPointsKey, paddingKey, boundaryKey, animateMove]);
 
   // ハイライトのピンのずらす量（px。スポットの id ごと）。ずらさないピンは入れない
   const [highlightOffsets, setHighlightOffsets] =
@@ -493,7 +509,9 @@ export function SpotMap({
   useEffect(() => {
     if (!map) return;
     const handleMoveStart = (event: { originalEvent?: unknown }) => {
-      if (event.originalEvent) onUserMoveRef.current?.();
+      if (!event.originalEvent) return;
+      userMoved.current = true;
+      onUserMoveRef.current?.();
     };
     map.on("movestart", handleMoveStart);
     return () => {

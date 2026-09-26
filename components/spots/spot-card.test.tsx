@@ -38,4 +38,19 @@ describe("SpotCard", () => {
     fireEvent.click(screen.getByRole("button"));
     expect(onSelect).toHaveBeenCalledWith(s);
   });
+
+  test("情報パネルのカードでも、キャッチコピーは2行まで（長い文は「…」、#155）", () => {
+    render(
+      <SpotCard
+        spot={{
+          ...spot("hakuba", "姫川源流", "nature"),
+          catchphrase: "とても長いキャッチコピー".repeat(10),
+        }}
+        variant="panel"
+      />,
+    );
+    const catchphrase = screen.getByText(/とても長いキャッチコピー/);
+    expect(catchphrase.className).toMatch(/\bline-clamp-2\b/);
+    expect(catchphrase.className).not.toMatch(/line-clamp-1/);
+  });
 });

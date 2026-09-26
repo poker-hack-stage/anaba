@@ -600,3 +600,14 @@ describe("スマホの写真の出典（#155）", () => {
     expect(screen.getByRole("link", { name: "写真の出典" })).toBeTruthy();
   });
 });
+
+describe("スマホのおすすめのカードの大きさ（#155）", () => {
+  test("3枚の li を同じ幅にし、中のカードを li の高さまで伸ばす（いちばん高いカードにそろえる）", () => {
+    render(<AreaRotator areas={areas} />);
+    const list = screen.getByRole("list", { name: "おすすめの2か所" });
+    for (const item of within(list).getAllByRole("listitem")) {
+      expect(item.className).toMatch(/\bmax-lg:flex\b/);
+      expect(item.className).toMatch(/max-lg:w-\[85%\]/);
+    }
+  });
+});

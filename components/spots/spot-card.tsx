@@ -35,7 +35,8 @@ export function preloadSpotCardImages(
  * 口コミの件数・平均はカードには出さない（詳細の口コミ欄だけ、#53）。
  * `variant="panel"` は PC（lg 以上）で写真を上に大きく出し、その下に文字を並べる。
  * スマホ・タブレット（lg 未満）では地図の下に浮かべた横スクロールのカードになるので（#142）、地図を隠しすぎないよう
- * 写真を少し小さくし、評価と穴場度を1行に、キャッチコピーを1行にして、タグとおすすめの時間帯は出さない
+ * 写真を少し小さくし、評価と穴場度を1行に、キャッチコピーを2行まで（長い文は「…」）にして、タグとおすすめの時間帯は出さない。
+ * 横に並べたカードの高さは、並びの側（spot-panel.tsx）でいちばん高いカードにそろえる（#155）
  */
 export function SpotCard({
   spot,
@@ -93,12 +94,7 @@ export function SpotCard({
           </div>
         )}
         {spot.catchphrase && (
-          <p
-            className={cn(
-              "line-clamp-2 text-xs leading-relaxed text-stone-600",
-              panel && "max-lg:line-clamp-1",
-            )}
-          >
+          <p className="line-clamp-2 text-xs leading-relaxed text-stone-600">
             {spot.catchphrase}
           </p>
         )}
