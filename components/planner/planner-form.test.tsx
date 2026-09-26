@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import type { SpotMapProps } from "@/components/map/spot-map";
@@ -268,6 +268,106 @@ describe("PlannerForm", () => {
           .getByRole("button", { name: "日帰り" })
           .getAttribute("aria-pressed"),
       ).toBe("true");
+    });
+  });
+
+  describe("自由記述の希望（#114）", () => {
+    function stubFetch() {
+      const body: PlanResponse = { candidates: [], mode: "ai" };
+      const fetchMock = vi.fn().mockResolvedValue(Response.json(body));
+      vi.stubGlobal("fetch", fetchMock);
+      return fetchMock;
+    }
+    const noteField = () =>
+      screen.getByLabelText<HTMLTextAreaElement>("ほかに希望があれば（任意）");
+
+    test("入力中は URL を書き換えず、フォーカスが外れたときに書く", () => {
+      renderForm({ submit: false });
+      const replaceState = vi.mocked(window.history.replaceState);
+      replaceState.mockClear();
+
+      fireEvent.change(noteField(), { target: { value: "雨" } });
+      fireEvent.change(noteField(), { target: { value: "雨でも\n楽しめる" } });
+      expect(replaceState).not.toHaveBeenCalled();
+      expect(noteField().value).toBe("雨でも\n楽しめる");
+      expect(screen.getByText("残り92文字")).toBeTruthy();
+
+      fireEvent.blur(noteField());
+      expect(replaceState).toHaveBeenCalledTimes(1);
+      expect(new URLSearchParams(query.get()).get("note")).toBe(
+        "雨でも 楽しめる",
+      );
+    });
+
+    test("「絞る」で、入力中の希望も URL に書いて送る", async () => {
+      const fetchMock = stubFetch();
+      renderForm({ submit: false });
+
+      fireEvent.change(noteField(), {
+        target: { value: " ゆっくり回りたい " },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "絞る" }));
+      await screen.findByText("この条件では候補を組めませんでした");
+
+      expect(sentBody(fetchMock)).toMatchObject({ note: "ゆっくり回りたい" });
+      expect(new URLSearchParams(query.get()).get("note")).toBe(
+        "ゆっくり回りたい",
+      );
+      // 送った条件と今の条件は同じなので、「条件が変わっています」は出さない
+      expect(screen.queryByText(/条件が変わっています/)).toBeNull();
+    });
+
+    test("希望を書かなければ、送る条件にも URL にも入れない", async () => {
+      const fetchMock = stubFetch();
+      renderForm({ submit: false });
+
+      fireEvent.change(noteField(), { target: { value: "   " } });
+      fireEvent.blur(noteField());
+      fireEvent.click(screen.getByRole("button", { name: "絞る" }));
+      await screen.findByText("この条件では候補を組めませんでした");
+
+      expect(sentBody(fetchMock)).not.toHaveProperty("note");
+      expect(query.get()).not.toContain("note=");
+    });
+
+    test("URL のクエリの希望を読み、100字で切る", () => {
+      query.set(
+        `?area=any&duration=day&companion=友人&transport=車&note=${encodeURIComponent(`子どもと${"あ".repeat(120)}`)}`,
+      );
+      renderForm({ submit: false });
+
+      expect(noteField().value).toBe(`子どもと${"あ".repeat(96)}`);
+      expect(screen.getByText("残り0文字")).toBeTruthy();
+    });
+
+    test("URL の希望が変わったら（ブラウザの「戻る」など）、入力中の文を捨てて URL に合わせる", () => {
+      query.set("?area=any&duration=day&companion=友人&transport=車&note=雨");
+      renderForm({ submit: false });
+
+      fireEvent.change(noteField(), { target: { value: "書きかけ" } });
+      act(() =>
+        query.set(
+          "?area=any&duration=day&companion=友人&transport=車&note=晴れ",
+        ),
+      );
+
+      expect(noteField().value).toBe("晴れ");
+    });
+
+    test("デモモードで希望があったら、一部だけ反映したと知らせる", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockRejectedValue(new TypeError("offline")),
+      );
+      renderForm({ submit: false });
+
+      fireEvent.change(noteField(), { target: { value: "雨の日" } });
+      fireEvent.click(screen.getByRole("button", { name: "絞る" }));
+      await screen.findByText("松本市をめぐる日帰りプラン");
+
+      expect(screen.getByRole("status").textContent).toContain(
+        "希望は、デモモードでは一部",
+      );
     });
   });
 
