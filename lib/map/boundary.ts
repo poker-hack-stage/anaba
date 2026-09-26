@@ -25,42 +25,6 @@ export function toAreaBoundary(value: unknown): AreaBoundary | null {
   return null;
 }
 
-/** 世界全体を覆う外周（反時計回り）。メルカトル図法で描ける緯度の範囲にとどめる */
-const WORLD_RING: Position[] = [
-  [-180, -85],
-  [180, -85],
-  [180, 85],
-  [-180, 85],
-  [-180, -85],
-];
-
-/**
- * 地域の外側（世界全体から地域をくり抜いた形）。地図で地域の外を暗くするのに使う。
- * くり抜くのは各ポリゴンの外周だけにする（地域の中の穴も明るいままになるが、今の12地域に穴はない）。
- * MapLibre は輪郭の回る向きで外周と穴を見分けるので、穴は外周と逆の時計回りにそろえる
- */
-export function outsideOf(boundary: AreaBoundary): Polygon {
-  const outers =
-    boundary.type === "Polygon"
-      ? [boundary.coordinates[0]]
-      : boundary.coordinates.map((polygon) => polygon[0]);
-  const holes = outers.map((ring) =>
-    signedArea(ring) > 0 ? [...ring].reverse() : ring,
-  );
-  return { type: "Polygon", coordinates: [WORLD_RING, ...holes] };
-}
-
-/** 輪郭の符号付き面積（経度・緯度のまま）。正なら反時計回り */
-function signedArea(ring: Position[]): number {
-  let sum = 0;
-  for (let i = 0; i < ring.length - 1; i++) {
-    const [x1, y1] = ring[i];
-    const [x2, y2] = ring[i + 1];
-    sum += x1 * y2 - x2 * y1;
-  }
-  return sum / 2;
-}
-
 /** 輪郭（最初が外周、残りが穴）の並び。輪郭は閉じた4点以上 */
 function isPolygon(value: unknown): value is Position[][] {
   return (
