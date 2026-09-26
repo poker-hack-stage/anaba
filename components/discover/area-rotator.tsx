@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { PanelRightClose, PanelRightOpen, SearchX } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { SpotDetailDialog } from "@/components/spots/spot-detail-dialog";
@@ -19,13 +19,16 @@ import { SpotPanel } from "./spot-panel";
 import { useAutoRotate } from "./use-auto-rotate";
 import { useDiscoverFilter } from "./use-discover-filter";
 import { useMediaQuery } from "./use-media-query";
+import { useOverlayInsets } from "./use-overlay-insets";
 
 /**
  * 「穴場を探す」のメイン部分。
  * 地図で1つの地域とおすすめ3件をハイライトし、情報パネルにその3件を出す。数秒ごとに次の地域へ切り替わる。
  * PC（lg 以上）は、ページの横幅いっぱいに地図を広げ、左に検索・絞り込み、右に情報パネルを重ねる（docs/spec.md 6.1）。
  * 右の情報パネルは、左上に付いたタブで開け閉めできる。閉じるとタブごと右へ滑り、地図の右の端にタブ（「開く」）だけが残る。
- * スマホ・タブレットは、検索欄・地図・情報パネルを縦に並べる。
+ * スマホ・タブレット（lg 未満）は、地図をヘッダーと下部ナビのあいだいっぱいに出し、上端に検索欄、
+ * 下端に情報パネル（地域の切り替え・地域名・横スクロールのおすすめのカード）を浮かべる（#142）。
+ * 表示中のカードのスポットのピンを地図で目立たせる。
  * 地図のおすすめのピンにマウスを乗せると、情報パネルの同じカードを枠で強調する（#14）。
  * 検索欄・カテゴリで絞り込むと、条件に合うスポットがある地域だけを巡回する（docs/spec.md 画面-3）。
  * 地図は area-map.tsx、情報パネルは spot-panel.tsx、切り替えは use-auto-rotate.ts と area-nav.tsx、
@@ -67,10 +70,15 @@ export function AreaRotator({ areas }: { areas: AreaWithSpots[] }) {
   // 地図のピンにマウスが乗っているスポット。情報パネルの同じカードを強調する。
   // 地域が変わったら消す（ピンが消えると、マウスが離れた知らせが来ないため）
   const [hoveredSpotId, setHoveredSpotId] = useState<string | null>(null);
+  // スマホで見えているおすすめのカードの番号。地域が変わったら最初のカードに戻す（カードの並びも作り直す）
+  const [cardIndex, setCardIndex] = useState(0);
   if (prevAreaId !== area?.id) {
     setPrevAreaId(area?.id);
     setHoveredSpotId(null);
+    setCardIndex(0);
   }
+  const visibleSpot =
+    area?.recommended[Math.min(cardIndex, area.recommended.length - 1)];
   const hoverSpot = useCallback(
     (spot: Spot | null) => setHoveredSpotId(spot?.id ?? null),
     [],
@@ -83,13 +91,28 @@ export function AreaRotator({ areas }: { areas: AreaWithSpots[] }) {
   const lg = useMediaQuery("(min-width: 1024px)");
   const panelClosed = lg && !panelOpen;
 
+  // スマホ・タブレットで、上に浮かべた検索欄と下に浮かべた情報パネルの高さ。地図の表示範囲の余白に使う
+  const frameRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const overlayInsets = useOverlayInsets(frameRef, searchRef, panelRef, !lg);
+
   return (
     // PC は main の横幅（max-w-7xl）の中で、周りに余白を残して地図を広げる。
     // 高さは画面からヘッダー（h-16）と上下の余白を引いた分に固定し、絞り込んでも地図が縮まないようにする（A-02）。
-    // 閉じた右のパネルがはみ出さないよう、枠の外は切る
-    <div className="flex flex-col gap-4 lg:relative lg:h-[calc(100dvh-7rem)] lg:overflow-hidden lg:rounded-2xl">
-      {/* 左のパネル（PC）。幅は area-map.tsx の OVERLAY_PANEL_WIDTH と合わせる */}
-      <div className="lg:absolute lg:left-4 lg:top-4 lg:z-10 lg:max-h-[calc(100%-2rem)] lg:w-[300px] lg:overflow-y-auto lg:rounded-2xl lg:border lg:border-stone-200 lg:bg-white/95 lg:p-4 lg:shadow-lg lg:backdrop-blur-sm xl:w-[340px]">
+    // 閉じた右のパネルがはみ出さないよう、枠の外は切る。
+    // スマホ（sm 未満）は、main の左右と上の余白を打ち消して画面の端まで広げ、高さはヘッダー（h-14 と下の枠線 1px）と下部ナビ（62px）のあいだにする。
+    // タブレットは、sm〜md はヒーローの下に下部ナビの上までの高さで、md 以上（下部ナビがない）は PC と同じ高さで出す
+    <div
+      ref={frameRef}
+      className="relative -mx-4 -mt-5 h-[calc(100dvh-3.5rem-1px-62px)] overflow-hidden sm:mx-0 sm:mt-0 sm:h-[calc(100dvh-4rem-1px-62px-2.5rem)] sm:rounded-2xl md:h-[calc(100dvh-7rem)]"
+    >
+      {/* 左のパネル（PC）。幅は area-map.tsx の OVERLAY_PANEL_WIDTH と合わせる。
+          スマホ・タブレットでは地図の上端に浮かべる。スマホは検索欄だけが見え、そのまわりで地図を触れるよう、枠は触れないようにする */}
+      <div
+        ref={searchRef}
+        className="max-lg:absolute max-lg:inset-x-3 max-lg:top-3 max-lg:z-20 max-sm:pointer-events-none sm:max-lg:rounded-2xl sm:max-lg:border sm:max-lg:border-stone-200 sm:max-lg:bg-white/95 sm:max-lg:p-3 sm:max-lg:shadow-lg sm:max-lg:backdrop-blur-sm lg:absolute lg:left-4 lg:top-4 lg:z-10 lg:max-h-[calc(100%-2rem)] lg:w-[300px] lg:overflow-y-auto lg:rounded-2xl lg:border lg:border-stone-200 lg:bg-white/95 lg:p-4 lg:shadow-lg lg:backdrop-blur-sm xl:w-[340px]"
+      >
         <DiscoverSearch
           text={search.text}
           onTextChange={search.setText}
@@ -112,18 +135,16 @@ export function AreaRotator({ areas }: { areas: AreaWithSpots[] }) {
         />
       </div>
 
-      {/* PC では contents で枠をなくし、中の地図と右のパネルを外側の枠に重ねる。
-          Tab で条件の次にすぐ情報パネルへ行けるよう、DOM では情報パネルを地図より前に置き、
-          スマホ・タブレットでは order で地図を上に並べる（A-10） */}
-      <section
-        className="flex flex-col gap-4 lg:contents"
-        {...hoverHandlers}
-        {...focusHandlers}
-      >
+      {/* contents で枠をなくし、中の地図と情報パネルを外側の枠に重ねる。
+          Tab で条件の次にすぐ情報パネルへ行けるよう、DOM では情報パネルを地図より前に置く（A-10） */}
+      <section className="contents" {...hoverHandlers} {...focusHandlers}>
         {/* 右のパネル（PC）。下は地図の帰属表示が見えるよう空ける。幅は area-map.tsx の OVERLAY_PANEL_WIDTH と合わせる。
-            外側の枠は開閉で横に滑らせるだけで、地図の操作を邪魔しないよう pointer-events を切る */}
+            外側の枠は開閉で横に滑らせるだけで、地図の操作を邪魔しないよう pointer-events を切る。
+            スマホ・タブレットでは地図の下端に浮かべる。下部ナビがある幅（md 未満）は、真ん中の＋ボタン（ナビから 28px 飛び出す）と
+            重ならないよう下を 36px 空ける。低い画面（横向き）では検索欄の下までに収め、中をスクロールさせる */}
         <div
-          className={`order-2 lg:pointer-events-none lg:absolute lg:bottom-20 lg:right-4 lg:top-4 lg:z-10 lg:w-[360px] lg:transition-transform lg:duration-500 lg:ease-in-out lg:motion-reduce:transition-none xl:w-[420px] ${panelClosed ? "lg:translate-x-[calc(100%+1rem)]" : ""}`}
+          ref={panelRef}
+          className={`max-lg:absolute max-lg:inset-x-3 max-lg:bottom-9 max-lg:z-10 max-lg:flex max-lg:max-h-[calc(100%-6.5rem)] max-lg:flex-col sm:max-lg:right-auto sm:max-lg:w-[420px] md:max-lg:bottom-3 lg:pointer-events-none lg:absolute lg:bottom-20 lg:right-4 lg:top-4 lg:z-10 lg:w-[360px] lg:transition-transform lg:duration-500 lg:ease-in-out lg:motion-reduce:transition-none xl:w-[420px] ${panelClosed ? "lg:translate-x-[calc(100%+1rem)]" : ""}`}
         >
           {/* パネルの左上に付いたタブ（PC）。パネルと一緒に滑るので、閉じると地図の右の端に残る。
               開いているときは「閉じる」、閉じているときは「開く」を縦書きで出す */}
@@ -152,7 +173,7 @@ export function AreaRotator({ areas }: { areas: AreaWithSpots[] }) {
             id="discover-panel"
             // 閉じている間は、中のカードやボタンに Tab で行かないようにする
             inert={panelClosed}
-            className="lg:pointer-events-auto lg:max-h-full lg:overflow-y-auto lg:rounded-2xl lg:shadow-lg"
+            className="max-lg:min-h-0 max-lg:overflow-y-auto max-lg:rounded-2xl max-lg:shadow-lg lg:pointer-events-auto lg:max-h-full lg:overflow-y-auto lg:rounded-2xl lg:shadow-lg"
           >
             {filtering && !area ? (
               <NoMatchPanel onClear={search.clear} />
@@ -161,6 +182,8 @@ export function AreaRotator({ areas }: { areas: AreaWithSpots[] }) {
                 area={area}
                 nextArea={filteredAreas[(index + 1) % filteredAreas.length]}
                 activeSpotId={hoveredSpotId}
+                cardIndex={cardIndex}
+                onCardIndexChange={setCardIndex}
                 onSelectSpot={setSelectedSpot}
                 nav={
                   <AreaNav
@@ -176,11 +199,13 @@ export function AreaRotator({ areas }: { areas: AreaWithSpots[] }) {
           </div>
         </div>
 
-        <div className="order-1 lg:absolute lg:inset-0">
+        <div className="absolute inset-0">
           <AreaMap
             area={area}
             allAreas={areas}
             rightPanelOpen={!panelClosed}
+            overlayInsets={overlayInsets}
+            activeSpotId={visibleSpot?.id}
             onSpotClick={setSelectedSpot}
             onSpotHover={hoverSpot}
           />
@@ -192,15 +217,18 @@ export function AreaRotator({ areas }: { areas: AreaWithSpots[] }) {
   );
 }
 
-/** 絞り込みで1件も当たらなかったときの情報パネル */
+/**
+ * 絞り込みで1件も当たらなかったときの情報パネル。
+ * スマホ・タブレットでは地図の下端に浮かべるので、点線の枠をなくして余白を詰め、地図を隠しすぎないようにする（#142）
+ */
 function NoMatchPanel({ onClear }: { onClear: () => void }) {
   return (
-    <div className="flex flex-col gap-4 rounded-2xl border border-stone-200 bg-white p-5">
+    <div className="flex flex-col gap-4 rounded-2xl border border-stone-200 bg-white p-5 max-lg:gap-2 max-lg:bg-white/95 max-lg:p-3 max-lg:backdrop-blur-sm">
       <EmptyState
         icon={SearchX}
         title="条件に合う穴場が見つかりませんでした"
         description="キーワードを短くするか、カテゴリを減らしてみてください。"
-        className="flex-1"
+        className="flex-1 max-lg:border-0 max-lg:bg-transparent max-lg:px-2 max-lg:py-2"
       />
       <Button variant="outline" onClick={onClear} className="self-center">
         条件をクリア

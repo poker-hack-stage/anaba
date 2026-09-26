@@ -1,7 +1,7 @@
 "use client";
 
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import {
   Map as MapLibreMap,
@@ -51,6 +51,11 @@ export type SpotMapProps = {
    * 幅の狭い地図（640px 未満）では、重なるピンを少しずらしてどれも押せるようにする（#109）
    */
   highlighted?: Spot[];
+  /**
+   * ハイライトのうち、さらに目立たせるスポットの id（「穴場を探す」のスマホで、表示中のカードのスポット、#142）。
+   * ピンを一回り大きくし、枠を付けて前に出す
+   */
+  activeSpotId?: string | null;
   /** 経路。日ごとに分けるときは複数渡し、線とピンを色分けする。経路どうしは線でつながない */
   routes?: SpotRoute[];
   /** そのほかのスポット。小さく表示 */
@@ -100,6 +105,8 @@ export type SpotMapProps = {
   /** 左上の表示（地域名と凡例）の位置を変えるクラス。地図の上に重ねたパネルと重ならないようにする */
   labelClassName?: string;
   className?: string;
+  /** 外側の枠の style（CSS 変数を渡すときなど） */
+  style?: CSSProperties;
 };
 
 export type FitPadding = {
@@ -197,6 +204,7 @@ const LOCALE = {
 /** スポットを載せる地図（MapLibre ＋ OpenFreeMap） */
 export function SpotMap({
   highlighted = [],
+  activeSpotId,
   routes = [],
   others = [],
   areaName,
@@ -213,6 +221,7 @@ export function SpotMap({
   controlPosition = "top-right",
   labelClassName,
   className,
+  style,
 }: SpotMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<MapLibreMap | null>(null);
@@ -456,6 +465,7 @@ export function SpotMap({
         "relative isolate overflow-hidden rounded-2xl border border-stone-200 bg-emerald-50/60 [&_.maplibregl-control-container>div]:z-[5]",
         className,
       )}
+      style={style}
     >
       {/* MapLibre が地図の要素に position: relative を付けるので、外側の枠で大きさを決める */}
       <div className="absolute inset-0">
@@ -483,7 +493,8 @@ export function SpotMap({
               spot={spot}
               size="lg"
               title={spot.name}
-              zIndex={2}
+              zIndex={spot.id === activeSpotId ? 3 : 2}
+              active={spot.id === activeSpotId}
               offset={highlightOffsets.get(spot.id)}
             />
           ))}
@@ -591,6 +602,7 @@ function SpotMarker({
   color,
   title,
   zIndex,
+  active = false,
   offset,
   onSpotClick,
   onSpotHover,
@@ -605,6 +617,8 @@ function SpotMarker({
   title: string;
   /** 重なり順。経路 > ハイライト > そのほか */
   zIndex: number;
+  /** 目立たせる（表示中のカードのスポット、#142） */
+  active?: boolean;
   /** 本当の場所からずらして描く量（px）。重なるピンを離すとき（#109） */
   offset?: PixelPoint;
   onSpotClick?: (spot: Spot) => void;
@@ -639,6 +653,12 @@ function SpotMarker({
     };
   }, [map, element, spot.lng, spot.lat]);
 
+  // 重なり順は、目立たせるピンが変わるたびに付け直す（Marker の要素は作るときに渡した element）
+  useEffect(() => {
+    const el = markerRef.current?.getElement();
+    if (el) el.style.zIndex = String(zIndex);
+  }, [zIndex]);
+
   useEffect(() => {
     offsetRef.current = [offsetX, offsetY];
     markerRef.current?.setOffset([offsetX, offsetY]);
@@ -653,6 +673,7 @@ function SpotMarker({
       type="button"
       title={title}
       aria-label={title}
+      data-active={active || undefined}
       onClick={() => onSpotClick?.(spot)}
       // マウスだけを「乗せた」に数える。タッチのタップは詳細を開くだけにする（離れたことが分からず、強調が残るため）
       onPointerEnter={(e) => e.pointerType === "mouse" && onSpotHover?.(spot)}
@@ -672,6 +693,9 @@ function SpotMarker({
         size === "sm" && "text-[10px] opacity-70",
         size === "md" && "text-xs",
         size === "lg" && "text-lg",
+        // 表示中のカードのスポット。大きくし、濃い枠で囲む（色だけに頼らない）
+        active &&
+          "scale-125 shadow-lg ring-[3px] ring-ink hover:scale-[1.35] motion-reduce:transition-none",
       )}
     >
       {label ??
