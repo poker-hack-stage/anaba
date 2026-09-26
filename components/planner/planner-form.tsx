@@ -17,6 +17,7 @@ import {
   Route,
   SearchX,
   Sparkles,
+  Undo2,
   type LucideIcon,
 } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
@@ -58,6 +59,7 @@ import {
 import {
   type PlannerResult,
   type PlannerStatus,
+  toSnapshot,
   usePlannerState,
 } from "./planner-state";
 
@@ -176,6 +178,10 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
     setResult,
     selectedCandidate,
     selectCandidate,
+    history,
+    pushHistory,
+    clearHistory,
+    restorePrevious,
   } = usePlannerState();
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   // 入力中の希望（#114）。null なら、URL の条件の希望を出す。
@@ -316,6 +322,8 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
     // 結果は Context に入れるので、読み込み中に別のタブへ移動しても戻ると表示される
     // 結果には、送ったときの条件を付けておく（あとで条件が変わってもずれが分かるように）
     const requested = commitNote();
+    // 新しく作るプランは、作り直し（#32）の続きではないので、前のプランの履歴を捨てる
+    clearHistory();
     setResult({ status: "loading", candidates, conditions: requested, mode });
     try {
       setResult(await fetchPlan(requested));
@@ -341,7 +349,8 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
 
   /**
    * 経路外のスポットを経路に加えて作り直す（#32）。今の候補を出したときの条件（フォームで変えた条件ではなく）に
-   * スポットの id を足して呼び直す。失敗したら（候補が0件も）、元の候補と選んでいたタブに戻してエラーを出す
+   * スポットの id を足して呼び直す。失敗したら（候補が0件も）、元の候補と選んでいたタブに戻してエラーを出す。
+   * 作り直せたら、元のプランを「前のプランに戻る」の履歴に積む（#149）
    */
   const rebuildWithSpot = async (spot: Spot) => {
     const previous = result;
@@ -370,10 +379,29 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
     if (rebuilt && rebuilt.candidates.length > 0) {
       // 元と同じ地域の候補があれば、そのタブを選んだままにする
       const index = rebuilt.candidates.findIndex((c) => c.id === previousId);
+      const snapshot = toSnapshot(previous, previousIndex);
+      if (snapshot) {
+        pushHistory({
+          plan: snapshot,
+          addedSpot: { id: spot.id, name: spot.name },
+        });
+      }
       setResult(rebuilt, Math.max(index, 0));
       return;
     }
-    setResult({ ...previous, rebuildError: error }, previousIndex);
+    setResult(
+      { ...previous, rebuildError: error, restoredWithout: undefined },
+      previousIndex,
+    );
+  };
+
+  /**
+   * 「前のプランに戻る」（#149）。戻して履歴が空になるとボタンが消えるので、フォーカスを結果の見出しに移す
+   * （まだ戻れるときは、続けて押せるようボタンに残す）
+   */
+  const goBackToPreviousPlan = () => {
+    if (history.length === 1) resultHeadingRef.current?.focus();
+    restorePrevious();
   };
 
   // 詳細の「経路に加えて作り直す」は、表示中の候補の経路外のスポットを開いたときだけ出す
@@ -486,6 +514,9 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
           rateLimited={rateLimited}
           hasNote={result.conditions?.note !== undefined}
           rebuildError={result.rebuildError}
+          restoredWithout={result.restoredWithout}
+          previousPlanSpotName={history.at(-1)?.addedSpot.name}
+          onRestorePrevious={goBackToPreviousPlan}
           selectedCandidate={selectedCandidate}
           onSelectCandidate={selectCandidate}
           onSpotClick={setSelectedSpot}
@@ -531,6 +562,9 @@ function Result({
   rateLimited,
   hasNote,
   rebuildError,
+  restoredWithout,
+  previousPlanSpotName,
+  onRestorePrevious,
   selectedCandidate,
   onSelectCandidate,
   onSpotClick,
@@ -542,6 +576,11 @@ function Result({
   /** 候補を出したときの条件に、自由記述の希望（#114）があったか */
   hasNote: boolean;
   rebuildError?: string;
+  /** 「前のプランに戻る」で戻したとき、経路から外れたスポットの名前 */
+  restoredWithout?: string;
+  /** 戻れる前のプランがあるとき、そのプランのあとに加えたスポットの名前（なければボタンを出さない） */
+  previousPlanSpotName?: string;
+  onRestorePrevious: () => void;
   selectedCandidate: number;
   onSelectCandidate: (index: number) => void;
   onSpotClick: (spot: Spot) => void;
@@ -596,6 +635,23 @@ function Result({
           <span>{rebuildError}</span>
         </p>
       )}
+      {restoredWithout && (
+        <p
+          role="status"
+          className="flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900"
+        >
+          <Undo2 className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            「{restoredWithout}」を経路から外し、加える前のプランに戻しました。
+          </span>
+        </p>
+      )}
+      {previousPlanSpotName && (
+        <PreviousPlanButton
+          spotName={previousPlanSpotName}
+          onClick={onRestorePrevious}
+        />
+      )}
       {mode === "demo" && (
         <p
           role="status"
@@ -619,6 +675,33 @@ function Result({
         onSpotClick={onSpotClick}
       />
     </>
+  );
+}
+
+/** 「前のプランに戻る」（#149）。どのスポットを加える前に戻るのかを、ボタンの横に添える */
+function PreviousPlanButton({
+  spotName,
+  onClick,
+}: {
+  spotName: string;
+  onClick: () => void;
+}) {
+  const descriptionId = useId();
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <button
+        type="button"
+        onClick={onClick}
+        aria-describedby={descriptionId}
+        className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-bold text-stone-800 transition-colors hover:border-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98]"
+      >
+        <Undo2 className="h-4 w-4" />
+        前のプランに戻る
+      </button>
+      <span id={descriptionId} className="text-xs text-stone-600">
+        「{spotName}」を経路に加える前のプラン
+      </span>
+    </div>
   );
 }
 
