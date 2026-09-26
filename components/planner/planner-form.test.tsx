@@ -144,6 +144,16 @@ afterEach(() => {
 });
 
 describe("PlannerForm", () => {
+  test("作る前の空の「旅の候補」の枠は、スマホ（lg 未満）では出さない（#163）", () => {
+    renderForm({ submit: false });
+
+    // jsdom は CSS を当てないので、lg 未満で隠すクラスが付いていることを確かめる
+    const empty = screen
+      .getByText("旅の候補がここに表示されます")
+      .closest(".max-lg\\:hidden");
+    expect(empty).not.toBeNull();
+  });
+
   test("/api/plan が失敗したら、ブラウザでデモモードの候補を出す", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("offline")));
 

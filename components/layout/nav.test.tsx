@@ -64,6 +64,18 @@ describe("BottomNav の真ん中のボタン", () => {
     expect(button.hasAttribute("aria-current")).toBe(false);
   });
 
+  test("「穴場を教える」はほかのタブと同じ高さにそろえ、ナビの上に飛び出させない（#163）", () => {
+    render(<BottomNav />);
+
+    const nav = screen.getByRole("navigation");
+    const button = within(nav).getByRole("button", { name: "穴場を教える" });
+    const tab = within(nav).getByRole("link", { name: "穴場を探す" });
+    // jsdom は CSS を当てないので、高さを決めるクラスで比べる
+    expect(button.classList.contains("min-h-11")).toBe(true);
+    expect(tab.classList.contains("min-h-11")).toBe(true);
+    expect(button.className).not.toMatch(/(^|\s)-mt-/);
+  });
+
   test.each(["/", "/planner", "/credits", "/no-such-page"])(
     "%s でも、押すと「穴場を教える」のダイアログが開く",
     async (path) => {
