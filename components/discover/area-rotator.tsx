@@ -42,10 +42,15 @@ export function AreaRotator({ areas }: { areas: AreaWithSpots[] }) {
     [areas, filter],
   );
 
-  // 詳細を開いている間・検索欄にフォーカスがある間は止める
+  // 地図を拡大・移動したら、地域が変わるまで巡回を止める。詳細を閉じたあとなどに次の地域へ切り替わって、
+  // 見ていた場所を見失わないように（#151）
+  const [mapMoved, setMapMoved] = useState(false);
+  const holdMap = useCallback(() => setMapMoved(true), []);
+
+  // 詳細を開いている間・検索欄にフォーカスがある間・地図を動かしたあとは止める
   const { index, next, prev, goTo, hoverHandlers, focusHandlers } =
     useAutoRotate(filteredAreas.length, {
-      paused: selectedSpot !== null || search.focused,
+      paused: selectedSpot !== null || search.focused || mapMoved,
     });
 
   // 直前まで出していた地域。条件が変わったときに、同じ地域に留まるのに使う
@@ -70,6 +75,7 @@ export function AreaRotator({ areas }: { areas: AreaWithSpots[] }) {
   if (prevAreaId !== area?.id) {
     setPrevAreaId(area?.id);
     setHoveredSpotId(null);
+    setMapMoved(false);
   }
   const hoverSpot = useCallback(
     (spot: Spot | null) => setHoveredSpotId(spot?.id ?? null),
@@ -183,6 +189,7 @@ export function AreaRotator({ areas }: { areas: AreaWithSpots[] }) {
             rightPanelOpen={!panelClosed}
             onSpotClick={setSelectedSpot}
             onSpotHover={hoverSpot}
+            onUserMove={holdMap}
           />
         </div>
 

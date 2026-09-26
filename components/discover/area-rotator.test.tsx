@@ -33,22 +33,31 @@ vi.mock("next/navigation", async () => {
   };
 });
 
-// 地図（MapLibre）は jsdom では描けないので、表示中の地域名と、おすすめのピンだけ出す
+// 地図（MapLibre）は jsdom では描けないので、表示中の地域名と、おすすめのピンだけ出す。
+// 「地図を動かす」は、利用者が地図を拡大・移動したときの代わり
 vi.mock("./area-map", () => ({
   AreaMap: ({
     area,
+    onSpotClick,
     onSpotHover,
+    onUserMove,
   }: {
     area?: AreaWithSpots;
+    onSpotClick?: (spot: Spot) => void;
     onSpotHover?: (spot: Spot | null) => void;
+    onUserMove?: () => void;
   }) => (
     <div>
       <div data-testid="map">{area?.name ?? "日本全体"}</div>
+      <button type="button" onClick={onUserMove}>
+        地図を動かす
+      </button>
       <div data-testid="pins">
         {area?.recommended.map((s) => (
           <button
             key={s.id}
             type="button"
+            onClick={() => onSpotClick?.(s)}
             onMouseEnter={() => onSpotHover?.(s)}
             onMouseLeave={() => onSpotHover?.(null)}
           >
@@ -410,5 +419,55 @@ describe("地図のピンと情報パネルの連動（#14）", () => {
     fireEvent.click(screen.getByRole("button", { name: "前の地域" }));
     expect(currentArea()).toBe("白馬村");
     expect(activeCards()).toEqual([]);
+  });
+});
+
+describe("地図を動かしたあとの巡回（#151）", () => {
+  beforeEach(() => {
+    // 自動の切り替えを動かす（「視差効果を減らす」を切る）
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({
+        matches: false,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      })),
+    );
+  });
+
+  test("触らなければ、数秒ごとに次の地域へ切り替わる", () => {
+    render(<AreaRotator areas={areas} />);
+    expect(currentArea()).toBe("白馬村");
+    act(() => vi.advanceTimersByTime(6000));
+    expect(currentArea()).toBe("松本市");
+  });
+
+  test("地図を拡大・移動したら、詳細を開いて閉じたあとも次の地域へ切り替えない", () => {
+    render(<AreaRotator areas={areas} />);
+    fireEvent.click(screen.getByRole("button", { name: "地図を動かす" }));
+
+    // 詳細を開いて閉じる
+    fireEvent.click(
+      within(screen.getByTestId("pins")).getByRole("button", {
+        name: "白馬八方温泉",
+      }),
+    );
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    act(() => vi.advanceTimersByTime(60000));
+    expect(currentArea()).toBe("白馬村");
+  });
+
+  test("自分で地域を切り替えたら、その地域から巡回し直す", () => {
+    render(<AreaRotator areas={areas} />);
+    fireEvent.click(screen.getByRole("button", { name: "地図を動かす" }));
+    act(() => vi.advanceTimersByTime(60000));
+    expect(currentArea()).toBe("白馬村");
+
+    fireEvent.click(screen.getByRole("button", { name: "次の地域" }));
+    expect(currentArea()).toBe("松本市");
+    act(() => vi.advanceTimersByTime(6000));
+    expect(currentArea()).toBe("大町市");
   });
 });

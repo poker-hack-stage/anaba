@@ -1,7 +1,7 @@
 "use client";
 
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   Map as MapLibreMap,
@@ -59,7 +59,8 @@ export type SpotMapProps = {
   areaName?: string;
   /**
    * 地域の境界（GeoJSON）。塗りつぶして表示し、表示範囲にも含める。
-   * 参照が変わるたびに描き直すので、毎回新しいオブジェクトを作って渡さない（areas.boundary をそのまま渡す）
+   * 参照が変わるたびに描き直すので、毎回新しいオブジェクトを作って渡さない（areas.boundary をそのまま渡す）。
+   * 表示範囲は境界の範囲（外枠）で比べるので、参照だけ変わっても合わせ直さない（#151）
    */
   boundary?: GeoJsonObject | null;
   onSpotClick?: (spot: Spot) => void;
@@ -67,6 +68,11 @@ export type SpotMapProps = {
   onSpotHover?: (spot: Spot | null) => void;
   /** 地図をクリック・タップした場所（スポットの投稿で場所を選ぶ、#54） */
   onMapClick?: (point: MapPoint) => void;
+  /**
+   * 利用者が地図を動かし始めた（ドラッグ・ホイール・ピンチ・＋−ボタン・キーボード）。
+   * 表示範囲を合わせる移動（地域や候補が変わったとき）では呼ばない
+   */
+  onUserMove?: () => void;
   /**
    * 置いたピン（スポットの投稿で選んだ場所、#54）。スポットのピンと見分けられる形で1つ出す。
    * 表示範囲の計算には含めない（ピンを置き直すたびに拡大が戻らないように）
@@ -204,6 +210,7 @@ export function SpotMap({
   onSpotClick,
   onSpotHover,
   onMapClick,
+  onUserMove,
   pin,
   animateMove = false,
   emptyPlaceholder = true,
@@ -296,16 +303,27 @@ export function SpotMap({
     )
     .join("|");
 
+  // 境界は表示範囲に外枠（範囲）しか使わないので、範囲で比べる。親が描き直して別のオブジェクトを渡しても、
+  // 同じ範囲なら合わせ直さない（利用者が拡大・移動した表示を戻さない、#151）
+  const boundaryBox = useMemo(
+    () => (boundary ? computeBounds([], boundary) : null),
+    [boundary],
+  );
+  const boundaryKey = boundaryBox?.flat().join(",") ?? "";
+
   // 範囲を合わせたことのある地図。作り直した地図の最初の表示は即時にする
   const fittedMap = useRef<MapLibreMap | null>(null);
 
-  // 表示範囲を合わせる
+  // 表示範囲を合わせる。見る対象（スポット・境界・余白）が変わったときだけ動かす
   useEffect(() => {
     if (!map) return;
     const animate = animateMove && fittedMap.current === map;
     fittedMap.current = map;
-    const box = computeBounds([...points, ...fitPoints], boundary);
-    const boundaryBox = boundary ? computeBounds([], boundary) : null;
+    const box = computeBounds([
+      ...points,
+      ...fitPoints,
+      ...(boundaryBox ?? []),
+    ]);
     // essential を付けないので、「視差効果を減らす」なら MapLibre が即時に切り替える
     const move = { animate, duration: MOVE_DURATION_MS };
     if (!box) {
@@ -315,9 +333,9 @@ export function SpotMap({
     } else {
       map.fitBounds(box, { ...move, padding: fitPadding, maxZoom: 15 });
     }
-    // points は pointsKey、fitPoints と fitPadding は fitKey で比較する
+    // points は pointsKey、fitPoints と fitPadding は fitKey、boundaryBox は boundaryKey で比較する
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, pointsKey, fitKey, boundary, animateMove]);
+  }, [map, pointsKey, fitKey, boundaryKey, animateMove]);
 
   // ハイライトのピンのずらす量（px。スポットの id ごと）。ずらさないピンは入れない
   const [highlightOffsets, setHighlightOffsets] =
@@ -443,6 +461,22 @@ export function SpotMap({
       map.off("click", handleClick);
     };
   }, [map, clickable]);
+
+  // 利用者が動かしたか。MapLibre は操作による移動にだけ originalEvent を付ける（easeTo・fitBounds には付かない）
+  const onUserMoveRef = useRef(onUserMove);
+  useEffect(() => {
+    onUserMoveRef.current = onUserMove;
+  });
+  useEffect(() => {
+    if (!map) return;
+    const handleMoveStart = (event: { originalEvent?: unknown }) => {
+      if (event.originalEvent) onUserMoveRef.current?.();
+    };
+    map.on("movestart", handleMoveStart);
+    return () => {
+      map.off("movestart", handleMoveStart);
+    };
+  }, [map]);
 
   const markerProps = { onSpotClick, onSpotHover };
   // 経路が2本以上で名前があれば凡例を出す
