@@ -47,12 +47,25 @@ delete from reviews where id = '<口コミの id>';
 update reviews set status = 'hidden'
 where client_hash = (select client_hash from reviews where id = '<荒らしの口コミの id>');
 
--- サンプルの口コミ（#152、seed.sql で入れたもの）をまとめて非表示にする・消す
+```
+
+### サンプルの口コミ（#152）
+
+`seed.sql` で入れたサンプルの口コミ（`is_sample = true`）は、画面で「サンプル」の印と説明を出している（`docs/spec.md` の「サンプルの口コミ」）。本物の口コミが集まってきたら、まとめて非表示にするか消す。**下の2つのブロックは、どちらか一方だけを実行する**（まとめて実行すると、非表示にしたつもりでも消える）。
+
+非表示にする（戻せる。戻すときは `status = 'published'` にする）:
+
+```sql
 update reviews set status = 'hidden' where is_sample;
+```
+
+消す（戻せない）:
+
+```sql
 delete from reviews where is_sample;
 ```
 
-サンプルの口コミは、画面で「サンプル」の印と説明を出している（`docs/spec.md` の「サンプルの口コミ」）。本物の口コミが集まってきたら、まとめて非表示にするか消す。消したあとに `seed.sql` を SQL Editor で流すと、また入るので、そのときは `seed.sql` からも消す。
+消したあとに `seed.sql` を SQL Editor で流すと、サンプルの口コミがまた入る（同じ id で入れ直すだけで、消す前の状態が戻るわけではない）。入れ直したくないときは、`seed.sql` からもサンプルの口コミの insert を消す。
 
 ## 3. 投稿されたスポット
 
