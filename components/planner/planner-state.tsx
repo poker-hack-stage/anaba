@@ -20,6 +20,17 @@ export type PlannerResult = {
   rateLimited?: boolean;
   /** 「このスポットを経路に加えて作り直す」（#32）に失敗したときの文言。元の候補を残したまま出す */
   rebuildError?: string;
+  /** 前のプランに戻した（#149）ときの文言。戻したことと、加えたスポットが経路から外れたことを伝える */
+  restoredNotice?: string;
+};
+
+/** 「このスポットを経路に加えて作り直す」（#32）の前のプラン。「前のプランに戻る」（#149）で戻す */
+export type PlanSnapshot = {
+  result: PlannerResult;
+  /** 作り直す前に選んでいた候補の番号 */
+  selectedIndex: number;
+  /** 作り直しで経路に加えたスポットの名前（戻したときに「〜を加える前」と出す） */
+  addedSpotName: string;
 };
 
 type PlannerState = {
@@ -32,6 +43,9 @@ type PlannerState = {
   /** タブで選んでいる候補の番号（0 始まり）。候補が変わったら（つくり直し）0 に戻る */
   selectedCandidate: number;
   selectCandidate: (index: number) => void;
+  /** 作り直す前のプラン。古い順（最後が直前）。作り直した回数ぶん戻れる。新しく作ったら空にする */
+  planHistory: PlanSnapshot[];
+  setPlanHistory: (history: PlanSnapshot[]) => void;
 };
 
 const PlannerStateContext = createContext<PlannerState | null>(null);
@@ -52,6 +66,7 @@ export function PlannerStateProvider({
     mode: null,
   });
   // 選んだ番号は、どの候補の中で選んだかと一緒に持つ。候補の配列が差し替わったら（つくり直し）選び直しになり、0 番を返す
+  const [planHistory, setPlanHistory] = useState<PlanSnapshot[]>([]);
   const [selection, setSelection] = useState<{
     candidates: PlanCandidate[];
     index: number;
@@ -73,8 +88,10 @@ export function PlannerStateProvider({
       selectedCandidate,
       selectCandidate: (index: number) =>
         setSelection({ candidates: result.candidates, index }),
+      planHistory,
+      setPlanHistory,
     }),
-    [savedConditions, result, selectedCandidate],
+    [savedConditions, result, selectedCandidate, planHistory],
   );
 
   return (

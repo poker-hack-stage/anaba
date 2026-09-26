@@ -741,6 +741,92 @@ describe("PlannerForm", () => {
       expect(screen.getByText("松本市をめぐる日帰りプラン")).toBeTruthy();
     });
 
+    const restoreButton = (name: string) =>
+      screen.queryByRole("button", {
+        name: `「${name}」を加える前のプランに戻る`,
+      });
+
+    /** 経路外のピンを押し、そのスポットを経路に加えて作り直す。加えたスポットの名前を返す */
+    async function rebuildWithOffRouteSpot(skip: string[] = []) {
+      const pins = await screen.findAllByRole("button", {
+        name: /^経路外のピン: /,
+      });
+      const pin = pins.find(
+        (p) => !skip.includes(p.textContent!.replace("経路外のピン: ", "")),
+      )!;
+      const name = pin.textContent!.replace("経路外のピン: ", "");
+      fireEvent.click(pin);
+      fireEvent.click(rebuildButton()!);
+      await screen.findByRole("button", {
+        name: `「${name}」を加える前のプランに戻る`,
+      });
+      return name;
+    }
+
+    test("作り直したあと「前のプランに戻る」を押すと、作り直す前の候補に戻り、加えたスポットが外れたことを出す（#149）", async () => {
+      stubPlanApi();
+      renderForm({ areas: sixSpots });
+      const name = await rebuildWithOffRouteSpot();
+      expect(
+        screen.queryByRole("button", { name: `経路外のピン: ${name}` }),
+      ).toBeNull();
+
+      fireEvent.click(restoreButton(name)!);
+
+      // 作り直す前と同じく、加えたスポットは経路の外に戻る
+      expect(
+        await screen.findByRole("button", { name: `経路外のピン: ${name}` }),
+      ).toBeTruthy();
+      const notice = `「${name}」を加える前のプランに戻しました。「${name}」は経路に入っていません。`;
+      expect(screen.getAllByText(notice).length).toBeGreaterThan(0);
+      // 戻れる前のプランはもうない
+      expect(restoreButton(name)).toBeNull();
+    });
+
+    test("2回作り直したら、1回ずつ2つ前まで戻れる（#149）", async () => {
+      stubPlanApi();
+      renderForm({ areas: sixSpots });
+      const first = await rebuildWithOffRouteSpot();
+      const second = await rebuildWithOffRouteSpot([first]);
+      expect(restoreButton(first)).toBeNull();
+
+      fireEvent.click(restoreButton(second)!);
+      fireEvent.click(
+        await screen.findByRole("button", {
+          name: `「${first}」を加える前のプランに戻る`,
+        }),
+      );
+
+      expect(
+        await screen.findByRole("button", { name: `経路外のピン: ${first}` }),
+      ).toBeTruthy();
+      expect(restoreButton(first)).toBeNull();
+      expect(restoreButton(second)).toBeNull();
+    });
+
+    test("作り直しに失敗したときは、戻るボタンを出さない（#149）", async () => {
+      stubPlanApi(() => Promise.reject(new TypeError("offline")));
+      const name = await openOffRouteSpot();
+
+      fireEvent.click(rebuildButton()!);
+
+      await screen.findByRole("alert");
+      expect(restoreButton(name)).toBeNull();
+    });
+
+    test("「この条件でつくり直す」で新しく作ったら、前のプランには戻れなくする（#149）", async () => {
+      stubPlanApi();
+      renderForm({ areas: sixSpots });
+      const name = await rebuildWithOffRouteSpot();
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "この条件でつくり直す" }),
+      );
+
+      await screen.findAllByRole("button", { name: /^経路外のピン: / });
+      expect(restoreButton(name)).toBeNull();
+    });
+
     test("経路に入っているスポットの詳細には、ボタンを出さない", async () => {
       stubPlanApi();
       renderForm({ areas: sixSpots });

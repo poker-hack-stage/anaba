@@ -17,6 +17,7 @@ import {
   Route,
   SearchX,
   Sparkles,
+  Undo2,
   type LucideIcon,
 } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
@@ -176,6 +177,8 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
     setResult,
     selectedCandidate,
     selectCandidate,
+    planHistory,
+    setPlanHistory,
   } = usePlannerState();
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   // 入力中の希望（#114）。null なら、URL の条件の希望を出す。
@@ -316,6 +319,8 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
     // 結果は Context に入れるので、読み込み中に別のタブへ移動しても戻ると表示される
     // 結果には、送ったときの条件を付けておく（あとで条件が変わってもずれが分かるように）
     const requested = commitNote();
+    // 新しく作ったら、作り直す前のプラン（#149）には戻れなくする（条件の違うプランに戻らないように）
+    setPlanHistory([]);
     setResult({ status: "loading", candidates, conditions: requested, mode });
     try {
       setResult(await fetchPlan(requested));
@@ -368,12 +373,43 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
         "候補を作り直せませんでした。元の候補のままです。時間をおいて、もう一度お試しください。";
     }
     if (rebuilt && rebuilt.candidates.length > 0) {
+      // 作り直す前のプランを覚えておき、「前のプランに戻る」（#149）で戻せるようにする。
+      // 前の作り直しの失敗・戻したときの文言は、戻したときに出し直さないよう外しておく
+      setPlanHistory([
+        ...planHistory,
+        {
+          result: {
+            ...previous,
+            rebuildError: undefined,
+            restoredNotice: undefined,
+          },
+          selectedIndex: previousIndex,
+          addedSpotName: spot.name,
+        },
+      ]);
       // 元と同じ地域の候補があれば、そのタブを選んだままにする
       const index = rebuilt.candidates.findIndex((c) => c.id === previousId);
       setResult(rebuilt, Math.max(index, 0));
       return;
     }
-    setResult({ ...previous, rebuildError: error }, previousIndex);
+    setResult(
+      { ...previous, rebuildError: error, restoredNotice: undefined },
+      previousIndex,
+    );
+  };
+
+  /** 作り直す前のプランに戻す（#149）。戻したプランは、作り直す前と同じ候補・同じタブで出す */
+  const restorePreviousPlan = () => {
+    const last = planHistory.at(-1);
+    if (!last || isLoading) return;
+    setPlanHistory(planHistory.slice(0, -1));
+    setResult(
+      {
+        ...last.result,
+        restoredNotice: `「${last.addedSpotName}」を加える前のプランに戻しました。「${last.addedSpotName}」は経路に入っていません。`,
+      },
+      last.selectedIndex,
+    );
   };
 
   // 詳細の「経路に加えて作り直す」は、表示中の候補の経路外のスポットを開いたときだけ出す
@@ -468,7 +504,12 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
               旅プランをつくっています
             </p>
           ) : (
-            resultAnnouncement(status, candidates, result.rebuildError)
+            resultAnnouncement(
+              status,
+              candidates,
+              result.rebuildError,
+              result.restoredNotice,
+            )
           )}
         </div>
         {isStale && (
@@ -486,6 +527,11 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
           rateLimited={rateLimited}
           hasNote={result.conditions?.note !== undefined}
           rebuildError={result.rebuildError}
+          restoredNotice={result.restoredNotice}
+          previousPlanSpotName={
+            status === "done" ? planHistory.at(-1)?.addedSpotName : undefined
+          }
+          onRestorePreviousPlan={restorePreviousPlan}
           selectedCandidate={selectedCandidate}
           onSelectCandidate={selectCandidate}
           onSpotClick={setSelectedSpot}
@@ -511,14 +557,19 @@ function scrollToResult(result: HTMLElement | null) {
   });
 }
 
-/** 結果が出たときに読み上げる文。作り直しの失敗は role="alert" で伝えるので、ここでは読まない */
+/**
+ * 結果が出たときに読み上げる文。作り直しの失敗は role="alert" で伝えるので、ここでは読まない。
+ * 前のプランに戻した（#149）ときは、戻したことを読む
+ */
 function resultAnnouncement(
   status: PlannerStatus,
   candidates: PlanCandidate[],
   rebuildError: string | undefined,
+  restoredNotice: string | undefined,
 ): string {
   if (status === "error") return "候補を取得できませんでした。";
   if (status !== "done" || rebuildError) return "";
+  if (restoredNotice) return restoredNotice;
   return candidates.length > 0
     ? `旅の候補を${candidates.length}件つくりました。`
     : "この条件では候補を組めませんでした。";
@@ -531,6 +582,9 @@ function Result({
   rateLimited,
   hasNote,
   rebuildError,
+  restoredNotice,
+  previousPlanSpotName,
+  onRestorePreviousPlan,
   selectedCandidate,
   onSelectCandidate,
   onSpotClick,
@@ -542,6 +596,10 @@ function Result({
   /** 候補を出したときの条件に、自由記述の希望（#114）があったか */
   hasNote: boolean;
   rebuildError?: string;
+  restoredNotice?: string;
+  /** 戻れる前のプランがあれば、直前の作り直しで加えたスポットの名前（#149） */
+  previousPlanSpotName?: string;
+  onRestorePreviousPlan: () => void;
   selectedCandidate: number;
   onSelectCandidate: (index: number) => void;
   onSpotClick: (spot: Spot) => void;
@@ -595,6 +653,22 @@ function Result({
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{rebuildError}</span>
         </p>
+      )}
+      {restoredNotice && (
+        <p className="flex items-start gap-2 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-700">
+          <Undo2 aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{restoredNotice}</span>
+        </p>
+      )}
+      {previousPlanSpotName !== undefined && (
+        <button
+          type="button"
+          onClick={onRestorePreviousPlan}
+          className="flex w-fit items-center gap-1.5 rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-bold text-stone-700 transition-colors hover:bg-stone-50 max-sm:w-full max-sm:justify-center max-sm:py-2.5"
+        >
+          <Undo2 aria-hidden className="h-4 w-4 shrink-0" />「
+          {previousPlanSpotName}」を加える前のプランに戻る
+        </button>
       )}
       {mode === "demo" && (
         <p
