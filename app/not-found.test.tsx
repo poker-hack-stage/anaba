@@ -17,4 +17,12 @@ describe("NotFound", () => {
       screen.getByRole("link", { name: "穴場を探す" }).getAttribute("href"),
     ).toBe("/");
   });
+
+  test("大きい画面でも読みやすい幅（写真の出典と同じ max-w-3xl）に収める", () => {
+    const { container } = render(<NotFound />);
+
+    expect(container.firstElementChild?.classList.contains("max-w-3xl")).toBe(
+      true,
+    );
+  });
 });

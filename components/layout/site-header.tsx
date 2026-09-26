@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { LogoMark } from "@/components/brand/logo-mark";
 import { HeaderTabs } from "./header-tabs";
+import { PAGE_CONTAINER } from "./page-width";
 
 export function SiteHeader() {
   return (
     <header className="sticky top-0 z-30 border-b border-stone-200 bg-white/95 backdrop-blur-md">
-      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-4 sm:h-16 sm:px-6 lg:px-8">
+      <div
+        className={`${PAGE_CONTAINER} flex h-14 items-center justify-between gap-4 sm:h-16`}
+      >
         <Link href="/" className="flex shrink-0 items-center gap-2.5">
           <LogoMark />
           <span className="flex flex-col leading-none">

@@ -10,11 +10,12 @@ export const metadata: Metadata = {
 
 /**
  * 存在しない URL を開いたときの表示（#124）。Next.js の英語の既定の 404 の代わりに出す。
- * ヘッダー・フッター・下のタブはルートのレイアウトにあるので、この表示の上下に残る。見た目は app/error.tsx に合わせる
+ * ヘッダー・フッター・下のタブはルートのレイアウトにあるので、この表示の上下に残る。見た目は app/error.tsx に合わせる。
+ * 大きい画面でも文が読みやすいよう、写真の出典（app/credits）と同じ幅（max-w-3xl）に収める（#137）
  */
 export default function NotFound() {
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-4">
       <EmptyState
         icon={MapPinOff}
         title="ページが見つかりませんでした"
