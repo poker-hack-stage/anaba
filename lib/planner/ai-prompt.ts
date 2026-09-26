@@ -19,7 +19,7 @@ import {
   type IncludedSpot,
 } from "./include-spot";
 import { findNearbyAreas } from "./nearby";
-import { MAX_NOTE_LENGTH, normalizeNote } from "./note";
+import { normalizeNote, truncateNote } from "./note";
 import type { PlanConditions } from "./types";
 
 // Gemini に渡すプロンプト（#18）。Supabase も Gemini も呼ばない純粋な関数
@@ -267,6 +267,6 @@ export function spotText(text: string, max: number, fromUser: boolean): string {
  */
 export function noteText(note: string): string {
   const safe = normalizeNote(note).replace(/</g, "＜").replace(/>/g, "＞");
-  const clipped = [...safe].slice(0, MAX_NOTE_LENGTH).join("");
+  const clipped = truncateNote(safe);
   return `${USER_REQUEST_OPEN}${clipped}${USER_REQUEST_CLOSE}`;
 }

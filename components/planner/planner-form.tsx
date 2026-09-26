@@ -25,7 +25,12 @@ import {
   TRANSPORTS,
 } from "@/lib/planner/options";
 import { generateCandidates, type PlannableArea } from "@/lib/planner/generate";
-import { MAX_NOTE_LENGTH, normalizeNote, noteLength } from "@/lib/planner/note";
+import {
+  MAX_NOTE_LENGTH,
+  normalizeNote,
+  noteLength,
+  truncateNote,
+} from "@/lib/planner/note";
 import type {
   PlanCandidate,
   PlanConditions,
@@ -59,7 +64,7 @@ const ANY_AREA_QUERY = "any";
 
 /** 希望（#114）を送る形にする。改行・制御文字を空白にし、長さで切る。空なら undefined（書かなかった） */
 function toNote(text: string): string | undefined {
-  const note = [...normalizeNote(text)].slice(0, MAX_NOTE_LENGTH).join("");
+  const note = truncateNote(normalizeNote(text));
   return note || undefined;
 }
 
@@ -594,10 +599,9 @@ function NoteField({
       <textarea
         id={id}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => onChange(truncateNote(e.target.value))}
         onBlur={onBlur}
         rows={2}
-        maxLength={MAX_NOTE_LENGTH}
         placeholder="例: 雨でも楽しめる所がいい、ゆっくり回りたい"
         aria-describedby={`${id}-count`}
         className="block w-full resize-none rounded-xl border border-stone-200 bg-white px-3 py-2 text-base text-stone-900 transition-colors placeholder:text-stone-400 hover:border-stone-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:text-sm"

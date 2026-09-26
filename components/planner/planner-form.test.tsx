@@ -340,6 +340,24 @@ describe("PlannerForm", () => {
       expect(screen.getByText("残り0文字")).toBeTruthy();
     });
 
+    test("家族の絵文字も1文字と数え、100字を超えた入力は絵文字を分けずに切る", () => {
+      renderForm({ submit: false });
+
+      fireEvent.change(noteField(), {
+        target: { value: "👨‍👩‍👧‍👦".repeat(99) },
+      });
+      expect(noteField().value).toBe("👨‍👩‍👧‍👦".repeat(99));
+      expect(screen.getByText("残り1文字")).toBeTruthy();
+
+      fireEvent.change(noteField(), {
+        target: { value: "👨‍👩‍👧‍👦".repeat(101) },
+      });
+      expect(noteField().value).toBe("👨‍👩‍👧‍👦".repeat(100));
+      expect(screen.getByText("残り0文字")).toBeTruthy();
+      // 文字数の上限はブラウザの maxLength（UTF-16 で数える）に任せない
+      expect(noteField().maxLength).toBe(-1);
+    });
+
     test("URL の希望が変わったら（ブラウザの「戻る」など）、入力中の文を捨てて URL に合わせる", () => {
       query.set("?area=any&duration=day&companion=友人&transport=車&note=雨");
       renderForm({ submit: false });

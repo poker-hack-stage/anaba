@@ -455,6 +455,30 @@ describe("自由記述の希望（#114、デモモードではキーワードだ
     expect(kids.reason).toContain("子どもと楽しめるスポットを優先しました");
   });
 
+  test("希望が2つあれば、両方に合うスポットを、片方だけに合うスポットより先に経路に入れる", () => {
+    const town: PlannableArea = {
+      ...area("雨の町", 36.238, 137.972, []),
+      spots: [
+        // 穴場度は、片方だけに合うスポットのほうが高い
+        { ...spot("雨の町", "あ", "history", { gem: 90 }), tags: ["雨の日"] },
+        { ...spot("雨の町", "い", "history", { gem: 90 }), tags: ["公園"] },
+        { ...spot("雨の町", "う", "history", { gem: 90 }), tags: ["資料館"] },
+        { ...spot("雨の町", "え", "history", { gem: 90 }), tags: ["体験"] },
+        {
+          ...spot("雨の町", "ん", "history", { gem: 10 }),
+          tags: ["雨の日", "子ども"],
+        },
+      ],
+    };
+
+    const [candidate] = generateCandidates(
+      [town],
+      request({ note: "雨でも子どもと楽しみたい" }),
+    );
+
+    expect(allRouteSpots(candidate).map((s) => s.name)).toContain("ん");
+  });
+
   test("キーワードのない希望では、経路も理由も変わらない", () => {
     expect(
       generateCandidates(areas, request({ note: "おいしい空気を吸いたい" })),

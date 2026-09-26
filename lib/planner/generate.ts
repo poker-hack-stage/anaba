@@ -9,7 +9,7 @@ import {
   type IncludedSpot,
 } from "./include-spot";
 import { findNearbyAreas } from "./nearby";
-import { matchesNoteHints, type NoteHints, readNoteHints } from "./note";
+import { countNoteHintMatches, type NoteHints, readNoteHints } from "./note";
 import type { PlanCandidate, PlanDay, PlanConditions } from "./types";
 
 /** 候補を作るのに使う地域の列（テストのフィクスチャを短く書けるように、使う列だけにする） */
@@ -49,7 +49,8 @@ export const RELAXED_DAY_SPOTS = 3;
  * - 必ず入れるスポット（includeSpotId、#32）があれば、そのスポットの地域をめぐる日に必ず入れる。
  *   候補の地域と別の地域なら、2日目以降にその地域を優先する。入れられない候補は捨てる
  * - 自由記述の希望（note、#114）は、決まったキーワードだけを反映する（note.ts の readNoteHints()）:
- *   雨・屋内 → 屋内のスポット、子ども・子連れ → 子どもと楽しめるタグのスポットを、興味の次に優先する。
+ *   雨・屋内 → 屋内のスポット、子ども・子連れ → 子どもと楽しめるタグのスポットを、興味の次に優先する
+ *   （両方あれば、両方に合うスポットを先にする）。
  *   ゆっくり・のんびり → 1日3件まで
  */
 export function generateCandidates(
@@ -199,7 +200,7 @@ function compareForRoute(
   return (
     Number(wanted.has(b.category as SpotCategory)) -
       Number(wanted.has(a.category as SpotCategory)) ||
-    Number(matchesNoteHints(b, hints)) - Number(matchesNoteHints(a, hints)) ||
+    countNoteHintMatches(b, hints) - countNoteHintMatches(a, hints) ||
     compareByHiddenGemScore(a, b) ||
     compareByRating(a, b) ||
     a.name.localeCompare(b.name, "ja")

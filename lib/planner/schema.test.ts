@@ -50,6 +50,7 @@ describe("planConditionsSchema", () => {
     ["地域名で送っている（古い形）", { areaId: undefined, area: "松本市" }],
     ["余計な項目がある", { pace: "ゆったり" }],
     ["希望が101字", { note: "あ".repeat(101) }],
+    ["希望が家族の絵文字101字", { note: "👨‍👩‍👧‍👦".repeat(101) }],
     ["希望が文字列でない", { note: 1 }],
     ["型が違う", { interests: "温泉" }],
   ])("%s なら受け付けない", (_, overrides) => {
@@ -66,6 +67,14 @@ describe("planConditionsSchema", () => {
     // 絵文字（サロゲートペア）も1文字と数える
     expect(
       planConditionsSchema.safeParse({ ...valid, note: "🌧".repeat(100) })
+        .success,
+    ).toBe(true);
+    // ZWJ でつないだ家族の絵文字・国旗も、見た目どおり1文字と数える
+    expect(
+      planConditionsSchema.parse({ ...valid, note: "👨‍👩‍👧‍👦".repeat(100) }).note,
+    ).toBe("👨‍👩‍👧‍👦".repeat(100));
+    expect(
+      planConditionsSchema.safeParse({ ...valid, note: "🇯🇵".repeat(100) })
         .success,
     ).toBe(true);
   });

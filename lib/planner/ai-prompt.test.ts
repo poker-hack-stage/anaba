@@ -406,4 +406,10 @@ describe("noteText", () => {
       `<user_request>${"🌧".repeat(100)}</user_request>`,
     );
   });
+
+  test("家族の絵文字（ZWJ でつないだもの）を途中で分けずに切る", () => {
+    expect(noteText(`${"あ".repeat(99)}👨‍👩‍👧‍👦👨‍👩‍👧‍👦`)).toBe(
+      `<user_request>${"あ".repeat(99)}👨‍👩‍👧‍👦</user_request>`,
+    );
+  });
 });

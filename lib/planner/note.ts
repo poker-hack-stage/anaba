@@ -5,9 +5,22 @@ import type { Spot } from "@/lib/data/spots";
 /** 希望の長さの上限（見た目の1文字で数える） */
 export const MAX_NOTE_LENGTH = 100;
 
-/** 希望の長さ（見た目の1文字で数える。絵文字などのサロゲートペアも1文字） */
+const graphemeSegmenter = new Intl.Segmenter("ja", { granularity: "grapheme" });
+
+/** 見た目の1文字（書記素クラスタ）ごとに分ける。家族の絵文字（ZWJ でつないだもの）や国旗も1文字 */
+function graphemes(text: string): string[] {
+  return Array.from(graphemeSegmenter.segment(text), ({ segment }) => segment);
+}
+
+/** 希望の長さ（見た目の1文字で数える） */
 export function noteLength(text: string): number {
-  return [...text].length;
+  return graphemes(text).length;
+}
+
+/** 希望を、見た目の1文字で max 字までに切る（絵文字を途中で分けない） */
+export function truncateNote(text: string, max = MAX_NOTE_LENGTH): string {
+  const chars = graphemes(text);
+  return chars.length <= max ? text : chars.slice(0, max).join("");
 }
 
 /**
@@ -57,14 +70,15 @@ const INDOOR_TAGS = ["雨の日", "資料館", "美術館", "博物館"];
 /** 子どもと楽しめる場所を表すタグ */
 const KIDS_TAGS = ["子ども", "子連れ", "家族", "公園", "体験", "キャンプ場"];
 
-/** 希望に合うスポットか（デモモードで、興味のあることの次に優先する） */
-export function matchesNoteHints(spot: Spot, hints: NoteHints): boolean {
-  if (
+/**
+ * スポットが合う希望の数（デモモードで、興味のあることの次に、多いほど優先する）。
+ * 「雨でも子どもと」なら、屋内と子ども向けの両方に合うスポットを、片方だけのスポットより先にする
+ */
+export function countNoteHintMatches(spot: Spot, hints: NoteHints): number {
+  const indoor =
     hints.indoor &&
     (INDOOR_CATEGORIES.has(spot.category) ||
-      spot.tags.some((tag) => INDOOR_TAGS.includes(tag)))
-  ) {
-    return true;
-  }
-  return hints.kids && spot.tags.some((tag) => KIDS_TAGS.includes(tag));
+      spot.tags.some((tag) => INDOOR_TAGS.includes(tag)));
+  const kids = hints.kids && spot.tags.some((tag) => KIDS_TAGS.includes(tag));
+  return Number(indoor) + Number(kids);
 }
