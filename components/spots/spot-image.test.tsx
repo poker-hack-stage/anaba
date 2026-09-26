@@ -28,6 +28,15 @@ describe("SpotImage", () => {
     expect(container.querySelector("svg")).not.toBeNull();
   });
 
+  test("ルートは span（button の中にも置けるように）で、flex で並べる", () => {
+    const { container } = render(
+      <SpotImage category="onsen" imagePath={null} sizes="96px" />,
+    );
+    const root = container.firstElementChild;
+    expect(root?.tagName).toBe("SPAN");
+    expect(root?.className).toContain("flex");
+  });
+
   test("写真を読み込めなかったら、プレースホルダーに戻す", () => {
     const { container } = render(
       <SpotImage
