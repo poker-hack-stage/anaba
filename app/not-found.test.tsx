@@ -18,11 +18,11 @@ describe("NotFound", () => {
     ).toBe("/");
   });
 
-  test("大きい画面でも読みやすい幅（写真の出典と同じ max-w-3xl）に収める", () => {
+  test("大きい画面（2xl 以上）では写真の出典と同じ max-w-3xl に収める", () => {
     const { container } = render(<NotFound />);
 
-    expect(container.firstElementChild?.classList.contains("max-w-3xl")).toBe(
-      true,
-    );
+    expect(
+      container.firstElementChild?.classList.contains("2xl:max-w-3xl"),
+    ).toBe(true);
   });
 });
