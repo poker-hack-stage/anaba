@@ -29,6 +29,8 @@ function Items({ pathname }: { pathname: string | null }) {
           <Link
             key={href}
             href={href}
+            // 今いるタブを色だけでなく読み上げでも伝える（#124）
+            aria-current={active ? "page" : undefined}
             className={cn(
               "flex flex-col items-center rounded-xl border px-6 py-1",
               active

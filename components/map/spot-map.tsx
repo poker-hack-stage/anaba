@@ -20,6 +20,7 @@ import type {
 import { Map, MapPin } from "lucide-react";
 import type { Spot } from "@/lib/data/spots";
 import { computeBounds } from "@/lib/map/bounds";
+import { spreadOffsetsById, type PixelPoint } from "@/lib/map/spread";
 import { getCategory } from "@/lib/spots/categories";
 import { cn } from "@/lib/utils";
 
@@ -44,7 +45,10 @@ export type SpotRoute = {
 };
 
 export type SpotMapProps = {
-  /** ハイライトするスポット（おすすめ3件など）。大きく強調して表示 */
+  /**
+   * ハイライトするスポット（おすすめ3件など）。大きく強調して表示。
+   * 幅の狭い地図（640px 未満）では、重なるピンを少しずらしてどれも押せるようにする（#109）
+   */
   highlighted?: Spot[];
   /** 経路。日ごとに分けるときは複数渡し、線とピンを色分けする。経路どうしは線でつながない */
   routes?: SpotRoute[];
@@ -114,6 +118,14 @@ const BOUNDARY_COLOR = "#1c1917"; // stone-900
 const BOUNDARY_WIDTH = 2.5;
 const BOUNDARY_HALO_COLOR = "#ffffff";
 const BOUNDARY_HALO_WIDTH = BOUNDARY_WIDTH + 2;
+/**
+ * これより幅の狭い地図（スマホ。「穴場を探す」では高さ 288px）では、ハイライトのピンが重ならないようずらす（#109）。
+ * 境界全体を入れるとスポットが狭い範囲に集まり、40px のピンが重なって下のピンを押せなくなるため。
+ * 広い地図（PC）は見た目を変えないよう、ずらさない
+ */
+const NARROW_MAP_WIDTH = 640;
+/** ずらしたハイライトのピンの中心どうしの最小の間隔。ピンの直径にすき間を足す */
+const HIGHLIGHT_MIN_DISTANCE = 44;
 /** 移動にかける時間。自動の切り替え（6秒ごと）より十分短くする */
 const MOVE_DURATION_MS = 1200;
 
@@ -278,6 +290,44 @@ export function SpotMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, pointsKey, boundary, animateMove]);
 
+  // ハイライトのピンのずらす量（px。スポットの id ごと）。ずらさないピンは入れない
+  const [highlightOffsets, setHighlightOffsets] =
+    useState<ReadonlyMap<string, PixelPoint>>(NO_OFFSETS);
+  const highlightedKey = highlighted
+    .map((s) => `${s.id}:${s.lng},${s.lat}`)
+    .join(";");
+
+  // 幅の狭い地図では、重なるハイライトのピンをずらす。画面上の間隔はズームと地図の大きさで変わるので、そのたびに計算し直す
+  useEffect(() => {
+    if (!map) return;
+    const update = () => {
+      const narrow = map.getContainer().clientWidth < NARROW_MAP_WIDTH;
+      const next =
+        narrow && highlighted.length > 1
+          ? spreadOffsetsById(
+              highlighted.map((s) => ({
+                id: s.id,
+                point: map.project([s.lng, s.lat]),
+              })),
+              HIGHLIGHT_MIN_DISTANCE,
+            )
+          : NO_OFFSETS;
+      // ズームの途中は毎フレーム呼ばれるので、変わったときだけ描き直す
+      setHighlightOffsets((prev) =>
+        sameOffsets(prev, next) ? prev : next.size === 0 ? NO_OFFSETS : next,
+      );
+    };
+    update();
+    map.on("zoom", update);
+    map.on("resize", update);
+    return () => {
+      map.off("zoom", update);
+      map.off("resize", update);
+    };
+    // highlighted は highlightedKey で比較する
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, highlightedKey]);
+
   // 境界と経路の線を置く場所を用意する
   useEffect(() => {
     if (!map || !styleLoaded) return;
@@ -405,6 +455,7 @@ export function SpotMap({
               size="lg"
               title={spot.name}
               zIndex={2}
+              offset={highlightOffsets.get(spot.id)}
             />
           ))}
           {routes.flatMap((r, ri) =>
@@ -480,6 +531,20 @@ export function SpotMap({
 
 const PIN_SIZE = { sm: 20, md: 28, lg: 40 } as const;
 
+const NO_OFFSETS: ReadonlyMap<string, PixelPoint> = new globalThis.Map();
+
+function sameOffsets(
+  a: ReadonlyMap<string, PixelPoint>,
+  b: ReadonlyMap<string, PixelPoint>,
+): boolean {
+  if (a.size !== b.size) return false;
+  for (const [id, o] of a) {
+    const other = b.get(id);
+    if (!other || other.x !== o.x || other.y !== o.y) return false;
+  }
+  return true;
+}
+
 /**
  * スポットのピン。MapLibre の Marker に渡した要素へ、React で button を描く。
  * button なので Tab で選べて Enter / Space で開ける。フォーカスはマウスオーバーと同じ扱いにする
@@ -492,6 +557,7 @@ function SpotMarker({
   color,
   title,
   zIndex,
+  offset,
   onSpotClick,
   onSpotHover,
 }: {
@@ -505,6 +571,8 @@ function SpotMarker({
   title: string;
   /** 重なり順。経路 > ハイライト > そのほか */
   zIndex: number;
+  /** 本当の場所からずらして描く量（px）。重なるピンを離すとき（#109） */
+  offset?: PixelPoint;
   onSpotClick?: (spot: Spot) => void;
   onSpotHover?: (spot: Spot | null) => void;
 }) {
@@ -514,14 +582,33 @@ function SpotMarker({
     return el;
   });
 
+  const offsetX = offset?.x ?? 0;
+  const offsetY = offset?.y ?? 0;
+  const markerRef = useRef<Marker | null>(null);
+  // 作り直したピンにも今のずらす量を付けるため、最新の値を ref で持つ
+  const offsetRef = useRef<[number, number]>([offsetX, offsetY]);
+
   useEffect(() => {
-    const marker = new Marker({ element, anchor: "center" })
+    const marker = new Marker({
+      element,
+      anchor: "center",
+      offset: offsetRef.current,
+      // 既定では位置を整数 px に丸め、ずらしたピンの間隔が 44px を切ることがあるので、小数のまま置く
+      subpixelPositioning: true,
+    })
       .setLngLat([spot.lng, spot.lat])
       .addTo(map);
+    markerRef.current = marker;
     return () => {
       marker.remove();
+      markerRef.current = null;
     };
   }, [map, element, spot.lng, spot.lat]);
+
+  useEffect(() => {
+    offsetRef.current = [offsetX, offsetY];
+    markerRef.current?.setOffset([offsetX, offsetY]);
+  }, [offsetX, offsetY]);
 
   const meta = getCategory(spot.category);
   const px = PIN_SIZE[size];

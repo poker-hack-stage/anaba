@@ -12,7 +12,8 @@ const selectVariants = cva(
       shape: {
         default:
           "h-9 rounded-md border-input pl-3 pr-9 text-base shadow-sm md:text-sm",
-        pill: "rounded-full border-stone-200 py-1.5 pl-3 pr-8 text-xs font-semibold text-stone-900 hover:border-stone-400",
+        // iOS の Safari は 16px 未満の select にフォーカスすると画面を拡大するので、sm 未満だけ 16px にする（#124）
+        pill: "rounded-full border-stone-200 py-1.5 pl-3 pr-8 text-xs font-semibold text-stone-900 hover:border-stone-400 max-sm:text-base",
       },
     },
     defaultVariants: { shape: "default" },
