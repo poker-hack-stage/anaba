@@ -955,6 +955,24 @@ export const AI_IMAGE_CREDITS: AiImageCredit[] = [
     prompt: "石で囲った池に澄んだ水が湧き、石の水路へ流れ出る湧き水（初夏）",
     createdOn: "2026-09-26",
   },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/tsuwano-03.jpg",
+    subject: "堀庭園",
+    model: AI_MODEL,
+    prompt:
+      "山あいの古い日本庭園の苔むした庭石と池、池の上に枝を伸ばす色づいたもみじ、奥に杉の山の斜面（秋）",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/tsuwano-05.jpg",
+    subject: "山田竹風軒 本町店",
+    model: AI_MODEL,
+    prompt:
+      "木のテーブルの白い和皿にのった源氏巻（輪切りと1本）と、陶器の湯のみの緑茶",
+    createdOn: "2026-09-26",
+  },
 ];
 
 /** 写真と AI の画像のすべて（パスで引くとき・シードとの突き合わせ） */
