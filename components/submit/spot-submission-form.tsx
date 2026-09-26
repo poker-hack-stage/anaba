@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { AreaSelect } from "@/components/ui/area-select";
 import {
   NETWORK_ERROR_MESSAGE,
   loadNickname,
@@ -23,7 +23,6 @@ import {
   type SpotSubmissionInput,
 } from "@/lib/community/schema";
 import type { Area } from "@/lib/data/areas";
-import { groupAreasByPrefecture } from "@/lib/planner/area-groups";
 import { CATEGORIES, type SpotCategory } from "@/lib/spots/categories";
 import { cn } from "@/lib/utils";
 import { areaRange } from "./area-range";
@@ -69,6 +68,7 @@ export function SpotSubmissionForm({
   onCancel: () => void;
 }) {
   const id = useId();
+  const [prefecture, setPrefecture] = useState("");
   const [areaId, setAreaId] = useState("");
   const [name, setName] = useState("");
   const [category, setCategory] = useState<SpotCategory | null>(null);
@@ -86,12 +86,17 @@ export function SpotSubmissionForm({
     if (formError) formErrorRef.current?.scrollIntoView?.({ block: "nearest" });
   }, [formError]);
 
-  const groups = useMemo(() => groupAreasByPrefecture(areas), [areas]);
   const area = areas.find((a) => a.id === areaId);
   // 参照が変わると地図が描き直すので、地域ごとに1回だけ作る
   const range = useMemo(() => (area ? areaRange(area) : null), [area]);
 
   const remaining = LIMITS.description - countChars(description);
+
+  const changePrefecture = (next: string) => {
+    setPrefecture(next);
+    // 市区町村はその県の中から選び直す
+    changeArea("");
+  };
 
   const changeArea = (next: string) => {
     setAreaId(next);
@@ -180,27 +185,32 @@ export function SpotSubmissionForm({
         </p>
       )}
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor={`${id}-areaId`}>地域</Label>
-        <Select
-          id={`${id}-areaId`}
-          value={areaId}
-          onChange={(e) => changeArea(e.target.value)}
-          aria-invalid={fieldErrors.areaId ? true : undefined}
-          aria-describedby={describedBy("areaId")}
+      <div
+        role="group"
+        aria-labelledby={`${id}-area-label`}
+        aria-describedby={describedBy("areaId")}
+        className="flex flex-col gap-1.5"
+      >
+        <span
+          id={`${id}-area-label`}
+          className="text-sm font-medium leading-none"
         >
-          <option value="">地域を選んでください</option>
-          {groups.map((group) => (
-            <optgroup key={group.prefecture} label={group.prefecture}>
-              {group.areas.map((a) => (
-                // 旅プランのエリア欄と同じく、都道府県の見出しが見えないブラウザのために名前に添える
-                <option key={a.id} value={a.id}>
-                  {a.name}（{group.prefecture}）
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </Select>
+          地域
+        </span>
+        {/* 県 → 市区町村の2段（#147）。送る値は市区町村（地域）の id で、県だけでは送れない（地図の範囲が地域ごとのため） */}
+        <AreaSelect
+          areas={areas}
+          prefecture={prefecture}
+          areaId={areaId}
+          onPrefectureChange={changePrefecture}
+          onAreaChange={changeArea}
+          labelClassName="font-normal text-stone-600"
+          areaSelectProps={{
+            id: `${id}-areaId`,
+            "aria-invalid": fieldErrors.areaId ? true : undefined,
+            "aria-describedby": describedBy("areaId"),
+          }}
+        />
         <FieldError id={`${id}-areaId-error`} message={fieldErrors.areaId} />
       </div>
 

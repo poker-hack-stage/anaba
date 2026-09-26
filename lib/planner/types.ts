@@ -9,6 +9,11 @@ export type PlanDuration = "day" | "1n2d" | "2n3d";
 export type PlanConditions = {
   /** 地域の id。null なら「おまかせ」 */
   areaId: string | null;
+  /**
+   * 県だけ選んで市区町村（地域）を選ばないとき（#147）の都道府県名。1日目の候補をその県の地域だけにする（「県の中でおまかせ」）。
+   * 地域を選んだとき・「おまかせ」のときは undefined
+   */
+  prefecture?: string;
   duration: PlanDuration;
   interests: string[];
   companion: string;

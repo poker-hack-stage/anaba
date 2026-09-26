@@ -22,9 +22,8 @@ import {
 import { EmptyState } from "@/components/empty-state";
 import { SpotDetailDialog } from "@/components/spots/spot-detail-dialog";
 import { Chip } from "@/components/ui/chip";
-import { Select } from "@/components/ui/select";
+import { AreaSelect } from "@/components/ui/area-select";
 import type { Spot } from "@/lib/data/spots";
-import { groupAreasByPrefecture } from "@/lib/planner/area-groups";
 import { DURATION_LABELS } from "@/lib/planner/duration";
 import {
   ANY_AREA_LABEL,
@@ -91,15 +90,19 @@ function toNote(text: string): string | undefined {
 
 /**
  * 条件を URL のクエリにする（例: ?area=<地域の id>&duration=1n2d&interests=食&interests=温泉&…&note=…）。
- * 「クエリがない = タブやリンクから来た」と見分けるため、既定値も含めて書く（希望は書いたときだけ）
+ * 「クエリがない = タブやリンクから来た」と見分けるため、既定値も含めて書く（県だけ選んだとき（#147）の県と、希望は書いたときだけ。
+ * 県だけ選んだときは ?area=any&prefecture=長野県&…）
  */
 function toQuery(conditions: PlanConditions) {
   const params = new URLSearchParams({
     area: conditions.areaId ?? ANY_AREA_QUERY,
-    duration: conditions.duration,
-    companion: conditions.companion,
-    transport: conditions.transport,
   });
+  if (conditions.areaId === null && conditions.prefecture) {
+    params.set("prefecture", conditions.prefecture);
+  }
+  params.set("duration", conditions.duration);
+  params.set("companion", conditions.companion);
+  params.set("transport", conditions.transport);
   for (const interest of conditions.interests) {
     params.append("interests", interest);
   }
@@ -110,6 +113,7 @@ function toQuery(conditions: PlanConditions) {
 /** 条件のクエリのキー（toQuery と同じ並び） */
 const QUERY_KEYS = [
   "area",
+  "prefecture",
   "duration",
   "companion",
   "transport",
@@ -126,10 +130,10 @@ function pickConditionQuery(params: URLSearchParams) {
   return picked.toString();
 }
 
-/** URL のクエリから条件を読む。クエリがなければ null。知らない値は既定値（地域は「おまかせ」）にする */
+/** URL のクエリから条件を読む。クエリがなければ null。知らない値は既定値（地域・県は「おまかせ」）にする */
 function fromQuery(
   params: URLSearchParams,
-  areaIds: readonly string[],
+  areas: readonly Pick<PlannableArea, "id" | "prefecture">[],
 ): PlanConditions | null {
   if (!QUERY_KEYS.some((key) => params.has(key))) return null;
 
@@ -142,8 +146,18 @@ function fromQuery(
     return options.includes(value as T) ? (value as T) : fallback;
   };
   const area = params.get("area");
+  const areaId =
+    area !== null && areas.some((a) => a.id === area) ? area : null;
+  const prefecture = params.get("prefecture");
   return {
-    areaId: area !== null && areaIds.includes(area) ? area : null,
+    areaId,
+    // 地域を選んでいれば県は持たない（地域の県から出す）
+    prefecture:
+      areaId === null &&
+      prefecture !== null &&
+      areas.some((a) => a.prefecture === prefecture)
+        ? prefecture
+        : undefined,
     duration: pick("duration", DURATIONS, DEFAULT_CONDITIONS.duration),
     interests: INTERESTS.filter((i) => params.getAll("interests").includes(i)),
     companion: pick("companion", COMPANIONS, DEFAULT_CONDITIONS.companion),
@@ -186,10 +200,9 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
   const resultRef = useRef<HTMLElement>(null);
   const resultHeadingRef = useRef<HTMLHeadingElement>(null);
 
-  const areaIds = useMemo(() => areas.map((area) => area.id), [areas]);
   const queryConditions = useMemo(
-    () => fromQuery(searchParams, areaIds),
-    [searchParams, areaIds],
+    () => fromQuery(searchParams, areas),
+    [searchParams, areas],
   );
   const conditions = queryConditions ?? savedConditions ?? DEFAULT_CONDITIONS;
   const { status, candidates, mode, rateLimited = false } = result;
@@ -393,7 +406,10 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
         <AreaField
           areas={areas}
           areaId={conditions.areaId}
-          onChange={(areaId) => set("areaId", areaId)}
+          prefecture={conditions.prefecture}
+          onChange={(areaId, prefecture) =>
+            replaceQuery({ ...conditions, areaId, prefecture })
+          }
         />
         <Choice
           label="日程"
@@ -644,64 +660,61 @@ function toDuration(label: string): PlanDuration {
 }
 
 /**
- * エリア: 「おまかせ」のチップと、都道府県ごとの optgroup にまとめた地域の select（docs/spec.md の画面-1）。
- * 送る値は地域の id（同じ名前の市町村がありうるため）
+ * エリア: 「おまかせ」のチップと、都道府県 → 市区町村の2段の select（docs/spec.md の画面-1・#147）。
+ * 送る値は地域の id（同じ名前の市町村がありうるため）。県だけ選んだときは県の名前を送り、その県の中でおまかせにする
  */
 function AreaField({
   areas,
   areaId,
+  prefecture,
   onChange,
 }: {
   areas: PlannableArea[];
   areaId: string | null;
-  onChange: (areaId: string | null) => void;
+  prefecture: string | undefined;
+  onChange: (areaId: string | null, prefecture: string | undefined) => void;
 }) {
-  const selectId = useId();
   const labelId = useId();
+  // 地域を選んでいるときは、その地域の県を出す
+  const shownPrefecture =
+    (areaId !== null
+      ? areas.find((area) => area.id === areaId)?.prefecture
+      : prefecture) ?? "";
   return (
     <div role="group" aria-labelledby={labelId}>
-      <label
+      <span
         id={labelId}
-        htmlFor={selectId}
         className="mb-1.5 block text-xs font-bold text-stone-700"
       >
         エリア
-      </label>
-      <div className="flex flex-wrap items-center gap-1.5">
-        <Chip
-          active={areaId === null}
-          onClick={() => onChange(null)}
-          className={CHIP_CLASS}
-        >
-          <ChipIcon icon={ANY_AREA_ICON} />
-          {ANY_AREA_LABEL}
-        </Chip>
-        <Select
-          id={selectId}
-          shape="pill"
-          value={areaId ?? ""}
-          onChange={(e) => onChange(e.target.value || null)}
-          containerClassName="min-w-0 flex-1"
-          // 地域を選んでいるときは、選択中の Chip と同じ濃い枠にする
-          className={cn(
-            areaId === null
-              ? "text-stone-600"
-              : "border-stone-900 hover:border-stone-900",
-          )}
-        >
-          <option value="">地域を選ぶ</option>
-          {groupAreasByPrefecture(areas).map((group) => (
-            <optgroup key={group.prefecture} label={group.prefecture}>
-              {group.areas.map((area) => (
-                // 選択肢の一覧で都道府県の見出しが見えないブラウザがあり、選んだ後の欄にも出ないので、名前に添える
-                <option key={area.id} value={area.id}>
-                  {area.name}（{group.prefecture}）
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </Select>
-      </div>
+      </span>
+      <Chip
+        active={areaId === null && prefecture === undefined}
+        onClick={() => onChange(null, undefined)}
+        className={CHIP_CLASS}
+      >
+        <ChipIcon icon={ANY_AREA_ICON} />
+        {ANY_AREA_LABEL}
+      </Chip>
+      <AreaSelect
+        areas={areas}
+        prefecture={shownPrefecture}
+        areaId={areaId ?? ""}
+        // 県を変えたら、市区町村は選び直す（県だけのときは、その県の中でおまかせ）
+        onPrefectureChange={(next) => onChange(null, next || undefined)}
+        // 地域を選んだら県は持たない。市区町村を「選ぶ」に戻したら、県だけ選んだ状態にする
+        onAreaChange={(next) =>
+          next
+            ? onChange(next, undefined)
+            : onChange(null, shownPrefecture || undefined)
+        }
+        shape="pill"
+        className="mt-2"
+        labelClassName="font-semibold text-stone-500"
+        // 選んでいるときは、選択中の Chip と同じ濃い枠にする
+        selectedClassName="border-stone-900 hover:border-stone-900"
+        unselectedClassName="text-stone-600"
+      />
     </div>
   );
 }

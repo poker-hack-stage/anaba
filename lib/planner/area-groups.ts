@@ -1,4 +1,4 @@
-// 旅プランのエリアの select を、都道府県ごとの optgroup にまとめる（docs/spec.md の画面-1・#17）
+// 地域を都道府県ごとにまとめる。旅プランと「穴場を教える」の、都道府県 → 市区町村の2段の select で使う（docs/spec.md の画面-1・#17・#147）
 
 export type PrefectureGroup<T> = {
   prefecture: string;
@@ -19,4 +19,17 @@ export function groupAreasByPrefecture<T extends { prefecture: string }>(
     else groups.set(area.prefecture, [area]);
   }
   return [...groups].map(([prefecture, areas]) => ({ prefecture, areas }));
+}
+
+/**
+ * 都道府県の地域を、渡した順のまま返す。旅プランで県だけ選んで市区町村を選ばないとき（#147）の、1日目の候補にする地域。
+ * 県を選んでいない（undefined）・地域が1つもない県なら undefined（「おまかせ」として全国から選ぶ）
+ */
+export function findPrefectureAreas<T extends { prefecture: string }>(
+  areas: readonly T[],
+  prefecture: string | undefined,
+): T[] | undefined {
+  if (prefecture === undefined) return undefined;
+  const found = areas.filter((area) => area.prefecture === prefecture);
+  return found.length > 0 ? found : undefined;
 }

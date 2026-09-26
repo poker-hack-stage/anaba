@@ -18,6 +18,7 @@ import {
   findIncludedSpot,
   type IncludedSpot,
 } from "./include-spot";
+import { findPrefectureAreas } from "./area-groups";
 import { findNearbyAreas } from "./nearby";
 import { normalizeNote, truncateNote } from "./note";
 import type { PlanConditions } from "./types";
@@ -35,6 +36,8 @@ export type PlanScope = {
   bases: PlannableArea[];
   /** 必ず経路に入れるスポット（#32）。指定がなければ undefined */
   included?: IncludedSpot;
+  /** 県だけ選んだとき（#147）の都道府県名。1日目の候補はその県の地域だけ。地域を選んだ・おまかせなら undefined */
+  prefecture?: string;
 };
 
 export function getPlanScope(
@@ -43,11 +46,15 @@ export function getPlanScope(
 ): PlanScope {
   const selected = areas.find((area) => area.id === request.areaId);
   const included = findIncludedSpot(areas, request);
+  const prefectureAreas = selected
+    ? undefined
+    : findPrefectureAreas(areas, request.prefecture);
   const bases = selected
     ? [selected, ...findNearbyAreas(selected, areas)]
-    : [...areas];
+    : [...(prefectureAreas ?? areas)];
   return {
     selected,
+    prefecture: prefectureAreas ? request.prefecture : undefined,
     bases: bases.filter(
       (area) =>
         area.spots.length >= MIN_DAY_SPOTS &&
@@ -114,6 +121,7 @@ export function buildPlanPrompt(
     selected,
     bases,
     included: includedSpot,
+    prefecture,
   } = getPlanScope(areas, request);
   const dayCount = DAY_COUNTS[request.duration];
 
@@ -210,7 +218,7 @@ export function buildPlanPrompt(
 
   const moveMinutes = getMoveMinutes(request.transport);
   const contents = `# 旅の条件
-- エリア: ${selected ? `${selected.name}（${areaKey.get(selected.id)}）` : "おまかせ"}
+- エリア: ${selected ? `${selected.name}（${areaKey.get(selected.id)}）` : prefecture ? `${prefecture}の中でおまかせ` : "おまかせ"}
 - 日程: ${DURATION_LABELS[request.duration]}（${dayCount}日）
 - 興味のあること: ${request.interests.length > 0 ? request.interests.join("、") : "指定なし"}
 - だれと: ${request.companion}
