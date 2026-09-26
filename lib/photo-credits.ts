@@ -1,18 +1,22 @@
-// アプリで使う写真の出典（撮影者・ライセンス・元の場所）。「写真の出典」ページ（app/credits）がこれを表示する。
-// 写真を足したら、public/images/ にファイルを置き、supabase/seed.sql の image_path と、ここに1件ずつ足す。
+// アプリで使う画像の出典（写真は撮影者・ライセンス・元の場所、AI の画像は生成に使ったモデルとプロンプトの要旨）。
+// 「写真の出典」ページ（app/credits）がこれを表示する。
+// 画像を足したら、public/images/ にファイルを置き、supabase/seed.sql の image_path と、ここに1件ずつ足す。
 // CC BY・CC BY-SA は、撮影者・ライセンス・元の題名を見る人に分かる形で示すことが条件なので、必ずここに書く（#67）
+// 許可のいらない写真が見つからないスポットは、AI で生成したイメージ画像を使い、画面で「イメージ（AI で生成）」と示す（#146）
 
 export type PhotoCredit = {
+  kind: "photo";
   /** public/ からのパス（spots.image_path と同じ値） */
   path: string;
   /** 写っているもの（スポット名） */
   subject: string;
   /**
    * 元の写真の題名。CC BY・CC BY-SA は題名が付いていれば表示を求めるので、必ず書く。
-   * Flickr は写真のページの題名、Commons はファイルページの名前（`File:` を除き、`_` を空白にしたもの）
+   * Flickr は写真のページの題名、Commons はファイルページの名前（`File:` を除き、`_` を空白にしたもの）、
+   * VIEW OF KAMIKAWA は写真のページの「題名」
    */
   title: string;
-  /** 撮影者（元の写真のページの表記） */
+  /** 撮影者（元の写真のページの表記。VIEW OF KAMIKAWA は職員が撮影しているので、公開している北海道上川総合振興局） */
   author: string;
   /** ライセンスの短い名前 */
   license: string;
@@ -20,9 +24,32 @@ export type PhotoCredit = {
   licenseUrl: string | null;
   /** 元の写真のページ */
   sourceUrl: string;
-  /** 元の写真を公開しているサイト */
-  sourceName: "Wikimedia Commons" | "Flickr";
+  /**
+   * 元の写真を公開しているサイト。VIEW OF KAMIKAWA は北海道上川総合振興局の写真集で、
+   * 北海道のサイトポリシーにより CC BY 4.0（#146。使ったあとに画像の番号などを知らせてほしいというお願いがある）
+   */
+  sourceName: "Wikimedia Commons" | "Flickr" | typeof VIEW_OF_KAMIKAWA;
 };
+
+/**
+ * AI で生成したイメージ画像。実在の建物・看板・人物を写真のように再現せず、「イメージ」と分かる絵柄にする。
+ * path は AI_IMAGE_DIR（lib/spots/image-kind.ts）の下に置く（画面はパスで「イメージ（AI で生成）」を出すかを決める）
+ */
+export type AiImageCredit = {
+  kind: "ai";
+  /** public/ からのパス（spots.image_path と同じ値）。AI_IMAGE_DIR の下 */
+  path: string;
+  /** 表しているもの（スポット名） */
+  subject: string;
+  /** 生成に使ったモデル（例: "Gemini 2.5 Flash Image"） */
+  model: string;
+  /** プロンプトの要旨（「写真の出典」ページに出す） */
+  prompt: string;
+  /** 生成した日（YYYY-MM-DD） */
+  createdOn: string;
+};
+
+export type ImageCredit = PhotoCredit | AiImageCredit;
 
 /** 元の写真からの変更。CC BY・CC BY-SA では、変更したことを示す */
 export const PHOTO_CHANGES = "長辺を1200px以下に縮小し、JPEG で圧縮した";
@@ -37,9 +64,13 @@ const BY_SA_4 = "https://creativecommons.org/licenses/by-sa/4.0";
 const CC0 = "https://creativecommons.org/publicdomain/zero/1.0";
 const COMMONS = "https://commons.wikimedia.org/wiki/File:";
 const FLICKR = "https://www.flickr.com/photos/";
+const KAMIKAWA_ALBUM = "https://www.kamikawa.pref.hokkaido.lg.jp/ts/tss/album/";
+const KAMIKAWA = "北海道上川総合振興局";
+export const VIEW_OF_KAMIKAWA = "北海道の風景～VIEW OF KAMIKAWA～";
 
 export const PHOTO_CREDITS: PhotoCredit[] = [
   {
+    kind: "photo",
     path: "/images/spots/hakuba-01.jpg",
     subject: "白馬塩の道温泉 倉下の湯",
     title: "Kurashita no yu.jpg",
@@ -50,6 +81,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/hakuba-02.jpg",
     subject: "青鬼集落",
     title: "青鬼集落 - panoramio.jpg",
@@ -60,6 +92,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/hakuba-03.jpg",
     subject: "大出公園",
     title: "大出吊橋 - panoramio (4).jpg",
@@ -70,6 +103,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/hakuba-04.jpg",
     subject: "姫川源流自然探勝園",
     title: "姫川源流 - panoramio.jpg",
@@ -80,6 +114,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/hakuba-06.jpg",
     subject: "貞麟寺",
     title: "桜@貞麟寺",
@@ -90,6 +125,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Flickr",
   },
   {
+    kind: "photo",
     path: "/images/spots/omachi-01.jpg",
     subject: "塩の道ちょうじや",
     title: "Hirabayashi-ke Jyutaku Shuoku.jpg",
@@ -100,6 +136,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/omachi-02.jpg",
     subject: "若一王子神社",
     title: "若一王子神社鳥居と三重塔.jpg",
@@ -110,6 +147,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/omachi-03.jpg",
     subject: "ぽかぽかランド美麻",
     title: "Road Station Poka-Poka Land Miasa 01.jpg",
@@ -120,6 +158,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/omachi-06.jpg",
     subject: "居谷里湿原",
     title: "リュウキンカ@居谷里湿原",
@@ -130,6 +169,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Flickr",
   },
   {
+    kind: "photo",
     path: "/images/spots/omachi-07.jpg",
     subject: "中綱湖",
     title: "中綱湖 - panoramio.jpg",
@@ -140,6 +180,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/omachi-08.jpg",
     subject: "鷹狩山",
     title: "Japan North Alps",
@@ -150,6 +191,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Flickr",
   },
   {
+    kind: "photo",
     path: "/images/spots/ikeda-01.jpg",
     subject: "池田八幡神社",
     title: "池田八幡神社社殿.jpg",
@@ -160,6 +202,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/ikeda-04.jpg",
     subject: "夢農場",
     title: "桜@池田町 夢農場",
@@ -170,6 +213,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Flickr",
   },
   {
+    kind: "photo",
     path: "/images/spots/ikeda-05.jpg",
     subject: "花紋大雪渓",
     title: "Daisekkei Sake Brewing 1.jpg",
@@ -180,6 +224,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/azumino-02.jpg",
     subject: "ほりでーゆ〜四季の郷",
     title: "Holiday You Shikinosato.jpg",
@@ -190,6 +235,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/azumino-04.jpg",
     subject: "貞享義民記念館",
     title: "Kinenkan.JPG",
@@ -200,6 +246,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/azumino-06.jpg",
     subject: "御宝田遊水池",
     title: "御宝田遊水池.jpg",
@@ -210,6 +257,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/azumino-07.jpg",
     subject: "烏川渓谷緑地",
     title: "Karasu River view from Karasugawakeikokubashi-bridge.jpg",
@@ -220,6 +268,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/matsumoto-01.jpg",
     subject: "松本市はかり資料館",
     title:
@@ -231,6 +280,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/matsumoto-05.jpg",
     subject: "源智の井戸",
     title: "源智の井戸.jpg",
@@ -241,6 +291,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/matsumoto-06.jpg",
     subject: "馬場家住宅",
     title: "Babake house 2010.jpg",
@@ -251,6 +302,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/matsumoto-07.jpg",
     subject: "弘法山古墳",
     title: "Koboyama Kofun zenkei.JPG",
@@ -261,6 +313,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/higashikawa-01.jpg",
     subject: "旭岳",
     title: "Asahi-dake (9099317042).jpg",
@@ -271,6 +324,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/higashikawa-02.jpg",
     subject: "忠別湖",
     title: "忠別湖（Lake Tyubetsu） - panoramio.jpg",
@@ -281,6 +335,40 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
+    path: "/images/spots/higashikawa-03.jpg",
+    subject: "キトウシの森",
+    title: "スプリング・エフェメラル２",
+    author: KAMIKAWA,
+    license: "CC BY 4.0",
+    licenseUrl: BY_4,
+    sourceUrl: `${KAMIKAWA_ALBUM}life/133087.html`,
+    sourceName: VIEW_OF_KAMIKAWA,
+  },
+  {
+    kind: "photo",
+    path: "/images/spots/higashikawa-04.jpg",
+    subject: "大雪旭岳源水",
+    title: "旭岳源水",
+    author: KAMIKAWA,
+    license: "CC BY 4.0",
+    licenseUrl: BY_4,
+    sourceUrl: `${KAMIKAWA_ALBUM}view/133653.html`,
+    sourceName: VIEW_OF_KAMIKAWA,
+  },
+  {
+    kind: "photo",
+    path: "/images/spots/higashikawa-05.jpg",
+    subject: "北の住まい設計社",
+    title: "北の住まい設計社１",
+    author: KAMIKAWA,
+    license: "CC BY 4.0",
+    licenseUrl: BY_4,
+    sourceUrl: `${KAMIKAWA_ALBUM}structure/132066.html`,
+    sourceName: VIEW_OF_KAMIKAWA,
+  },
+  {
+    kind: "photo",
     path: "/images/spots/marumori-01.jpg",
     subject: "蔵の郷土館 齋理屋敷",
     title: "Sairi Residence storehouse.jpg",
@@ -291,6 +379,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/nakanojo-02.jpg",
     subject: "奥四万湖",
     title: "Shimagawa Dam-Lake.jpg",
@@ -301,6 +390,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/nakanojo-03.jpg",
     subject: "沢渡温泉 共同浴場",
     title: "Sawatari Onsen public bath.jpg",
@@ -311,6 +401,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/nakanojo-04.jpg",
     subject: "旧太子駅",
     title: "Oshi Station 2017-08 1.jpg",
@@ -321,6 +412,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/nakanojo-05.jpg",
     subject: "野反湖",
     title: "Lake Nozori 2011-07-23 (5989960888).jpg",
@@ -331,6 +423,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/nakanojo-06.jpg",
     subject: "道の駅 霊山たけやま",
     title: "R145-2020-102.jpg",
@@ -341,6 +434,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/ono-01.jpg",
     subject: "御清水",
     title: "Echizen-Ono Oshozu 2021-07 ac.jpg",
@@ -351,6 +445,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/ono-02.jpg",
     subject: "武家屋敷旧内山家",
     title: "Former Uchiyama House 2021-07 ac.jpg",
@@ -361,6 +456,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/ono-03.jpg",
     subject: "亀山湯",
     title: "Echizen-Ono Kameyama-yu 2021-07 ac.jpg",
@@ -371,6 +467,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/ono-04.jpg",
     subject: "真名鶴酒造",
     title: "Manatsuru Brewery 2021-07 ac.jpg",
@@ -381,6 +478,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/ono-05.jpg",
     subject: "六呂師高原",
     title: "Rokuroshi Highland s2.jpg",
@@ -391,6 +489,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/ono-06.jpg",
     subject: "越前大野城",
     title: "Echizen Ono Castle.jpg",
@@ -401,6 +500,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/takashima-01.jpg",
     subject: "白鬚神社",
     title: "Shirahige-jinja (Takashima) otorii.JPG",
@@ -411,6 +511,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/takashima-02.jpg",
     subject: "メタセコイア並木",
     title: "Metasequoia Namiki in 2019.jpg",
@@ -421,6 +522,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/takashima-03.jpg",
     subject: "針江生水の郷",
     title: "Harie20160508a.JPG",
@@ -431,6 +533,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/takashima-04.jpg",
     subject: "道の駅 くつき新本陣",
     title: "Michinoeki Kutsuki Shinhonjin 20220228 03.jpg",
@@ -441,6 +544,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/takahashi-01.jpg",
     subject: "備中松山城",
     title: "BitchuMatsuyamaCastleKeep Takahashi Okayama Japan 2015.jpg",
@@ -451,6 +555,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/takahashi-02.jpg",
     subject: "吹屋ふるさと村",
     title: "高梁市 吹屋ふるさと村 - panoramio.jpg",
@@ -461,6 +566,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/takahashi-03.jpg",
     subject: "ベンガラ館",
     title: "Bengarakan07s3200.jpg",
@@ -471,6 +577,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/takahashi-04.jpg",
     subject: "頼久寺庭園",
     title: "Raikyuji 20180502 112529.jpg",
@@ -481,6 +588,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/takahashi-05.jpg",
     subject: "弥高山公園",
     title: "Yatakayama-unkai002.jpg",
@@ -491,6 +599,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/taketa-01.jpg",
     subject: "岡城跡",
     title: "Okajoshi.jpg",
@@ -501,6 +610,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/taketa-02.jpg",
     subject: "白水ダム",
     title: "Hakusui-Dam full-view.jpg",
@@ -511,6 +621,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/taketa-03.jpg",
     subject: "七里田温泉館",
     title: "七里田温泉下湯 - panoramio.jpg",
@@ -521,6 +632,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/taketa-05.jpg",
     subject: "ラムネ温泉館",
     title: "ラムネ温泉 - panoramio.jpg",
@@ -531,6 +643,7 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceName: "Wikimedia Commons",
   },
   {
+    kind: "photo",
     path: "/images/spots/taketa-06.jpg",
     subject: "くじゅう花公園",
     title: "Kuju Flower Park(3553982332).jpg",
@@ -540,4 +653,13 @@ export const PHOTO_CREDITS: PhotoCredit[] = [
     sourceUrl: `${COMMONS}Kuju_Flower_Park(3553982332).jpg`,
     sourceName: "Wikimedia Commons",
   },
+];
+
+/** AI で生成したイメージ画像。許可のいらない写真が見つからなかったスポットに使う（#146。探した結果は docs/image-credits.md） */
+export const AI_IMAGE_CREDITS: AiImageCredit[] = [];
+
+/** 写真と AI の画像のすべて（パスで引くとき・シードとの突き合わせ） */
+export const IMAGE_CREDITS: ImageCredit[] = [
+  ...PHOTO_CREDITS,
+  ...AI_IMAGE_CREDITS,
 ];

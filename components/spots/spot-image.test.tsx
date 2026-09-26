@@ -37,6 +37,40 @@ describe("SpotImage", () => {
     expect(root?.className).toContain("flex");
   });
 
+  test("AI の画像には「イメージ（AI で生成）」を重ねる", () => {
+    const { getByText } = render(
+      <SpotImage
+        category="onsen"
+        imagePath="/images/spots/ai/yu.jpg"
+        sizes="96px"
+      />,
+    );
+    expect(getByText("イメージ（AI で生成）")).toBeTruthy();
+  });
+
+  test("写真には「イメージ（AI で生成）」を出さない", () => {
+    const { queryByText } = render(
+      <SpotImage
+        category="onsen"
+        imagePath="/images/spots/yu.jpg"
+        sizes="96px"
+      />,
+    );
+    expect(queryByText("イメージ（AI で生成）")).toBeNull();
+  });
+
+  test("AI の画像を読み込めなかったら、「イメージ（AI で生成）」も消す", () => {
+    const { container, queryByText } = render(
+      <SpotImage
+        category="onsen"
+        imagePath="/images/spots/ai/missing.jpg"
+        sizes="96px"
+      />,
+    );
+    fireEvent.error(container.querySelector("img")!);
+    expect(queryByText("イメージ（AI で生成）")).toBeNull();
+  });
+
   test("写真を読み込めなかったら、プレースホルダーに戻す", () => {
     const { container } = render(
       <SpotImage

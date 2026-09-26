@@ -1,7 +1,13 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { PHOTO_CREDITS } from "./photo-credits";
+import { AI_IMAGE_DIR, isAiImagePath } from "./spots/image-kind";
+import {
+  AI_IMAGE_CREDITS,
+  IMAGE_CREDITS,
+  PHOTO_CREDITS,
+  VIEW_OF_KAMIKAWA,
+} from "./photo-credits";
 
 const ROOT = join(__dirname, "..");
 
@@ -11,22 +17,38 @@ function seedImagePaths(): string[] {
   return [...seed.matchAll(/'(\/images\/[^']+)'/g)].map((m) => m[1]);
 }
 
-describe("PHOTO_CREDITS", () => {
-  test("どの写真も public/ にあり、300KB 以下", () => {
-    for (const { path } of PHOTO_CREDITS) {
+describe("IMAGE_CREDITS", () => {
+  test("どの画像も public/ にあり、300KB 以下", () => {
+    for (const { path } of IMAGE_CREDITS) {
       const file = join(ROOT, "public", path);
       expect(existsSync(file), path).toBe(true);
       expect(statSync(file).size, path).toBeLessThanOrEqual(300_000);
     }
   });
 
-  test("同じ写真を2回書いていない", () => {
-    const paths = PHOTO_CREDITS.map((c) => c.path);
+  test("同じ画像を2回書いていない", () => {
+    const paths = IMAGE_CREDITS.map((c) => c.path);
     expect(new Set(paths).size).toBe(paths.length);
   });
 
-  test("シードで使う写真には、必ず出典がある（出典のない写真を表示しない）", () => {
-    const credited = new Set(PHOTO_CREDITS.map((c) => c.path));
+  test("写真と AI の画像の一覧を合わせたもの", () => {
+    expect(IMAGE_CREDITS).toHaveLength(
+      PHOTO_CREDITS.length + AI_IMAGE_CREDITS.length,
+    );
+    expect(PHOTO_CREDITS.every((c) => c.kind === "photo")).toBe(true);
+    expect(AI_IMAGE_CREDITS.every((c) => c.kind === "ai")).toBe(true);
+  });
+
+  test("AI の画像だけが AI の画像のフォルダにある（画面はパスで「イメージ（AI で生成）」を出す）", () => {
+    for (const credit of IMAGE_CREDITS) {
+      expect(isAiImagePath(credit.path), credit.path).toBe(
+        credit.kind === "ai",
+      );
+    }
+  });
+
+  test("シードで使う画像には、必ず出典か生成の記録がある（出典のない画像を表示しない）", () => {
+    const credited = new Set(IMAGE_CREDITS.map((c) => c.path));
     const used = seedImagePaths();
     expect(used.length).toBeGreaterThan(0);
     for (const path of used) expect(credited.has(path), path).toBe(true);
@@ -49,6 +71,8 @@ describe("PHOTO_CREDITS", () => {
     const prefix = {
       "Wikimedia Commons": /^https:\/\/commons\.wikimedia\.org\/wiki\/File:/,
       Flickr: /^https:\/\/www\.flickr\.com\/photos\/[^/]+\/\d+$/,
+      [VIEW_OF_KAMIKAWA]:
+        /^https:\/\/www\.kamikawa\.pref\.hokkaido\.lg\.jp\/ts\/tss\/album\/\w+\/\d+\.html$/,
     };
     for (const credit of PHOTO_CREDITS) {
       expect(credit.sourceUrl, credit.path).toMatch(prefix[credit.sourceName]);
@@ -96,5 +120,34 @@ describe("PHOTO_CREDITS", () => {
       "https://www.flickr.com/photos/154568645@N04/34840653796":
         "桜@池田町 夢農場",
     });
+  });
+});
+
+test("VIEW OF KAMIKAWA の写真は CC BY 4.0 で、題名は写真のページで確かめた題名（2026-09-26）", () => {
+  const photos = PHOTO_CREDITS.filter((c) => c.sourceName === VIEW_OF_KAMIKAWA);
+  for (const credit of photos) {
+    expect(credit.license, credit.path).toBe("CC BY 4.0");
+    expect(credit.author, credit.path).toBe("北海道上川総合振興局");
+  }
+  expect(Object.fromEntries(photos.map((c) => [c.sourceUrl, c.title]))).toEqual(
+    {
+      "https://www.kamikawa.pref.hokkaido.lg.jp/ts/tss/album/life/133087.html":
+        "スプリング・エフェメラル２",
+      "https://www.kamikawa.pref.hokkaido.lg.jp/ts/tss/album/view/133653.html":
+        "旭岳源水",
+      "https://www.kamikawa.pref.hokkaido.lg.jp/ts/tss/album/structure/132066.html":
+        "北の住まい設計社１",
+    },
+  );
+});
+
+describe("AI_IMAGE_CREDITS", () => {
+  test("モデル・プロンプトの要旨・生成した日がある", () => {
+    for (const credit of AI_IMAGE_CREDITS) {
+      expect(credit.path.startsWith(AI_IMAGE_DIR), credit.path).toBe(true);
+      expect(credit.model.trim(), credit.path).not.toBe("");
+      expect(credit.prompt.trim(), credit.path).not.toBe("");
+      expect(credit.createdOn, credit.path).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    }
   });
 });

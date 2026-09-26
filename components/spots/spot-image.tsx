@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Image, { getImageProps } from "next/image";
 import { getCategory } from "@/lib/spots/categories";
+import { AI_IMAGE_LABEL, isAiImagePath } from "@/lib/spots/image-kind";
 import { cn } from "@/lib/utils";
 
 /**
@@ -44,6 +45,8 @@ export function preloadSpotImage(
 /**
  * スポットの写真。`imagePath` があれば写真を、なければカテゴリ色のプレースホルダーを出す。
  * 写真はプレースホルダーの上に重ねるので、読み込み中や読み込めなかったときもプレースホルダーが見える。
+ * AI で生成したイメージ画像（lib/spots/image-kind.ts）には、右下に「イメージ（AI で生成）」を重ねる（#146）。
+ * カード・詳細・経路のカードのどれもこの部品で出すので、どこでも表示がそろう。
  * Vercel の画像変換の無料枠（5,000回/月）を超えないよう、`sizes` に表示する幅を必ず指定する（#30）
  */
 export function SpotImage({
@@ -52,6 +55,7 @@ export function SpotImage({
   sizes,
   alt = "",
   className,
+  aiLabelClassName,
 }: {
   category: string;
   imagePath?: string | null;
@@ -63,6 +67,8 @@ export function SpotImage({
   /** 写真の代替テキスト。横に名前を出している場所では空のままにする */
   alt?: string;
   className?: string;
+  /** 「イメージ（AI で生成）」の表示の位置・大きさを変えるとき（詳細の大きい画像など） */
+  aiLabelClassName?: string;
 }) {
   const meta = getCategory(category);
   // 読み込めなかった写真のパス（別のスポットに替わったら、また写真を試す）
@@ -96,6 +102,17 @@ export function SpotImage({
           className="object-cover"
           onError={() => setFailedPath(imagePath)}
         />
+      )}
+      {showPhoto && isAiImagePath(imagePath) && (
+        // 小さい画像（経路のカードの 64px）では2行に折り返す
+        <span
+          className={cn(
+            "absolute bottom-1 right-1 max-w-[calc(100%-0.5rem)] rounded bg-black/60 px-1 py-px text-right text-[10px] font-bold leading-tight text-white",
+            aiLabelClassName,
+          )}
+        >
+          {AI_IMAGE_LABEL}
+        </span>
       )}
     </span>
   );
