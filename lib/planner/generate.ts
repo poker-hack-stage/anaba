@@ -9,6 +9,7 @@ import {
   type IncludedSpot,
 } from "./include-spot";
 import { findNearbyAreas } from "./nearby";
+import { countNoteHintMatches, type NoteHints, readNoteHints } from "./note";
 import type { PlanCandidate, PlanDay, PlanConditions } from "./types";
 
 /** 候補を作るのに使う地域の列（テストのフィクスチャを短く書けるように、使う列だけにする） */
@@ -32,6 +33,8 @@ export const MAX_CANDIDATES = 3;
 /** 1日の経路のスポット数の下限と上限 */
 export const MIN_DAY_SPOTS = 2;
 export const MAX_DAY_SPOTS = 4;
+/** 希望に「ゆっくり」「のんびり」があるとき（デモモード、#114）の、1日のスポット数の上限 */
+export const RELAXED_DAY_SPOTS = 3;
 
 /**
  * Gemini を使わずに旅プランの候補を作る（デモモード、#19）。Supabase は読まない。
@@ -45,6 +48,10 @@ export const MAX_DAY_SPOTS = 4;
  * - 1つの候補の中で同じスポットを2回使わない。組めない候補は捨てる
  * - 必ず入れるスポット（includeSpotId、#32）があれば、そのスポットの地域をめぐる日に必ず入れる。
  *   候補の地域と別の地域なら、2日目以降にその地域を優先する。入れられない候補は捨てる
+ * - 自由記述の希望（note、#114）は、決まったキーワードだけを反映する（note.ts の readNoteHints()）:
+ *   雨・屋内 → 屋内のスポット、子ども・子連れ → 子どもと楽しめるタグのスポットを、興味の次に優先する
+ *   （両方あれば、両方に合うスポットを先にする）。
+ *   ゆっくり・のんびり → 1日3件まで
  */
 export function generateCandidates(
   areas: readonly PlannableArea[],
@@ -53,6 +60,7 @@ export function generateCandidates(
   const wanted = new Set(
     request.interests.map((i) => INTEREST_TO_CATEGORY[i]).filter(Boolean),
   );
+  const hints = readNoteHints(request.note);
   const selected = areas.find((area) => area.id === request.areaId);
   const included = findIncludedSpot(areas, request);
   // 見つからないスポットは、どの候補にも入れられない
@@ -76,7 +84,7 @@ export function generateCandidates(
   for (const { area, nearby } of bases) {
     if (candidates.length >= MAX_CANDIDATES) break;
     if (included && !canInclude(area, included, areas, request)) continue;
-    const candidate = buildCandidate(area, areas, request, wanted, {
+    const candidate = buildCandidate(area, areas, request, wanted, hints, {
       nearbyOf: nearby ? selected : undefined,
       included: included ?? undefined,
     });
@@ -90,6 +98,7 @@ function buildCandidate(
   areas: readonly PlannableArea[],
   request: PlanConditions,
   wanted: ReadonlySet<SpotCategory>,
+  hints: NoteHints,
   { nearbyOf, included }: { nearbyOf?: PlannableArea; included?: IncludedSpot },
 ): PlanCandidate | null {
   const used = new Set<string>();
@@ -127,13 +136,13 @@ function buildCandidate(
         ? Math.max(0, DAY_COUNTS[request.duration] - day - nearbyDays)
         : 0;
     const limit = Math.min(
-      MAX_DAY_SPOTS,
+      hints.relaxed ? RELAXED_DAY_SPOTS : MAX_DAY_SPOTS,
       unused(area).length - reservedDays * MIN_DAY_SPOTS,
     );
     if (limit < MIN_DAY_SPOTS) return null;
 
     const sorted = [...unused(area)].sort((a, b) =>
-      compareForRoute(a, b, wanted),
+      compareForRoute(a, b, wanted, hints),
     );
     let picked = sorted.slice(0, limit);
     // 必ず入れるスポットがこの地域にあり、選んだ中になければ、最後の1件と入れ替える
@@ -169,7 +178,7 @@ function buildCandidate(
     areaName: base.name,
     title: `${base.name}をめぐる${DURATION_LABELS[request.duration]}プラン`,
     summary: base.catchphrase ?? "",
-    reason: buildReason(request, days, base, nearbyOf, included),
+    reason: buildReason(request, days, base, nearbyOf, included, hints),
     duration: request.duration,
     days,
     otherSpots,
@@ -178,25 +187,31 @@ function buildCandidate(
 }
 
 /**
- * 経路に入れる順。興味に合うカテゴリ → 穴場度の高い順 → 評価の高い順 → 名前の順（DB から返る順に左右されないように）。
+ * 経路に入れる順。興味に合うカテゴリ → 希望に合うスポット（#114） → 穴場度の高い順 → 評価の高い順 →
+ * 名前の順（DB から返る順に左右されないように）。
  * 穴場度・評価がないスポットは後ろ（docs/spot-scores.md）
  */
 function compareForRoute(
   a: Spot,
   b: Spot,
   wanted: ReadonlySet<SpotCategory>,
+  hints: NoteHints,
 ): number {
   return (
     Number(wanted.has(b.category as SpotCategory)) -
       Number(wanted.has(a.category as SpotCategory)) ||
+    countNoteHintMatches(b, hints) - countNoteHintMatches(a, hints) ||
     compareByHiddenGemScore(a, b) ||
     compareByRating(a, b) ||
     a.name.localeCompare(b.name, "ja")
   );
 }
 
-/** 先頭のスポットから、まだ通っていちばん近いスポットを順につなぐ（地図で経路が行ったり来たりしないように） */
-function orderByProximity(spots: readonly Spot[]): Spot[] {
+/**
+ * 先頭のスポットから、まだ通っていちばん近いスポットを順につなぐ（地図で経路が行ったり来たりしないように）。
+ * Gemini の経路にも使う（ai-candidates.ts、#113）
+ */
+export function orderByProximity(spots: readonly Spot[]): Spot[] {
   if (spots.length === 0) return [];
   const [first, ...rest] = spots;
   const ordered = [first];
@@ -239,6 +254,7 @@ function buildReason(
   base: PlannableArea,
   nearbyOf: PlannableArea | undefined,
   included: IncludedSpot | undefined,
+  hints: NoteHints,
 ): string {
   const interests = request.interests.filter((i) => i in INTEREST_TO_CATEGORY);
   const sentences = [
@@ -250,6 +266,17 @@ function buildReason(
       .filter((d) => d.areaId !== base.id)
       .map((d) => `${d.day}日目は近くの${d.areaName}をめぐります。`),
     included ? `「${included.spot.name}」を経路に加えました。` : "",
+    noteSentence(hints),
   ];
   return sentences.join("");
+}
+
+/** 希望（#114）のうち、デモモードで反映したことの文。何も反映していなければ空 */
+function noteSentence(hints: NoteHints): string {
+  const done = [
+    hints.indoor ? "屋内で楽しめるスポットを優先しました" : "",
+    hints.kids ? "子どもと楽しめるスポットを優先しました" : "",
+    hints.relaxed ? `1日${RELAXED_DAY_SPOTS}件までにしました` : "",
+  ].filter(Boolean);
+  return done.length > 0 ? `希望に合わせて、${done.join("。")}。` : "";
 }

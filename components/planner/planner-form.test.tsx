@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import type { SpotMapProps } from "@/components/map/spot-map";
@@ -99,16 +99,40 @@ function renderForm({
       <PlannerForm areas={plannable} />
     </PlannerStateProvider>,
   );
-  if (submit) fireEvent.click(screen.getByRole("button", { name: "絞る" }));
+  if (submit)
+    fireEvent.click(screen.getByRole("button", { name: "旅プランをつくる" }));
 }
+
+/** エリアの select（「エリア」はチップと select をまとめた group の名前でもあるので、role で探す） */
+const areaSelect = () =>
+  screen.getByRole<HTMLSelectElement>("combobox", { name: "エリア" });
 
 /** fetch に送った本文 */
 function sentBody(fetchMock: ReturnType<typeof vi.fn>) {
   return JSON.parse(fetchMock.mock.calls[0][1].body);
 }
 
+/** 画面の幅と「動きを減らす」の設定。matchMedia は jsdom にないので差し替える */
+function stubMatchMedia({
+  wide = false,
+  reduceMotion = false,
+}: { wide?: boolean; reduceMotion?: boolean } = {}) {
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn((media: string) => ({
+      media,
+      matches:
+        (media === "(min-width: 1024px)" && wide) ||
+        (media === "(prefers-reduced-motion: reduce)" && reduceMotion),
+    })),
+  );
+}
+
 beforeEach(() => {
   query.set("");
+  stubMatchMedia();
+  // jsdom には scrollIntoView がない
+  Element.prototype.scrollIntoView = vi.fn();
   vi.spyOn(window.history, "replaceState").mockImplementation(
     (_data, _unused, url) => query.set(String(url ?? "")),
   );
@@ -127,9 +151,7 @@ describe("PlannerForm", () => {
 
     // 見つからなければ findByText が失敗する
     await screen.findByText("松本市をめぐる日帰りプラン");
-    expect(screen.getByRole("status").textContent).toContain(
-      "デモモードで作成しました",
-    );
+    expect(screen.getByText(/デモモードで作成しました/)).toBeTruthy();
   });
 
   test("/api/plan がエラーを返したときも、デモモードの候補を出す", async () => {
@@ -158,9 +180,9 @@ describe("PlannerForm", () => {
 
     // 見つからなければ findByText が失敗する
     await screen.findByText("松本市をめぐる日帰りプラン");
-    expect(screen.getByRole("status").textContent).toContain(
-      "短い時間に何度も作ったため、デモモードで作成しました",
-    );
+    expect(
+      screen.getByText(/短い時間に何度も作ったため、デモモードで作成しました/),
+    ).toBeTruthy();
   });
 
   test("Gemini で作った候補なら、デモモードの表示を出さない", async () => {
@@ -201,12 +223,12 @@ describe("PlannerForm", () => {
       const fetchMock = stubFetch();
       renderForm({ submit: false });
 
-      fireEvent.change(screen.getByLabelText("エリア"), {
+      fireEvent.change(areaSelect(), {
         target: { value: "matsumoto" },
       });
       fireEvent.click(screen.getByRole("button", { name: "1泊2日" }));
       fireEvent.click(screen.getByRole("button", { name: "温泉" }));
-      fireEvent.click(screen.getByRole("button", { name: "絞る" }));
+      fireEvent.click(screen.getByRole("button", { name: "旅プランをつくる" }));
       await screen.findByText("この条件では候補を組めませんでした");
 
       expect(sentBody(fetchMock)).toMatchObject({
@@ -220,7 +242,7 @@ describe("PlannerForm", () => {
 
     test("地域を選ぶと「おまかせ」が外れ、「おまかせ」を押すと地域の選択が外れる", () => {
       renderForm({ submit: false });
-      const select = screen.getByLabelText<HTMLSelectElement>("エリア");
+      const select = areaSelect();
       const any = screen.getByRole("button", { name: "おまかせ" });
       expect(any.getAttribute("aria-pressed")).toBe("true");
 
@@ -235,7 +257,7 @@ describe("PlannerForm", () => {
 
     test("地域は都道府県ごとの optgroup にまとめる", () => {
       renderForm({ submit: false });
-      const select = screen.getByLabelText<HTMLSelectElement>("エリア");
+      const select = areaSelect();
 
       const groups = [...select.querySelectorAll("optgroup")];
       expect(groups.map((g) => g.label)).toEqual(["長野県"]);
@@ -248,9 +270,7 @@ describe("PlannerForm", () => {
       query.set("?area=matsumoto&duration=2n3d&companion=友人&transport=車");
       renderForm({ submit: false });
 
-      expect(screen.getByLabelText<HTMLSelectElement>("エリア").value).toBe(
-        "matsumoto",
-      );
+      expect(areaSelect().value).toBe("matsumoto");
       expect(
         screen
           .getByRole("button", { name: "2泊3日" })
@@ -262,12 +282,291 @@ describe("PlannerForm", () => {
       query.set("?area=unknown&duration=9n10d&companion=友人&transport=車");
       renderForm({ submit: false });
 
-      expect(screen.getByLabelText<HTMLSelectElement>("エリア").value).toBe("");
+      expect(areaSelect().value).toBe("");
       expect(
         screen
           .getByRole("button", { name: "日帰り" })
           .getAttribute("aria-pressed"),
       ).toBe("true");
+    });
+  });
+
+  describe("自由記述の希望（#114）", () => {
+    function stubFetch() {
+      const body: PlanResponse = { candidates: [], mode: "ai" };
+      const fetchMock = vi.fn().mockResolvedValue(Response.json(body));
+      vi.stubGlobal("fetch", fetchMock);
+      return fetchMock;
+    }
+    const noteField = () =>
+      screen.getByLabelText<HTMLTextAreaElement>("ほかに希望があれば（任意）");
+
+    test("入力中は URL を書き換えず、フォーカスが外れたときに書く", () => {
+      renderForm({ submit: false });
+      const replaceState = vi.mocked(window.history.replaceState);
+      replaceState.mockClear();
+
+      fireEvent.change(noteField(), { target: { value: "雨" } });
+      fireEvent.change(noteField(), { target: { value: "雨でも\n楽しめる" } });
+      expect(replaceState).not.toHaveBeenCalled();
+      expect(noteField().value).toBe("雨でも\n楽しめる");
+      expect(screen.getByText("残り92文字")).toBeTruthy();
+
+      fireEvent.blur(noteField());
+      expect(replaceState).toHaveBeenCalledTimes(1);
+      expect(new URLSearchParams(query.get()).get("note")).toBe(
+        "雨でも 楽しめる",
+      );
+    });
+
+    test("「旅プランをつくる」で、入力中の希望も URL に書いて送る", async () => {
+      const fetchMock = stubFetch();
+      renderForm({ submit: false });
+
+      fireEvent.change(noteField(), {
+        target: { value: " ゆっくり回りたい " },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "旅プランをつくる" }));
+      await screen.findByText("この条件では候補を組めませんでした");
+
+      expect(sentBody(fetchMock)).toMatchObject({ note: "ゆっくり回りたい" });
+      expect(new URLSearchParams(query.get()).get("note")).toBe(
+        "ゆっくり回りたい",
+      );
+      // 送った条件と今の条件は同じなので、「条件が変わっています」は出さない
+      expect(screen.queryByText(/条件が変わっています/)).toBeNull();
+    });
+
+    test("希望を書かなければ、送る条件にも URL にも入れない", async () => {
+      const fetchMock = stubFetch();
+      renderForm({ submit: false });
+
+      fireEvent.change(noteField(), { target: { value: "   " } });
+      fireEvent.blur(noteField());
+      fireEvent.click(screen.getByRole("button", { name: "旅プランをつくる" }));
+      await screen.findByText("この条件では候補を組めませんでした");
+
+      expect(sentBody(fetchMock)).not.toHaveProperty("note");
+      expect(query.get()).not.toContain("note=");
+    });
+
+    test("URL のクエリの希望を読み、100字で切る", () => {
+      query.set(
+        `?area=any&duration=day&companion=友人&transport=車&note=${encodeURIComponent(`子どもと${"あ".repeat(120)}`)}`,
+      );
+      renderForm({ submit: false });
+
+      expect(noteField().value).toBe(`子どもと${"あ".repeat(96)}`);
+      expect(screen.getByText("残り0文字")).toBeTruthy();
+    });
+
+    test("家族の絵文字も1文字と数え、100字を超えた入力は絵文字を分けずに切る", () => {
+      renderForm({ submit: false });
+
+      fireEvent.change(noteField(), {
+        target: { value: "👨‍👩‍👧‍👦".repeat(99) },
+      });
+      expect(noteField().value).toBe("👨‍👩‍👧‍👦".repeat(99));
+      expect(screen.getByText("残り1文字")).toBeTruthy();
+
+      fireEvent.change(noteField(), {
+        target: { value: "👨‍👩‍👧‍👦".repeat(101) },
+      });
+      expect(noteField().value).toBe("👨‍👩‍👧‍👦".repeat(100));
+      expect(screen.getByText("残り0文字")).toBeTruthy();
+      // 文字数の上限はブラウザの maxLength（UTF-16 で数える）に任せない
+      expect(noteField().maxLength).toBe(-1);
+    });
+
+    test("URL の希望が変わったら（ブラウザの「戻る」など）、入力中の文を捨てて URL に合わせる", () => {
+      query.set("?area=any&duration=day&companion=友人&transport=車&note=雨");
+      renderForm({ submit: false });
+
+      fireEvent.change(noteField(), { target: { value: "書きかけ" } });
+      act(() =>
+        query.set(
+          "?area=any&duration=day&companion=友人&transport=車&note=晴れ",
+        ),
+      );
+
+      expect(noteField().value).toBe("晴れ");
+    });
+
+    test("デモモードで希望があったら、一部だけ反映したと知らせる", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockRejectedValue(new TypeError("offline")),
+      );
+      renderForm({ submit: false });
+
+      fireEvent.change(noteField(), { target: { value: "雨の日" } });
+      fireEvent.click(screen.getByRole("button", { name: "旅プランをつくる" }));
+      await screen.findByText("松本市をめぐる日帰りプラン");
+
+      expect(screen.getByText(/希望は、デモモードでは一部/)).toBeTruthy();
+    });
+  });
+
+  describe("押してから結果が出るまで（#123）", () => {
+    /** 応答を止めておける /api/plan。resolve を呼ぶまで返さない */
+    function stubPendingFetch() {
+      let resolve: (res: Response) => void = () => {};
+      const fetchMock = vi.fn(
+        () =>
+          new Promise<Response>((r) => {
+            resolve = r;
+          }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+      const respond = async (body: PlanResponse) => {
+        await act(async () => resolve(Response.json(body)));
+      };
+      return { fetchMock, respond };
+    }
+    const planned = (): PlanResponse => ({
+      candidates: generateCandidates(areas, {
+        areaId: null,
+        duration: "day",
+        interests: [],
+        companion: "ひとり",
+        transport: "車",
+      }),
+      mode: "ai",
+    });
+
+    test("結果が出る前の案内は「条件を選んで「旅プランをつくる」を押すと」", () => {
+      renderForm({ submit: false });
+
+      expect(
+        screen.getByText(
+          "条件を選んで「旅プランをつくる」を押すと、おすすめの地域とルートを地図つきで提案します。",
+        ),
+      ).toBeTruthy();
+      expect(screen.queryByText(/左の条件/)).toBeNull();
+    });
+
+    test("作っている間は「旅プランをつくっています」を出し、ボタンは aria-disabled にしてフォーカスを残す", async () => {
+      const { fetchMock, respond } = stubPendingFetch();
+      renderForm({ submit: false });
+      const button = screen.getByRole("button", { name: "旅プランをつくる" });
+      button.focus();
+
+      fireEvent.click(button);
+
+      const status = screen
+        .getAllByRole("status")
+        .find((el) => el.textContent?.includes("旅プランをつくっています"));
+      expect(status).toBeTruthy();
+      expect(button.getAttribute("aria-disabled")).toBe("true");
+      expect(button.hasAttribute("disabled")).toBe(false);
+      expect(document.activeElement).toBe(button);
+
+      // 作っている間に押しても、もう一度は呼ばない
+      fireEvent.click(button);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      await respond(planned());
+      expect(screen.queryByText("旅プランをつくっています")).toBeNull();
+    });
+
+    test("結果が出たら、結果の見出しにフォーカスを移し、件数を読み上げる。ボタンは「この条件でつくり直す」になる", async () => {
+      const { respond } = stubPendingFetch();
+      renderForm({ submit: false });
+      const button = screen.getByRole("button", { name: "旅プランをつくる" });
+      button.focus();
+      fireEvent.click(button);
+
+      await respond(planned());
+
+      const heading = screen.getByRole("heading", { name: "旅の候補" });
+      expect(document.activeElement).toBe(heading);
+      const count = planned().candidates.length;
+      expect(
+        screen
+          .getAllByRole("status")
+          .some(
+            (el) => el.textContent === `旅の候補を${count}件つくりました。`,
+          ),
+      ).toBe(true);
+      expect(screen.getByRole("button", { name: "この条件でつくり直す" })).toBe(
+        button,
+      );
+      expect(button.getAttribute("aria-disabled")).toBe("false");
+    });
+
+    test("候補が0件なら、そのことを読み上げる", async () => {
+      const { respond } = stubPendingFetch();
+      renderForm();
+
+      await respond({ candidates: [], mode: "ai" });
+
+      expect(
+        screen
+          .getAllByRole("status")
+          .some(
+            (el) => el.textContent === "この条件では候補を組めませんでした。",
+          ),
+      ).toBe(true);
+    });
+
+    test("作っている間にほかの欄へ移っていたら、結果が出てもフォーカスを奪わない", async () => {
+      const { respond } = stubPendingFetch();
+      renderForm();
+      const note = screen.getByLabelText("ほかに希望があれば（任意）");
+      note.focus();
+
+      await respond(planned());
+
+      expect(document.activeElement).toBe(note);
+    });
+
+    test("条件と結果が縦に並ぶ幅では、押すと結果の欄までなめらかに動かす", () => {
+      stubPendingFetch();
+      renderForm();
+
+      expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+
+    test("動きを減らす設定なら、アニメーションせずに動かす", () => {
+      stubMatchMedia({ reduceMotion: true });
+      stubPendingFetch();
+      renderForm();
+
+      expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({
+        behavior: "auto",
+        block: "start",
+      });
+    });
+
+    test("条件と結果が横に並ぶ幅（PC）では、動かさない", () => {
+      stubMatchMedia({ wide: true });
+      stubPendingFetch();
+      renderForm();
+
+      expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+    });
+
+    test("チップのまとまりは、見出しを名前にした group にする", () => {
+      renderForm({ submit: false });
+
+      for (const name of [
+        "エリア",
+        "日程",
+        "興味のあること（複数選べます）",
+        "だれと",
+        "移動手段",
+      ]) {
+        expect(screen.getByRole("group", { name })).toBeTruthy();
+      }
+      expect(
+        within(screen.getByRole("group", { name: "日程" })).getByRole(
+          "button",
+          { name: "1泊2日" },
+        ),
+      ).toBeTruthy();
     });
   });
 

@@ -202,7 +202,9 @@ describe("AreaRotator の絞り込み（#50）", () => {
     expect(
       screen.getByText("条件に合う穴場が見つかりませんでした"),
     ).toBeTruthy();
-    expect(screen.getByText("0地域・0件が見つかりました")).toBeTruthy();
+    // 件数の行も「0地域・0件」とは言わない（#120）
+    expect(screen.getByText("条件に合う穴場はありません")).toBeTruthy();
+    expect(screen.queryByText(/0地域/)).toBeNull();
     expect(currentArea()).toBe("日本全体");
 
     // 空状態のボタン（件数の横にもある）
@@ -260,7 +262,7 @@ describe("AreaRotator の絞り込み（#50）", () => {
     expect(input.value).toBe("松本");
   });
 
-  test("条件が変わったら先頭の地域に戻す。キーワードの前後の空白だけなら戻さない", () => {
+  test("条件が変わって見ていた地域が合わなくなったら先頭の地域に戻す。キーワードの前後の空白だけなら戻さない", () => {
     query.set("?q=長野");
     render(<AreaRotator areas={areas} />);
     fireEvent.click(screen.getByRole("button", { name: "次の地域" }));
@@ -273,6 +275,72 @@ describe("AreaRotator の絞り込み（#50）", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "温泉・銭湯" }));
     expect(currentArea()).toBe("白馬村");
+  });
+
+  test("条件が変わっても、見ていた地域が条件に合えばその地域に留まる", () => {
+    render(<AreaRotator areas={areas} />);
+    fireEvent.click(screen.getByRole("button", { name: "次の地域" }));
+    fireEvent.click(screen.getByRole("button", { name: "次の地域" }));
+    expect(currentArea()).toBe("大町市");
+
+    // 大町市には温泉がある。先頭の白馬村に飛ばない
+    fireEvent.click(screen.getByRole("button", { name: "温泉・銭湯" }));
+    expect(currentArea()).toBe("大町市");
+
+    // 条件をクリアしても、同じ地域のまま
+    fireEvent.click(screen.getByRole("button", { name: "条件をクリア" }));
+    expect(currentArea()).toBe("大町市");
+  });
+});
+
+/** スマホでチップを開閉する枠（閉じている間は invisible） */
+function chipsHidden() {
+  const group = screen.getByRole("group", { name: "カテゴリで絞り込む" });
+  return group.parentElement!.className.split(" ").includes("invisible");
+}
+
+describe("スマホのカテゴリのチップ（#120）", () => {
+  test("検索欄にフォーカスすると開き、何も選ばずに離れると閉じる", () => {
+    render(<AreaRotator areas={areas} />);
+    expect(chipsHidden()).toBe(true);
+
+    fireEvent.focus(searchBox());
+    expect(chipsHidden()).toBe(false);
+
+    fireEvent.blur(searchBox());
+    expect(chipsHidden()).toBe(true);
+  });
+
+  test("カテゴリを選んでいる間は、検索欄から離れても閉じない", () => {
+    render(<AreaRotator areas={areas} />);
+    fireEvent.focus(searchBox());
+    fireEvent.click(screen.getByRole("button", { name: "温泉・銭湯" }));
+    fireEvent.blur(searchBox());
+    expect(chipsHidden()).toBe(false);
+
+    // 選んだカテゴリを外すと、フォーカスがなければ閉じる
+    fireEvent.click(screen.getByRole("button", { name: "温泉・銭湯" }));
+    expect(chipsHidden()).toBe(true);
+  });
+
+  test("URL でカテゴリを指定して開いたときも、最初から出す", () => {
+    query.set("?cat=onsen");
+    render(<AreaRotator areas={areas} />);
+    expect(chipsHidden()).toBe(false);
+  });
+});
+
+describe("地域のドット（#120）", () => {
+  test("押せる範囲は 24×24px（見た目の点は中の span）", () => {
+    render(<AreaRotator areas={areas} />);
+    for (const name of ["白馬村", "松本市", "大町市"]) {
+      const dot = screen.getByRole("button", { name });
+      expect(dot.className).toMatch(/\bh-6\b/);
+      expect(dot.className).toMatch(/\bmin-w-6\b/);
+      expect(dot.querySelector("span[aria-hidden]")?.className).toMatch(
+        /\bh-2\b/,
+      );
+    }
   });
 });
 

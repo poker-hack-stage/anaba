@@ -11,6 +11,9 @@ import {
 /** 次の地域へ切り替わるまでの時間 */
 const ROTATE_INTERVAL_MS = 6000;
 
+/** タッチ（ペンを含む）で触ってから、自動の切り替えを止めておく時間 */
+export const TOUCH_PAUSE_MS = 15000;
+
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
 function subscribeReducedMotion(onChange: () => void) {
@@ -27,15 +30,18 @@ function subscribeVisibility(onChange: () => void) {
 /**
  * 地域の自動切り替え。`count` 件を数秒ごとに順に巡回し、最後まで行くと最初に戻る。
  * 次のときは止まる: マウスを乗せている間（`hoverHandlers` を付けた要素）・
+ * その要素にタッチしてから 15 秒（`TOUCH_PAUSE_MS`。触るたびに数え直す）・
  * キーボードでフォーカスしている間（`focusHandlers` を付けた要素の中が `:focus-visible` のとき）・
  * `paused` が true の間・タブを離れている間・件数が1件以下のとき。
  * OS の「視差効果を減らす」（`prefers-reduced-motion`）が有効なら、自動では切り替えない
- * （一時停止ボタンは置かない方針。kosei の判断）。
+ * （一時停止ボタンは置かない方針。kosei の判断、#120）。
  */
 export function useAutoRotate(count: number, { paused }: { paused: boolean }) {
   const [index, setIndex] = useState(0);
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [touched, setTouched] = useState(false);
+  const touchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // サーバーでは「動きを減らさない」「タブは表示中」とみなす
   const reducedMotion = useSyncExternalStore(
@@ -76,8 +82,31 @@ export function useAutoRotate(count: number, { paused }: { paused: boolean }) {
     setHovered(true);
   };
 
+  // タッチでは「乗せている」が分からないので、触ってから一定時間止める。触るたびに数え直す
+  const holdOnTouch = (e: PointerEvent) => {
+    if (e.pointerType === "mouse") return;
+    if (touchTimer.current) clearTimeout(touchTimer.current);
+    setTouched(true);
+    touchTimer.current = setTimeout(() => {
+      touchTimer.current = null;
+      setTouched(false);
+    }, TOUCH_PAUSE_MS);
+  };
+  useEffect(
+    () => () => {
+      if (touchTimer.current) clearTimeout(touchTimer.current);
+    },
+    [],
+  );
+
   const stopped =
-    hovered || focused || paused || reducedMotion || hidden || count < 2;
+    hovered ||
+    touched ||
+    focused ||
+    paused ||
+    reducedMotion ||
+    hidden ||
+    count < 2;
   useEffect(() => {
     if (stopped) return;
     const id = setTimeout(next, ROTATE_INTERVAL_MS);
@@ -89,8 +118,10 @@ export function useAutoRotate(count: number, { paused }: { paused: boolean }) {
     next,
     prev,
     goTo: setIndex,
-    // タッチのタップは「乗せた」に数えない（外をタップするまで止まり続けてしまうため）
+    // タッチのタップは「乗せた」に数えない（外をタップするまで止まり続けてしまうため）。
+    // 代わりに、触ってから TOUCH_PAUSE_MS だけ止める（スクロールしようと触れたときも含む）
     hoverHandlers: {
+      onPointerDown: holdOnTouch,
       onPointerEnter: trackPointer,
       onPointerMove: trackPointer,
       onPointerLeave: () => {

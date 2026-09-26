@@ -8,6 +8,7 @@ import {
   Marker,
   NavigationControl,
   setWorkerUrl,
+  type ControlPosition,
   type GeoJSONSource,
   type MapMouseEvent,
 } from "maplibre-gl";
@@ -19,8 +20,8 @@ import type {
 } from "geojson";
 import { Map, MapPin } from "lucide-react";
 import type { Spot } from "@/lib/data/spots";
-import { outsideOf, toAreaBoundary } from "@/lib/map/boundary";
 import { computeBounds } from "@/lib/map/bounds";
+import { spreadOffsetsById, type PixelPoint } from "@/lib/map/spread";
 import { getCategory } from "@/lib/spots/categories";
 import { cn } from "@/lib/utils";
 
@@ -45,7 +46,10 @@ export type SpotRoute = {
 };
 
 export type SpotMapProps = {
-  /** ハイライトするスポット（おすすめ3件など）。大きく強調して表示 */
+  /**
+   * ハイライトするスポット（おすすめ3件など）。大きく強調して表示。
+   * 幅の狭い地図（640px 未満）では、重なるピンを少しずらしてどれも押せるようにする（#109）
+   */
   highlighted?: Spot[];
   /** 経路。日ごとに分けるときは複数渡し、線とピンを色分けする。経路どうしは線でつながない */
   routes?: SpotRoute[];
@@ -81,7 +85,28 @@ export type SpotMapProps = {
    * 地図を作るときにだけ読む（あとから変えても反映しない）
    */
   cooperativeGestures?: boolean;
+  /**
+   * 表示範囲の余白（px）。地図の上にパネルを重ねるとき（「穴場を探す」の PC）に、ピンや境界がパネルの下に隠れないよう広げる。
+   * 省くと既定の余白
+   */
+  fitPadding?: FitPadding;
+  /**
+   * 表示範囲に含める点（[経度, 緯度]）。ピンは出さない。
+   * 絞り込みで0件のときに、全地域が入る範囲を出すのに使う（docs/spec.md 画面-3）
+   */
+  fitPoints?: [number, number][];
+  /** ＋−ボタンの位置。地図を作るときにだけ読む（既定は右上） */
+  controlPosition?: ControlPosition;
+  /** 左上の表示（地域名と凡例）の位置を変えるクラス。地図の上に重ねたパネルと重ならないようにする */
+  labelClassName?: string;
   className?: string;
+};
+
+export type FitPadding = {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
 };
 
 export type MapPoint = { lat: number; lng: number };
@@ -104,19 +129,31 @@ const JAPAN_ZOOM = 4;
 const SINGLE_SPOT_ZOOM = 14;
 
 /** 表示範囲の余白。右は＋−ボタン、下は帰属表示の分を広めに取る */
-const FIT_PADDING = { top: 40, right: 56, bottom: 64, left: 40 };
+const FIT_PADDING: FitPadding = { top: 40, right: 56, bottom: 64, left: 40 };
+const NO_FIT_POINTS: [number, number][] = [];
 
 const ROUTE_COLOR = "#c0432b";
-const BOUNDARY_COLOR = "#24463d"; // ink
-/** 地域の外側を暗くする色と濃さ。表示中の地域だけが見えるよう、外はほとんど見えなくする */
-const OUTSIDE_COLOR = "#1c1917"; // stone-900
-const OUTSIDE_OPACITY = 0.85;
+/**
+ * 地域の境界の線。黒の太い線の下に白い縁を敷き、背景の道路・川・県境と紛れないようにする。
+ * 外側は暗くしない（#99 で暗くしたが、見にくいので 2026-09-26 に kosei が黒い枠に変えた）
+ */
+const BOUNDARY_COLOR = "#1c1917"; // stone-900
+const BOUNDARY_WIDTH = 2.5;
+const BOUNDARY_HALO_COLOR = "#ffffff";
+const BOUNDARY_HALO_WIDTH = BOUNDARY_WIDTH + 2;
+/**
+ * これより幅の狭い地図（スマホ。「穴場を探す」では高さ 288px）では、ハイライトのピンが重ならないようずらす（#109）。
+ * 境界全体を入れるとスポットが狭い範囲に集まり、40px のピンが重なって下のピンを押せなくなるため。
+ * 広い地図（PC）は見た目を変えないよう、ずらさない
+ */
+const NARROW_MAP_WIDTH = 640;
+/** ずらしたハイライトのピンの中心どうしの最小の間隔。ピンの直径にすき間を足す */
+const HIGHLIGHT_MIN_DISTANCE = 44;
 /** 移動にかける時間。自動の切り替え（6秒ごと）より十分短くする */
 const MOVE_DURATION_MS = 1200;
 
 const ROUTE_SOURCE = "spot-route";
 const BOUNDARY_SOURCE = "area-boundary";
-const OUTSIDE_SOURCE = "area-outside";
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 
 /**
@@ -171,6 +208,10 @@ export function SpotMap({
   animateMove = false,
   emptyPlaceholder = true,
   cooperativeGestures = true,
+  fitPadding = FIT_PADDING,
+  fitPoints = NO_FIT_POINTS,
+  controlPosition = "top-right",
+  labelClassName,
   className,
 }: SpotMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -182,6 +223,7 @@ export function SpotMap({
 
   // 地図を作るときの値だけを使う（作り直さないので、あとから変わっても反映しない）
   const initialCooperativeGestures = useRef(cooperativeGestures);
+  const initialControlPosition = useRef(controlPosition);
 
   // 地図は effect の中で作り、後始末で消す。cacheComponents で前のページが <Activity> に隠れると
   // 後始末が走り、表示に戻ると作り直すので、壊れた地図を再利用しない
@@ -207,10 +249,10 @@ export function SpotMap({
     });
     instance.touchZoomRotate.disableRotation();
     instance.keyboard.disableRotation();
-    // 地域名のバッジと重ならないよう右上に置く
+    // 地域名のバッジと重ならないよう、既定は右上に置く
     instance.addControl(
       new NavigationControl({ showCompass: false }),
-      "top-right",
+      initialControlPosition.current,
     );
     let loaded = false;
     let collapseTimer: ReturnType<typeof setTimeout> | undefined;
@@ -246,6 +288,7 @@ export function SpotMap({
     (s): [number, number] => [s.lng, s.lat],
   );
   const pointsKey = points.map((p) => p.join(",")).join(";");
+  const fitKey = `${fitPoints.map((p) => p.join(",")).join(";")}|${fitPadding.top},${fitPadding.right},${fitPadding.bottom},${fitPadding.left}`;
   const routeKey = routes
     .map(
       (r) =>
@@ -261,7 +304,7 @@ export function SpotMap({
     if (!map) return;
     const animate = animateMove && fittedMap.current === map;
     fittedMap.current = map;
-    const box = computeBounds(points, boundary);
+    const box = computeBounds([...points, ...fitPoints], boundary);
     const boundaryBox = boundary ? computeBounds([], boundary) : null;
     // essential を付けないので、「視差効果を減らす」なら MapLibre が即時に切り替える
     const move = { animate, duration: MOVE_DURATION_MS };
@@ -270,29 +313,71 @@ export function SpotMap({
     } else if (points.length === 1 && !boundaryBox) {
       map.easeTo({ ...move, center: points[0], zoom: SINGLE_SPOT_ZOOM });
     } else {
-      map.fitBounds(box, { ...move, padding: FIT_PADDING, maxZoom: 15 });
+      map.fitBounds(box, { ...move, padding: fitPadding, maxZoom: 15 });
     }
-    // points は pointsKey で比較する
+    // points は pointsKey、fitPoints と fitPadding は fitKey で比較する
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, pointsKey, boundary, animateMove]);
+  }, [map, pointsKey, fitKey, boundary, animateMove]);
 
-  // 境界の塗りつぶしと経路の線を置く場所を用意する
+  // ハイライトのピンのずらす量（px。スポットの id ごと）。ずらさないピンは入れない
+  const [highlightOffsets, setHighlightOffsets] =
+    useState<ReadonlyMap<string, PixelPoint>>(NO_OFFSETS);
+  const highlightedKey = highlighted
+    .map((s) => `${s.id}:${s.lng},${s.lat}`)
+    .join(";");
+
+  // 幅の狭い地図では、重なるハイライトのピンをずらす。画面上の間隔はズームと地図の大きさで変わるので、そのたびに計算し直す
+  useEffect(() => {
+    if (!map) return;
+    const update = () => {
+      const narrow = map.getContainer().clientWidth < NARROW_MAP_WIDTH;
+      const next =
+        narrow && highlighted.length > 1
+          ? spreadOffsetsById(
+              highlighted.map((s) => ({
+                id: s.id,
+                point: map.project([s.lng, s.lat]),
+              })),
+              HIGHLIGHT_MIN_DISTANCE,
+            )
+          : NO_OFFSETS;
+      // ズームの途中は毎フレーム呼ばれるので、変わったときだけ描き直す
+      setHighlightOffsets((prev) =>
+        sameOffsets(prev, next) ? prev : next.size === 0 ? NO_OFFSETS : next,
+      );
+    };
+    update();
+    map.on("zoom", update);
+    map.on("resize", update);
+    return () => {
+      map.off("zoom", update);
+      map.off("resize", update);
+    };
+    // highlighted は highlightedKey で比較する
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, highlightedKey]);
+
+  // 境界と経路の線を置く場所を用意する
   useEffect(() => {
     if (!map || !styleLoaded) return;
-    // 地域の外側を暗くする。外の地名も暗くするので、地名の文字より上に重ねる
-    map.addSource(OUTSIDE_SOURCE, { type: "geojson", data: EMPTY });
-    map.addLayer({
-      id: `${OUTSIDE_SOURCE}-fill`,
-      type: "fill",
-      source: OUTSIDE_SOURCE,
-      paint: { "fill-color": OUTSIDE_COLOR, "fill-opacity": OUTSIDE_OPACITY },
-    });
+    // 地域の境界。白い縁を先に敷き、その上に黒い線を重ねる
     map.addSource(BOUNDARY_SOURCE, { type: "geojson", data: EMPTY });
+    map.addLayer({
+      id: `${BOUNDARY_SOURCE}-halo`,
+      type: "line",
+      source: BOUNDARY_SOURCE,
+      layout: { "line-join": "round" },
+      paint: {
+        "line-color": BOUNDARY_HALO_COLOR,
+        "line-width": BOUNDARY_HALO_WIDTH,
+      },
+    });
     map.addLayer({
       id: `${BOUNDARY_SOURCE}-line`,
       type: "line",
       source: BOUNDARY_SOURCE,
-      paint: { "line-color": BOUNDARY_COLOR, "line-width": 2.5 },
+      layout: { "line-join": "round" },
+      paint: { "line-color": BOUNDARY_COLOR, "line-width": BOUNDARY_WIDTH },
     });
     map.addSource(ROUTE_SOURCE, { type: "geojson", data: EMPTY });
     map.addLayer({
@@ -317,10 +402,6 @@ export function SpotMap({
     const data =
       boundary && computeBounds([], boundary) ? (boundary as GeoJSON) : EMPTY;
     map.getSource<GeoJSONSource>(BOUNDARY_SOURCE)?.setData(data);
-    const area = toAreaBoundary(boundary);
-    map
-      .getSource<GeoJSONSource>(OUTSIDE_SOURCE)
-      ?.setData(area ? outsideOf(area) : EMPTY);
   }, [map, styleLoaded, boundary]);
 
   useEffect(() => {
@@ -403,6 +484,7 @@ export function SpotMap({
               size="lg"
               title={spot.name}
               zIndex={2}
+              offset={highlightOffsets.get(spot.id)}
             />
           ))}
           {routes.flatMap((r, ri) =>
@@ -445,7 +527,12 @@ export function SpotMap({
 
       {(areaName || showLegend) && (
         // 左上の表示（地域名と凡例）。両方あるときは縦に並べ、重ならないようにする
-        <div className="pointer-events-none absolute left-3 right-14 top-3 z-10 flex flex-col items-start gap-1.5">
+        <div
+          className={cn(
+            "pointer-events-none absolute left-3 right-14 top-3 z-10 flex flex-col items-start gap-1.5",
+            labelClassName,
+          )}
+        >
           {areaName && (
             <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-ink shadow-sm">
               <MapPin aria-hidden className="h-3.5 w-3.5" />
@@ -478,6 +565,20 @@ export function SpotMap({
 
 const PIN_SIZE = { sm: 20, md: 28, lg: 40 } as const;
 
+const NO_OFFSETS: ReadonlyMap<string, PixelPoint> = new globalThis.Map();
+
+function sameOffsets(
+  a: ReadonlyMap<string, PixelPoint>,
+  b: ReadonlyMap<string, PixelPoint>,
+): boolean {
+  if (a.size !== b.size) return false;
+  for (const [id, o] of a) {
+    const other = b.get(id);
+    if (!other || other.x !== o.x || other.y !== o.y) return false;
+  }
+  return true;
+}
+
 /**
  * スポットのピン。MapLibre の Marker に渡した要素へ、React で button を描く。
  * button なので Tab で選べて Enter / Space で開ける。フォーカスはマウスオーバーと同じ扱いにする
@@ -490,6 +591,7 @@ function SpotMarker({
   color,
   title,
   zIndex,
+  offset,
   onSpotClick,
   onSpotHover,
 }: {
@@ -503,6 +605,8 @@ function SpotMarker({
   title: string;
   /** 重なり順。経路 > ハイライト > そのほか */
   zIndex: number;
+  /** 本当の場所からずらして描く量（px）。重なるピンを離すとき（#109） */
+  offset?: PixelPoint;
   onSpotClick?: (spot: Spot) => void;
   onSpotHover?: (spot: Spot | null) => void;
 }) {
@@ -512,14 +616,33 @@ function SpotMarker({
     return el;
   });
 
+  const offsetX = offset?.x ?? 0;
+  const offsetY = offset?.y ?? 0;
+  const markerRef = useRef<Marker | null>(null);
+  // 作り直したピンにも今のずらす量を付けるため、最新の値を ref で持つ
+  const offsetRef = useRef<[number, number]>([offsetX, offsetY]);
+
   useEffect(() => {
-    const marker = new Marker({ element, anchor: "center" })
+    const marker = new Marker({
+      element,
+      anchor: "center",
+      offset: offsetRef.current,
+      // 既定では位置を整数 px に丸め、ずらしたピンの間隔が 44px を切ることがあるので、小数のまま置く
+      subpixelPositioning: true,
+    })
       .setLngLat([spot.lng, spot.lat])
       .addTo(map);
+    markerRef.current = marker;
     return () => {
       marker.remove();
+      markerRef.current = null;
     };
   }, [map, element, spot.lng, spot.lat]);
+
+  useEffect(() => {
+    offsetRef.current = [offsetX, offsetY];
+    markerRef.current?.setOffset([offsetX, offsetY]);
+  }, [offsetX, offsetY]);
 
   const meta = getCategory(spot.category);
   const px = PIN_SIZE[size];

@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { DAY_COUNTS } from "./duration";
+import { MAX_CANDIDATES, MAX_DAY_SPOTS, MIN_DAY_SPOTS } from "./generate";
+import { MAX_NOTE_LENGTH, normalizeNote, noteLength } from "./note";
 import { COMPANIONS, DURATIONS, INTERESTS, TRANSPORTS } from "./options";
 
 // /api/plan の入力の検証と、Gemini に返させる JSON の形（#18）
@@ -7,7 +10,7 @@ import { COMPANIONS, DURATIONS, INTERESTS, TRANSPORTS } from "./options";
 export const MAX_REQUEST_BYTES = 8_000;
 
 /**
- * 「絞る」で送られてくる条件（PlanConditions）。選択肢にない値や、余計な項目は受け付けない。
+ * 「旅プランをつくる」で送られてくる条件（PlanConditions）。選択肢にない値や、余計な項目は受け付けない。
  * 地域とスポットの id は、ここでは長さだけを確かめる（知らない地域の id は「おまかせ」として扱う、generate.ts・ai-prompt.ts。
  * 知らないスポットの id は、どの候補にも入れられないので候補を0件にする、include-spot.ts）
  */
@@ -22,6 +25,13 @@ export const planConditionsSchema = z.strictObject({
   transport: z.enum(TRANSPORTS),
   // 「このスポットを経路に加えて作り直す」（#32）で、どの候補にも必ず入れるスポットの id。知らない id なら候補は0件になる
   includeSpotId: z.string().trim().min(1).max(64).optional(),
+  // 自由記述の希望（#114）。改行・制御文字を空白にしてから、100字（見た目の1文字）まで。空なら書かなかったことにする
+  note: z
+    .string()
+    .transform(normalizeNote)
+    .refine((note) => noteLength(note) <= MAX_NOTE_LENGTH)
+    .transform((note) => note || undefined)
+    .optional(),
 });
 
 /**
@@ -46,13 +56,22 @@ export const aiPlanSchema = z.object({
 
 export type AiPlan = z.infer<typeof aiPlanSchema>;
 
-/** aiPlanSchema と同じ形を、Gemini の構造化出力（responseJsonSchema）に渡す JSON Schema で書いたもの */
+/** 日程の日数の上限（2泊3日） */
+const MAX_DAYS = Math.max(...Object.values(DAY_COUNTS));
+
+/**
+ * aiPlanSchema と同じ形を、Gemini の構造化出力（responseJsonSchema）に渡す JSON Schema で書いたもの。
+ * 件数の上限と下限（minItems・maxItems、#113）は、決まり（docs/spec.md のデータ-4）の範囲を伝えるだけ。
+ * ちょうどの件数はプロンプトで伝え、守られなかったときは ai-candidates.ts で直すか捨てる
+ */
 export const AI_PLAN_JSON_SCHEMA = {
   type: "object",
   properties: {
     candidates: {
       type: "array",
       description: "旅の候補。1件目から順に並べる",
+      minItems: 1,
+      maxItems: MAX_CANDIDATES,
       items: {
         type: "object",
         properties: {
@@ -65,6 +84,8 @@ export const AI_PLAN_JSON_SCHEMA = {
           days: {
             type: "array",
             description: "日ごとの経路。日程の日数と同じ数",
+            minItems: 1,
+            maxItems: MAX_DAYS,
             items: {
               type: "object",
               properties: {
@@ -74,8 +95,9 @@ export const AI_PLAN_JSON_SCHEMA = {
                 },
                 spotIds: {
                   type: "array",
-                  description:
-                    "その日にめぐるスポットの記号（S1 など）。めぐる順",
+                  description: "その日にめぐるスポットの記号（S1 など）",
+                  minItems: MIN_DAY_SPOTS,
+                  maxItems: MAX_DAY_SPOTS,
                   items: { type: "string" },
                 },
               },

@@ -382,3 +382,106 @@ describe("generateCandidates: 必ず入れるスポット（#32）", () => {
     ).toEqual([]);
   });
 });
+
+describe("自由記述の希望（#114、デモモードではキーワードだけ）", () => {
+  const categories = (candidate: PlanCandidate) =>
+    allRouteSpots(candidate).map((s) => s.category);
+
+  test("雨・屋内なら、屋内のカテゴリ（食・温泉・体験）を先に経路に入れる", () => {
+    const [plain] = generateCandidates([matsumoto], request());
+    const [rainy] = generateCandidates(
+      [matsumoto],
+      request({ note: "雨でも楽しめる所がいい" }),
+    );
+
+    expect(categories(plain)).not.toEqual(
+      expect.arrayContaining(["gourmet", "onsen", "craft"]),
+    );
+    expect(categories(rainy)).toEqual(
+      expect.arrayContaining(["gourmet", "onsen", "craft"]),
+    );
+    expect(rainy.reason).toContain("屋内で楽しめるスポットを優先しました");
+  });
+
+  test("興味のあることは、希望より先に優先する", () => {
+    const [candidate] = generateCandidates(
+      [matsumoto],
+      request({ interests: ["自然", "絶景"], note: "雨の日" }),
+    );
+
+    expect(categories(candidate).sort()).toEqual([
+      "nature",
+      "nature",
+      "view",
+      "view",
+    ]);
+  });
+
+  test("ゆっくり・のんびりなら、1日のスポットを3件までにする", () => {
+    const candidates = generateCandidates(
+      areas,
+      request({ duration: "2n3d", note: "のんびり回りたい" }),
+    );
+
+    expect(candidates.length).toBeGreaterThan(0);
+    for (const candidate of candidates) {
+      for (const day of candidate.days) {
+        expect(day.route.length).toBeLessThanOrEqual(3);
+      }
+      expect(candidate.reason).toContain("1日3件までにしました");
+    }
+  });
+
+  test("子ども・子連れなら、子どもと楽しめるタグのスポットを先に経路に入れる", () => {
+    const town: PlannableArea = {
+      ...area("公園の町", 36.238, 137.972, []),
+      spots: [
+        spot("公園の町", "あ", "history"),
+        spot("公園の町", "い", "history"),
+        spot("公園の町", "う", "history"),
+        spot("公園の町", "え", "history"),
+        { ...spot("公園の町", "ん", "nature"), tags: ["公園"] },
+      ],
+    };
+
+    const [plain] = generateCandidates([town], request());
+    const [kids] = generateCandidates(
+      [town],
+      request({ note: "子どもと一緒に行きたい" }),
+    );
+
+    expect(allRouteSpots(plain).map((s) => s.name)).not.toContain("ん");
+    expect(allRouteSpots(kids).map((s) => s.name)).toContain("ん");
+    expect(kids.reason).toContain("子どもと楽しめるスポットを優先しました");
+  });
+
+  test("希望が2つあれば、両方に合うスポットを、片方だけに合うスポットより先に経路に入れる", () => {
+    const town: PlannableArea = {
+      ...area("雨の町", 36.238, 137.972, []),
+      spots: [
+        // 穴場度は、片方だけに合うスポットのほうが高い
+        { ...spot("雨の町", "あ", "history", { gem: 90 }), tags: ["雨の日"] },
+        { ...spot("雨の町", "い", "history", { gem: 90 }), tags: ["公園"] },
+        { ...spot("雨の町", "う", "history", { gem: 90 }), tags: ["資料館"] },
+        { ...spot("雨の町", "え", "history", { gem: 90 }), tags: ["体験"] },
+        {
+          ...spot("雨の町", "ん", "history", { gem: 10 }),
+          tags: ["雨の日", "子ども"],
+        },
+      ],
+    };
+
+    const [candidate] = generateCandidates(
+      [town],
+      request({ note: "雨でも子どもと楽しみたい" }),
+    );
+
+    expect(allRouteSpots(candidate).map((s) => s.name)).toContain("ん");
+  });
+
+  test("キーワードのない希望では、経路も理由も変わらない", () => {
+    expect(
+      generateCandidates(areas, request({ note: "おいしい空気を吸いたい" })),
+    ).toEqual(generateCandidates(areas, request()));
+  });
+});

@@ -5,7 +5,7 @@ import type { Spot } from "@/lib/data/spots";
 /** 日程 */
 export type PlanDuration = "day" | "1n2d" | "2n3d";
 
-/** 「絞る」で送る条件（docs/spec.md のデータ-4） */
+/** 「旅プランをつくる」で送る条件（docs/spec.md のデータ-4） */
 export type PlanConditions = {
   /** 地域の id。null なら「おまかせ」 */
   areaId: string | null;
@@ -15,6 +15,8 @@ export type PlanConditions = {
   transport: string;
   /** どの候補にも必ず経路に入れるスポットの id（「このスポットを経路に加えて作り直す」、#32）。URL のクエリには持たない */
   includeSpotId?: string;
+  /** 自由記述の希望（#114）。100字まで。書かなければ undefined */
+  note?: string;
 };
 
 /** 1日ぶんの経路 */

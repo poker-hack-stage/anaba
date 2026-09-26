@@ -5,6 +5,7 @@ import {
   MAX_CANDIDATES,
   MAX_DAY_SPOTS,
   MIN_DAY_SPOTS,
+  orderByProximity,
   type PlannableArea,
 } from "./generate";
 import { findNearbyAreas } from "./nearby";
@@ -24,11 +25,12 @@ const MAX_TEXT_LENGTH = 200;
  * - 存在しないスポット・その日の地域にないスポット・候補の中で重なったスポットは取り除く。
  *   その結果スポットが2件未満の日ができたら、候補ごと捨てる。5件目以降は切る
  * - 日数が日程より少なければ捨てる。多ければ切る
+ * - 1日の経路は、Gemini が選んだ1件目から近い順に並べ直す（#113。Gemini には座標を渡していないので、順番は当てにしない）
  * - 必ず入れるスポット（#32）が、どの日の経路にも入っていない候補は捨てる（サーバーで足すと、Gemini の組んだ順や所要時間が崩れるため）
  * - 地域が選ばれているのに、その地域の候補がなければ、全部を捨てる（1件目は必ず選んだ地域にするため）。
  *   ただし必ず入れるスポットが選んだ地域では入れられないとき（近い地域のスポットで日帰り）は、捨てずに近い地域の候補を返す
  *
- * 所要時間・経路外のスポット・「近くの地域」は、Gemini ではなくここで決める
+ * 所要時間・経路の順番・経路外のスポット・「近くの地域」は、Gemini ではなくここで決める
  */
 export function toPlanCandidates(
   plan: AiPlan,
@@ -77,7 +79,7 @@ export function toPlanCandidates(
         day: i + 1,
         areaId: area.id,
         areaName: area.name,
-        route,
+        route: orderByProximity(route),
         durationMinutes: calcDayMinutes(route, request.transport),
       });
     }
