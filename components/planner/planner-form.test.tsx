@@ -751,6 +751,105 @@ describe("PlannerForm", () => {
       expect(screen.getByText("松本市をめぐる日帰りプラン")).toBeTruthy();
     });
 
+    const previousPlanButton = () =>
+      screen.queryByRole("button", { name: "前のプランに戻る" });
+
+    /** 経路外のピンを押して、そのスポットで作り直す。作り直した候補が出るまで待つ */
+    async function rebuildWithFirstOffRouteSpot() {
+      const [pin] = screen.getAllByRole("button", { name: /^経路外のピン: / });
+      const name = pin.textContent!.replace("経路外のピン: ", "");
+      fireEvent.click(pin);
+      fireEvent.click(rebuildButton()!);
+      await within(await screen.findByRole("list")).findByRole("button", {
+        name: (accessibleName) => accessibleName.startsWith(name),
+      });
+      return name;
+    }
+
+    describe("前のプランに戻る（#149）", () => {
+      test("作り直したあとに押すと、作り直す前と同じ経路に戻り、加えたスポットが外れたことを出す", async () => {
+        stubPlanApi();
+        renderForm({ areas: sixSpots });
+        const routeBefore = (await screen.findByRole("list")).textContent;
+        expect(previousPlanButton()).toBeNull();
+
+        const name = await rebuildWithFirstOffRouteSpot();
+        expect(screen.getByRole("list").textContent).not.toBe(routeBefore);
+        expect(
+          screen.getByText(`「${name}」を経路に加える前のプラン`),
+        ).toBeTruthy();
+
+        fireEvent.click(previousPlanButton()!);
+
+        expect(screen.getByRole("list").textContent).toBe(routeBefore);
+        expect(
+          screen.getByRole("button", { name: `経路外のピン: ${name}` }),
+        ).toBeTruthy();
+        expect(
+          screen.getByText(
+            `「${name}」を経路から外し、加える前のプランに戻しました。`,
+          ),
+        ).toBeTruthy();
+        // 戻れるのは作り直した回数（1回）ぶんだけ。ボタンが消えるので、フォーカスは結果の見出しへ
+        expect(previousPlanButton()).toBeNull();
+        expect(document.activeElement).toBe(
+          screen.getByRole("heading", { name: "旅の候補" }),
+        );
+      });
+
+      test("2回作り直したら、2回ぶん1つずつ戻れる。呼び直さない", async () => {
+        const sentBodies = stubPlanApi();
+        renderForm({ areas: sixSpots });
+        const route0 = (await screen.findByRole("list")).textContent;
+        const first = await rebuildWithFirstOffRouteSpot();
+        const route1 = screen.getByRole("list").textContent;
+        const second = await rebuildWithFirstOffRouteSpot();
+        expect(sentBodies()).toHaveLength(3);
+
+        fireEvent.click(previousPlanButton()!);
+        expect(screen.getByRole("list").textContent).toBe(route1);
+        expect(
+          screen.getByText(
+            `「${second}」を経路から外し、加える前のプランに戻しました。`,
+          ),
+        ).toBeTruthy();
+        expect(
+          screen.getByText(`「${first}」を経路に加える前のプラン`),
+        ).toBeTruthy();
+
+        fireEvent.click(previousPlanButton()!);
+        expect(screen.getByRole("list").textContent).toBe(route0);
+        expect(previousPlanButton()).toBeNull();
+        expect(sentBodies()).toHaveLength(3);
+      });
+
+      test("作り直しに失敗したときは、履歴に積まない", async () => {
+        stubPlanApi(() => Promise.reject(new TypeError("offline")));
+        await openOffRouteSpot();
+
+        fireEvent.click(rebuildButton()!);
+
+        await screen.findByRole("alert");
+        expect(previousPlanButton()).toBeNull();
+      });
+
+      test("「この条件でつくり直す」で新しく作ると、履歴を捨てる", async () => {
+        stubPlanApi();
+        renderForm({ areas: sixSpots });
+        await screen.findByRole("list");
+        await rebuildWithFirstOffRouteSpot();
+        expect(previousPlanButton()).toBeTruthy();
+
+        fireEvent.click(
+          screen.getByRole("button", { name: "この条件でつくり直す" }),
+        );
+
+        await screen.findByRole("heading", { name: "旅の候補" });
+        await screen.findByRole("list");
+        expect(previousPlanButton()).toBeNull();
+      });
+    });
+
     test("経路に入っているスポットの詳細には、ボタンを出さない", async () => {
       stubPlanApi();
       renderForm({ areas: sixSpots });
