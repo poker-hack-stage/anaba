@@ -11,7 +11,8 @@ const iconButton = cn(
 
 /**
  * 前へ／次へボタンと、今何番目かがわかるドット。
- * 地域が1件以下なら何も出さない。
+ * ドットの見た目は 8px（今の地域は横長）のまま、押せる範囲は 24×24px にする（WCAG 2.5.8、#120）。
+ * 並びきらないときはドットを折り返す。地域が1件以下なら何も出さない。
  */
 export function AreaNav({
   areas,
@@ -30,7 +31,7 @@ export function AreaNav({
 
   return (
     <div className="mt-auto flex items-center justify-center pt-2">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-0.5">
         <button
           type="button"
           onClick={onPrev}
@@ -39,7 +40,7 @@ export function AreaNav({
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap justify-center">
           {areas.map((a, i) => (
             <button
               key={a.id}
@@ -48,11 +49,18 @@ export function AreaNav({
               aria-label={a.name}
               aria-current={i === index ? "true" : undefined}
               className={cn(
-                "h-2 rounded-full transition-all motion-reduce:transition-none",
+                "flex h-6 min-w-6 items-center justify-center rounded-full",
                 focusRing,
-                i === index ? "w-6 bg-ink" : "w-2 bg-stone-300",
               )}
-            />
+            >
+              <span
+                aria-hidden
+                className={cn(
+                  "h-2 rounded-full transition-all motion-reduce:transition-none",
+                  i === index ? "w-6 bg-ink" : "w-2 bg-stone-300",
+                )}
+              />
+            </button>
           ))}
         </div>
         <button
