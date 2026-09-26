@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import type { AreaWithSpots } from "@/lib/data/areas";
@@ -33,10 +33,30 @@ vi.mock("next/navigation", async () => {
   };
 });
 
-// 地図（Leaflet）は jsdom では描けないので、表示中の地域名だけ出す
+// 地図（MapLibre）は jsdom では描けないので、表示中の地域名と、おすすめのピンだけ出す
 vi.mock("./area-map", () => ({
-  AreaMap: ({ area }: { area?: AreaWithSpots }) => (
-    <div data-testid="map">{area?.name ?? "日本全体"}</div>
+  AreaMap: ({
+    area,
+    onSpotHover,
+  }: {
+    area?: AreaWithSpots;
+    onSpotHover?: (spot: Spot | null) => void;
+  }) => (
+    <div>
+      <div data-testid="map">{area?.name ?? "日本全体"}</div>
+      <div data-testid="pins">
+        {area?.recommended.map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            onMouseEnter={() => onSpotHover?.(s)}
+            onMouseLeave={() => onSpotHover?.(null)}
+          >
+            {s.name}
+          </button>
+        ))}
+      </div>
+    </div>
   ),
 }));
 
@@ -253,5 +273,74 @@ describe("AreaRotator の絞り込み（#50）", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "温泉・銭湯" }));
     expect(currentArea()).toBe("白馬村");
+  });
+});
+
+/** 地図のピンの名前 */
+function pins() {
+  return within(screen.getByTestId("pins"))
+    .queryAllByRole("button")
+    .map((button) => button.textContent);
+}
+
+/** 情報パネルのカードの名前 */
+function cards() {
+  return screen
+    .queryAllByRole("listitem")
+    .map((item) => item.querySelector("h3")?.textContent);
+}
+
+function activeCards() {
+  return screen
+    .queryAllByRole("listitem")
+    .filter((item) => item.hasAttribute("data-active"))
+    .map((item) => item.querySelector("h3")?.textContent);
+}
+
+describe("地図のピンと情報パネルの連動（#14）", () => {
+  test("ピンと情報パネルのカードが同じスポットで、地域・絞り込みで差し替わる", () => {
+    render(<AreaRotator areas={areas} />);
+    expect(pins()).toEqual(["白馬八方温泉", "八方池"]);
+    expect(cards()).toEqual(pins());
+
+    fireEvent.click(screen.getByRole("button", { name: "次の地域" }));
+    expect(pins()).toEqual(["松本城"]);
+    expect(cards()).toEqual(pins());
+
+    fireEvent.click(screen.getByRole("button", { name: "絶景" }));
+    expect(currentArea()).toBe("白馬村");
+    expect(pins()).toEqual(["八方池"]);
+    expect(cards()).toEqual(pins());
+  });
+
+  test("ピンにマウスを乗せると同じカードを強調し、離すと戻す", () => {
+    render(<AreaRotator areas={areas} />);
+    const pin = within(screen.getByTestId("pins")).getByRole("button", {
+      name: "八方池",
+    });
+
+    fireEvent.mouseEnter(pin);
+    expect(activeCards()).toEqual(["八方池"]);
+
+    fireEvent.mouseLeave(pin);
+    expect(activeCards()).toEqual([]);
+  });
+
+  test("地域が切り替わったら強調を消す（戻ってきても残さない）", () => {
+    render(<AreaRotator areas={areas} />);
+    fireEvent.mouseEnter(
+      within(screen.getByTestId("pins")).getByRole("button", {
+        name: "白馬八方温泉",
+      }),
+    );
+    expect(activeCards()).toEqual(["白馬八方温泉"]);
+
+    // ピンは消えるので、離れた知らせ（mouseleave）は来ない
+    fireEvent.click(screen.getByRole("button", { name: "次の地域" }));
+    expect(activeCards()).toEqual([]);
+
+    fireEvent.click(screen.getByRole("button", { name: "前の地域" }));
+    expect(currentArea()).toBe("白馬村");
+    expect(activeCards()).toEqual([]);
   });
 });
