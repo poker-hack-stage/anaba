@@ -29,7 +29,7 @@ type PlannerState = {
   result: PlannerResult;
   /** selectedIndex を渡すと、新しい候補の中でその番号を選ぶ（渡さなければ 0 番） */
   setResult: (result: PlannerResult, selectedIndex?: number) => void;
-  /** タブで選んでいる候補の番号（0 始まり）。候補が変わったら（絞り直し）0 に戻る */
+  /** タブで選んでいる候補の番号（0 始まり）。候補が変わったら（つくり直し）0 に戻る */
   selectedCandidate: number;
   selectCandidate: (index: number) => void;
 };
@@ -51,7 +51,7 @@ export function PlannerStateProvider({
     conditions: null,
     mode: null,
   });
-  // 選んだ番号は、どの候補の中で選んだかと一緒に持つ。候補の配列が差し替わったら（絞り直し）選び直しになり、0 番を返す
+  // 選んだ番号は、どの候補の中で選んだかと一緒に持つ。候補の配列が差し替わったら（つくり直し）選び直しになり、0 番を返す
   const [selection, setSelection] = useState<{
     candidates: PlanCandidate[];
     index: number;
