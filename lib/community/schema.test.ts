@@ -11,7 +11,8 @@ import {
 const review = { nickname: "たろう", rating: 4, body: "静かでよかった" };
 
 const submission = {
-  areaId: "10000000-0000-4000-8000-000000000001",
+  prefecture: "長野県",
+  municipality: "松本市",
   name: "川沿いの小さな茶屋",
   category: "gourmet",
   description: "朝はほとんど人がいない",
@@ -101,7 +102,10 @@ describe("spotSubmissionInputSchema", () => {
     ["スポット名に改行", { name: "茶屋\n本店" }],
     ["ひとことが見えない文字だけ", { description: "\u200b \u2060" }],
     ["カテゴリが6種にない", { category: "shopping" }],
-    ["地域の id が uuid でない", { areaId: "matsumoto" }],
+    ["都道府県が47にない", { prefecture: "長野" }],
+    ["市区町村が空", { municipality: " " }],
+    ["市区町村が21文字", { municipality: "あ".repeat(21) }],
+    ["地域の id（古い形）", { areaId: "10000000-0000-4000-8000-000000000001" }],
     ["緯度が日本の外", { lat: 10 }],
     ["経度が日本の外", { lng: 160 }],
     ["緯度が文字列", { lat: "36.2" }],

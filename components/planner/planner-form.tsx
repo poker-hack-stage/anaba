@@ -13,6 +13,7 @@ import {
   AlertCircle,
   FlaskConical,
   Loader2,
+  MapPinPlus,
   RefreshCw,
   Route,
   SearchX,
@@ -22,9 +23,17 @@ import {
 } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { SpotDetailDialog } from "@/components/spots/spot-detail-dialog";
+import { useOpenSpotSubmission } from "@/components/submit/spot-submission";
 import { Chip } from "@/components/ui/chip";
-import { AreaSelect } from "@/components/ui/area-select";
+import { Input } from "@/components/ui/input";
+import { PrefectureSelect } from "@/components/ui/prefecture-select";
 import type { Spot } from "@/lib/data/spots";
+import {
+  findMunicipality,
+  loadMunicipalities,
+  prefectureBounds,
+  type MunicipalityIndex,
+} from "@/lib/geo/municipalities";
 import { DURATION_LABELS } from "@/lib/planner/duration";
 import {
   ANY_AREA_LABEL,
@@ -34,6 +43,7 @@ import {
   TRANSPORTS,
 } from "@/lib/planner/options";
 import { generateCandidates, type PlannableArea } from "@/lib/planner/generate";
+import { distanceKm } from "@/lib/planner/nearby";
 import {
   MAX_NOTE_LENGTH,
   normalizeNote,
@@ -198,6 +208,10 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
     restorePrevious,
   } = usePlannerState();
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
+  // anaba のスポットがまだない県・市区町村を選んでいるとき、その場所（URL の条件には持たない）。
+  // 選んでいる間は旅プランを作らず、近くの地域を勧める
+  const [noSpotPlace, setNoSpotPlace] = useState<NoSpotPlace | null>(null);
+  const municipalities = useMunicipalities();
   // 入力中の希望（#114）。null なら、URL の条件の希望を出す。
   // 1文字ごとに URL を書き換えると Safari の replaceState の回数制限に当たるので、
   // URL に書くのはフォーカスが外れたときと「旅プランをつくる」（「この条件でつくり直す」）を押したときだけにする
@@ -219,6 +233,8 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
     result.conditions !== null &&
     toQuery(result.conditions) !== toQuery(conditions);
   const isLoading = status === "loading";
+  // 地域が選ばれたら（ブラウザの「戻る」などで条件が変わったときも）、スポットがない場所の選択は外す
+  if (noSpotPlace && conditions.areaId !== null) setNoSpotPlace(null);
   // 候補を出したあと（作り直している間も）は、作り直すボタンにする
   const hasCandidates = status === "done" || candidates.length > 0;
 
@@ -329,8 +345,8 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
   };
 
   const submit = async () => {
-    // 作っている間はボタンを aria-disabled にしている（フォーカスを残すため disabled にしない）ので、ここで止める
-    if (isLoading) return;
+    // 作っている間・スポットがない場所を選んでいる間はボタンを aria-disabled にしている（フォーカスを残すため disabled にしない）ので、ここで止める
+    if (isLoading || noSpotPlace) return;
     shouldScrollToResult.current = true;
     // 結果は Context に入れるので、読み込み中に別のタブへ移動しても戻ると表示される
     // 結果には、送ったときの条件を付けておく（あとで条件が変わってもずれが分かるように）
@@ -433,11 +449,14 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
         <h2 className="font-extrabold text-stone-900">旅の条件</h2>
         <AreaField
           areas={areas}
+          municipalities={municipalities}
           areaId={conditions.areaId}
           prefecture={conditions.prefecture}
-          onChange={(areaId, prefecture) =>
-            replaceQuery({ ...conditions, areaId, prefecture })
-          }
+          noSpotPlace={noSpotPlace}
+          onChange={(areaId, prefecture, place = null) => {
+            setNoSpotPlace(place);
+            replaceQuery({ ...conditions, areaId, prefecture });
+          }}
         />
         <Choice
           label="日程"
@@ -476,7 +495,8 @@ export function PlannerForm({ areas }: { areas: PlannableArea[] }) {
           ref={submitRef}
           type="button"
           onClick={submit}
-          aria-disabled={isLoading}
+          aria-disabled={isLoading || noSpotPlace !== null}
+          aria-describedby={noSpotPlace ? NO_SPOT_NOTICE_ID : undefined}
           className="mt-2 flex items-center justify-center gap-1.5 rounded-xl bg-ink py-3 text-sm font-bold text-white transition-all hover:bg-ink/90 active:scale-[0.98] aria-disabled:cursor-not-allowed aria-disabled:opacity-60 aria-disabled:hover:bg-ink aria-disabled:active:scale-100"
         >
           {isLoading ? (
@@ -744,27 +764,114 @@ function toDuration(label: string): PlanDuration {
   return DURATIONS.find((d) => DURATION_LABELS[d] === label) ?? DURATIONS[0];
 }
 
+/** anaba のスポットがまだない場所（県だけ、または県と市区町村） */
+type NoSpotPlace = { prefecture: string; municipality?: string };
+
+/** スポットがない場所を選んだときの知らせの id（旅プランのボタンの説明にする） */
+const NO_SPOT_NOTICE_ID = "planner-no-spot-notice";
+
+/** スポットがない場所を選んだときに勧める、近い地域の数 */
+const SUGGESTED_AREA_COUNT = 3;
+
+/** 市区町村の候補を読む（65KB ほどあるので、ページを開いてから読む）。読むまでは null */
+function useMunicipalities(): MunicipalityIndex | null {
+  const [index, setIndex] = useState<MunicipalityIndex | null>(null);
+  useEffect(() => {
+    let active = true;
+    void loadMunicipalities().then((loaded) => {
+      if (active) setIndex(loaded);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+  return index;
+}
+
 /**
- * エリア: 「おまかせ」のチップと、都道府県 → 市区町村の2段の select（docs/spec.md の画面-1・#147）。
- * 送る値は地域の id（同じ名前の市町村がありうるため）。県だけ選んだときは県の名前を送り、その県の中でおまかせにする
+ * エリア: 「おまかせ」のチップと、47都道府県の select → 市区町村の入力（docs/spec.md の画面-1・#147）。
+ * 市区町村は全国の候補から選べ、anaba の地域がある町には「穴場あり」を付ける。
+ * 送る値は地域の id（同じ名前の市町村がありうるため）。県だけ選んだときは県の名前を送り、その県の中でおまかせにする。
+ * 地域がない県・町を選んだら、「まだスポットがありません」と知らせて近くの地域を勧める（旅プランは作らない）
  */
 function AreaField({
   areas,
+  municipalities,
   areaId,
   prefecture,
+  noSpotPlace,
   onChange,
 }: {
   areas: PlannableArea[];
+  municipalities: MunicipalityIndex | null;
   areaId: string | null;
   prefecture: string | undefined;
-  onChange: (areaId: string | null, prefecture: string | undefined) => void;
+  noSpotPlace: NoSpotPlace | null;
+  onChange: (
+    areaId: string | null,
+    prefecture: string | undefined,
+    noSpotPlace?: NoSpotPlace | null,
+  ) => void;
 }) {
   const labelId = useId();
+  const prefectureId = useId();
+  const municipalityId = useId();
+  const listId = useId();
+  const openSubmission = useOpenSpotSubmission();
+  const selectedArea =
+    areaId !== null ? areas.find((area) => area.id === areaId) : undefined;
   // 地域を選んでいるときは、その地域の県を出す
   const shownPrefecture =
-    (areaId !== null
-      ? areas.find((area) => area.id === areaId)?.prefecture
-      : prefecture) ?? "";
+    selectedArea?.prefecture ?? prefecture ?? noSpotPlace?.prefecture ?? "";
+  const [text, setText] = useState(selectedArea?.name ?? "");
+  // 地域が外から変わったら（URL・近くの地域のチップ・「戻る」）、入力をその地域の名前にする
+  const [prevAreaId, setPrevAreaId] = useState(areaId);
+  if (prevAreaId !== areaId) {
+    setPrevAreaId(areaId);
+    if (selectedArea) setText(selectedArea.name);
+  }
+
+  const areasInPrefecture = areas.filter(
+    (area) => area.prefecture === shownPrefecture,
+  );
+  const areaNames = new Set(areasInPrefecture.map((area) => area.name));
+  // 候補を読むまでは、地域の名前だけを出す
+  const options =
+    municipalities?.[shownPrefecture]?.map((m) => m.name) ??
+    areasInPrefecture.map((area) => area.name);
+
+  const choosePrefecture = (next: string) => {
+    setText("");
+    if (next === "") onChange(null, undefined);
+    else if (areas.some((area) => area.prefecture === next)) {
+      onChange(null, next);
+    } else onChange(null, undefined, { prefecture: next });
+  };
+
+  const changeText = (next: string) => {
+    setText(next);
+    const name = next.trim();
+    const area = areasInPrefecture.find((a) => a.name === name);
+    if (area) return onChange(area.id, undefined);
+    const hasAreas = areasInPrefecture.length > 0;
+    const municipality =
+      municipalities && findMunicipality(municipalities, shownPrefecture, name);
+    if (municipality) {
+      // 候補にある町だが、anaba の地域がない
+      return onChange(null, hasAreas ? shownPrefecture : undefined, {
+        prefecture: shownPrefecture,
+        municipality: municipality.name,
+      });
+    }
+    // 空・入力の途中は、県だけ選んだ状態にする
+    if (hasAreas) onChange(null, shownPrefecture);
+    else onChange(null, undefined, { prefecture: shownPrefecture });
+  };
+
+  const suggestions = noSpotPlace
+    ? nearestAreas(areas, municipalities, noSpotPlace)
+    : [];
+
   return (
     <div role="group" aria-labelledby={labelId}>
       <span
@@ -774,34 +881,140 @@ function AreaField({
         エリア
       </span>
       <Chip
-        active={areaId === null && prefecture === undefined}
-        onClick={() => onChange(null, undefined)}
+        active={
+          areaId === null && prefecture === undefined && noSpotPlace === null
+        }
+        onClick={() => {
+          setText("");
+          onChange(null, undefined);
+        }}
         className={CHIP_CLASS}
       >
         <ChipIcon icon={ANY_AREA_ICON} />
         {ANY_AREA_LABEL}
       </Chip>
-      <AreaSelect
-        areas={areas}
-        prefecture={shownPrefecture}
-        areaId={areaId ?? ""}
-        // 県を変えたら、市区町村は選び直す（県だけのときは、その県の中でおまかせ）
-        onPrefectureChange={(next) => onChange(null, next || undefined)}
-        // 地域を選んだら県は持たない。市区町村を「選ぶ」に戻したら、県だけ選んだ状態にする
-        onAreaChange={(next) =>
-          next
-            ? onChange(next, undefined)
-            : onChange(null, shownPrefecture || undefined)
-        }
-        shape="pill"
-        className="mt-2"
-        labelClassName="font-semibold text-stone-500"
-        // 選んでいるときは、選択中の Chip と同じ濃い枠にする
-        selectedClassName="border-stone-900 hover:border-stone-900"
-        unselectedClassName="text-stone-600"
-      />
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <div className="flex min-w-0 flex-col gap-1">
+          <label
+            htmlFor={prefectureId}
+            className="block text-xs font-semibold text-stone-500"
+          >
+            都道府県
+          </label>
+          <PrefectureSelect
+            id={prefectureId}
+            shape="pill"
+            value={shownPrefecture}
+            onChange={choosePrefecture}
+            buttonClassName={
+              shownPrefecture !== ""
+                ? "border-stone-900 hover:border-stone-900"
+                : "text-stone-600"
+            }
+          />
+        </div>
+        <div className="flex min-w-0 flex-col gap-1">
+          <label
+            htmlFor={municipalityId}
+            className="block text-xs font-semibold text-stone-500"
+          >
+            市区町村
+          </label>
+          <Input
+            id={municipalityId}
+            value={text}
+            onChange={(e) => changeText(e.target.value)}
+            list={listId}
+            disabled={shownPrefecture === ""}
+            placeholder={
+              shownPrefecture === "" ? "先に県を選ぶ" : "県の中でおまかせ"
+            }
+            autoComplete="off"
+            className={cn(
+              // Select の pill と同じ見た目にする（iOS の Safari が拡大しないよう、sm 未満は 16px）
+              "h-auto rounded-full border-stone-200 py-1.5 pl-3 text-xs font-semibold text-stone-900 shadow-none max-sm:text-base",
+              selectedArea && "border-stone-900",
+            )}
+          />
+          <datalist id={listId}>
+            {options.map((name) => (
+              <option
+                key={name}
+                value={name}
+                label={areaNames.has(name) ? "穴場あり" : undefined}
+              />
+            ))}
+          </datalist>
+        </div>
+      </div>
+      {noSpotPlace && (
+        <div
+          id={NO_SPOT_NOTICE_ID}
+          role="status"
+          className="mt-2 flex flex-col gap-2 rounded-xl bg-stone-50 p-3 text-xs leading-relaxed text-stone-700"
+        >
+          <p className="font-bold text-stone-900">
+            {noSpotPlace.municipality ?? noSpotPlace.prefecture}
+            には、まだ anaba のスポットがありません
+          </p>
+          {suggestions.length > 0 && (
+            <>
+              <p>近くの地域なら旅プランを作れます</p>
+              <div className="flex flex-wrap gap-1.5">
+                {suggestions.map(({ area, km }) => (
+                  <Chip
+                    key={area.id}
+                    active={false}
+                    onClick={() => onChange(area.id, undefined)}
+                    className={CHIP_CLASS}
+                  >
+                    {area.name}（約{km}km）
+                  </Chip>
+                ))}
+              </div>
+            </>
+          )}
+          {openSubmission && (
+            <button
+              type="button"
+              onClick={openSubmission}
+              aria-haspopup="dialog"
+              className="inline-flex w-fit items-center gap-1 font-bold text-ink underline underline-offset-2 hover:text-shu"
+            >
+              <MapPinPlus aria-hidden className="h-3.5 w-3.5" />
+              この町の穴場を教える
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
+}
+
+/**
+ * スポットがない場所から近い地域を、近い順に返す（距離は km、切り上げ）。
+ * 場所の位置は、市区町村の範囲の中心（なければ県の範囲の中心）。候補を読む前は勧めない
+ */
+function nearestAreas(
+  areas: readonly PlannableArea[],
+  municipalities: MunicipalityIndex | null,
+  place: NoSpotPlace,
+): { area: PlannableArea; km: number }[] {
+  if (!municipalities) return [];
+  const box = place.municipality
+    ? findMunicipality(municipalities, place.prefecture, place.municipality)
+        ?.bounds
+    : prefectureBounds(municipalities, place.prefecture);
+  if (!box) return [];
+  const base = {
+    id: "",
+    center_lng: (box[0][0] + box[1][0]) / 2,
+    center_lat: (box[0][1] + box[1][1]) / 2,
+  };
+  return areas
+    .map((area) => ({ area, km: Math.ceil(distanceKm(base, area)) }))
+    .sort((a, b) => a.km - b.km)
+    .slice(0, SUGGESTED_AREA_COUNT);
 }
 
 /** 自由記述の希望（#114）。100字まで、残りの文字数を出す */

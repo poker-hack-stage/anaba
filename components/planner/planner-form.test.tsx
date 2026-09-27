@@ -1,4 +1,11 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import type { SpotMapProps } from "@/components/map/spot-map";
@@ -103,16 +110,44 @@ function renderForm({
     fireEvent.click(screen.getByRole("button", { name: "旅プランをつくる" }));
 }
 
-/** エリアの都道府県・市区町村の select（#147） */
+/** エリアの都道府県の選択（高さを決めてスクロールする一覧）と、市区町村の入力 */
 const prefectureSelect = () =>
-  screen.getByRole<HTMLSelectElement>("combobox", { name: "都道府県" });
+  screen.getByRole<HTMLButtonElement>("combobox", { name: "都道府県" });
+/** 選んでいる都道府県。選んでいなければ "" */
+const prefectureValue = () => {
+  const text = prefectureSelect().textContent ?? "";
+  return text === "選ぶ" ? "" : text;
+};
+/** 都道府県の一覧を開いて選ぶ */
+function choosePrefecture(prefecture: string) {
+  fireEvent.click(prefectureSelect());
+  fireEvent.click(screen.getByRole("option", { name: prefecture }));
+}
 const areaSelect = () =>
-  screen.getByRole<HTMLSelectElement>("combobox", { name: "市区町村" });
+  screen.getByRole<HTMLInputElement>("combobox", { name: "市区町村" });
 
-/** 県 → 市区町村の順に選ぶ */
+/** テストの地域の id → 名前 */
+const AREA_NAMES: Record<string, string> = {
+  matsumoto: "松本市",
+  azumino: "安曇野市",
+  higashikawa: "東川町",
+};
+
+/** 県を選び、市区町村（地域の名前）を入力する */
 function chooseArea(prefecture: string, areaId?: string) {
-  fireEvent.change(prefectureSelect(), { target: { value: prefecture } });
-  if (areaId) fireEvent.change(areaSelect(), { target: { value: areaId } });
+  choosePrefecture(prefecture);
+  if (areaId) {
+    fireEvent.change(areaSelect(), { target: { value: AREA_NAMES[areaId] } });
+  }
+}
+
+/** 市区町村の候補（datalist）の値と「穴場あり」の印 */
+function municipalityOptions() {
+  const list = document.getElementById(areaSelect().getAttribute("list") ?? "");
+  return [...(list?.querySelectorAll("option") ?? [])].map((o) => ({
+    value: o.value,
+    label: o.getAttribute("label"),
+  }));
 }
 
 /** 長野県に2地域、北海道に1地域（県だけ選んだときの候補を確かめる、#147） */
@@ -314,41 +349,104 @@ describe("PlannerForm", () => {
 
       chooseArea("長野県", "matsumoto");
       expect(any.getAttribute("aria-pressed")).toBe("false");
-      expect(prefectureSelect().value).toBe("長野県");
-      expect(areaSelect().value).toBe("matsumoto");
+      expect(prefectureValue()).toBe("長野県");
+      expect(areaSelect().value).toBe("松本市");
 
       fireEvent.click(any);
       expect(any.getAttribute("aria-pressed")).toBe("true");
-      expect(prefectureSelect().value).toBe("");
+      expect(prefectureValue()).toBe("");
       expect(areaSelect().value).toBe("");
     });
 
-    test("県 → 市区町村の2段で選ぶ。市区町村は、選んだ県の地域だけを出す（#147）", () => {
+    test("県は47都道府県から選び、市区町村は全国の候補から入力する。地域がある町に「穴場あり」を付ける", async () => {
       renderForm({ submit: false, areas: twoPrefectures });
 
-      // 県は登録済みの地域がある県だけを、display_order の順に出す（案 A）
-      expect([...prefectureSelect().options].map((o) => o.textContent)).toEqual(
-        ["選ぶ", "長野県", "北海道"],
-      );
-      // 県を選ぶまで、市区町村は選べない
+      // 一覧は閉じておき、押すと47都道府県を出す（高さを決めてスクロールする）
+      expect(screen.queryByRole("listbox")).toBeNull();
+      fireEvent.click(prefectureSelect());
+      const prefectures = screen
+        .getAllByRole("option")
+        .map((o) => o.textContent);
+      expect(prefectures).toHaveLength(47);
+      expect(prefectures[0]).toBe("北海道");
+      expect(prefectures.at(-1)).toBe("沖縄県");
+      expect(screen.getByRole("listbox").className).toContain("max-h-64");
+      fireEvent.click(prefectureSelect());
+      expect(screen.queryByRole("listbox")).toBeNull();
+      // 県を選ぶまで、市区町村は入力できない
       expect(areaSelect().disabled).toBe(true);
 
       chooseArea("長野県");
       expect(areaSelect().disabled).toBe(false);
-      expect([...areaSelect().options].map((o) => o.textContent)).toEqual([
-        "選ぶ",
-        "松本市",
-        "安曇野市",
-      ]);
+      // 候補を読むと、長野県の市区町村がすべて出る
+      await waitFor(() =>
+        expect(municipalityOptions().length).toBeGreaterThan(50),
+      );
+      const options = municipalityOptions();
+      expect(options).toContainEqual({ value: "松本市", label: "穴場あり" });
+      expect(options).toContainEqual({ value: "安曇野市", label: "穴場あり" });
+      expect(options).toContainEqual({ value: "軽井沢町", label: null });
 
       chooseArea("長野県", "azumino");
-      // 県を変えると、市区町村の選択は外れる
+      // 県を変えると、市区町村の入力は空になる
       chooseArea("北海道");
       expect(areaSelect().value).toBe("");
-      expect([...areaSelect().options].map((o) => o.textContent)).toEqual([
-        "選ぶ",
-        "東川町",
-      ]);
+      await waitFor(() =>
+        expect(municipalityOptions()).toContainEqual({
+          value: "東川町",
+          label: "穴場あり",
+        }),
+      );
+    });
+
+    test("スポットがない県を選ぶと、まだスポットがないと知らせて近くの地域を勧め、旅プランは作らない", async () => {
+      const fetchMock = stubFetch();
+      renderForm({ submit: false, areas: twoPrefectures });
+
+      chooseArea("沖縄県");
+      expect(
+        screen.getByText("沖縄県には、まだ anaba のスポットがありません"),
+      ).toBeTruthy();
+      const button = screen.getByRole("button", { name: "旅プランをつくる" });
+      expect(button.getAttribute("aria-disabled")).toBe("true");
+      fireEvent.click(button);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(
+        screen
+          .getByRole("button", { name: "おまかせ" })
+          .getAttribute("aria-pressed"),
+      ).toBe("false");
+    });
+
+    test("地域がない町を入力すると知らせ、勧めた近くの地域を押すとその地域を選ぶ", async () => {
+      renderForm({ submit: false, areas: twoPrefectures });
+
+      chooseArea("長野県");
+      await waitFor(() =>
+        expect(municipalityOptions().length).toBeGreaterThan(50),
+      );
+      fireEvent.change(areaSelect(), { target: { value: "軽井沢町" } });
+      expect(
+        screen.getByText("軽井沢町には、まだ anaba のスポットがありません"),
+      ).toBeTruthy();
+
+      // 近い順に勧める（軽井沢町からは松本市、安曇野市、東川町の順）
+      const suggestions = screen.getAllByRole("button", {
+        name: /（約\d+km）$/,
+      });
+      expect(
+        suggestions.map((b) => b.textContent?.replace(/（.*/, "")),
+      ).toEqual(["松本市", "安曇野市", "東川町"]);
+      fireEvent.click(suggestions[0]);
+      expect(
+        screen.queryByText("軽井沢町には、まだ anaba のスポットがありません"),
+      ).toBeNull();
+      expect(areaSelect().value).toBe("松本市");
+      expect(
+        screen
+          .getByRole("button", { name: "旅プランをつくる" })
+          .getAttribute("aria-disabled"),
+      ).toBe("false");
     });
 
     test("市区町村を「市区町村を選ぶ」に戻すと、県だけ選んだ状態になる", () => {
@@ -357,7 +455,7 @@ describe("PlannerForm", () => {
       chooseArea("長野県", "matsumoto");
       fireEvent.change(areaSelect(), { target: { value: "" } });
 
-      expect(prefectureSelect().value).toBe("長野県");
+      expect(prefectureValue()).toBe("長野県");
       const params = new URLSearchParams(query.get());
       expect(params.get("area")).toBe("any");
       expect(params.get("prefecture")).toBe("長野県");
@@ -368,7 +466,7 @@ describe("PlannerForm", () => {
         "?area=any&prefecture=北海道&duration=day&companion=友人&transport=車",
       );
       renderForm({ submit: false, areas: twoPrefectures });
-      expect(prefectureSelect().value).toBe("北海道");
+      expect(prefectureValue()).toBe("北海道");
       expect(areaSelect().value).toBe("");
     });
 
@@ -376,8 +474,8 @@ describe("PlannerForm", () => {
       query.set("?area=matsumoto&duration=2n3d&companion=友人&transport=車");
       renderForm({ submit: false });
 
-      expect(prefectureSelect().value).toBe("長野県");
-      expect(areaSelect().value).toBe("matsumoto");
+      expect(prefectureValue()).toBe("長野県");
+      expect(areaSelect().value).toBe("松本市");
       expect(
         screen
           .getByRole("button", { name: "2泊3日" })
@@ -391,7 +489,7 @@ describe("PlannerForm", () => {
       );
       renderForm({ submit: false });
 
-      expect(prefectureSelect().value).toBe("");
+      expect(prefectureValue()).toBe("");
       expect(areaSelect().value).toBe("");
       expect(
         screen

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PREFECTURE_NAMES, type PrefectureName } from "@/lib/geo/prefectures";
 import { CATEGORIES, type SpotCategory } from "@/lib/spots/categories";
 
 // 口コミ・スポットの投稿の API（#52）の入力の検証。
@@ -13,6 +14,7 @@ export const LIMITS = {
   body: 300,
   name: 40,
   description: 300,
+  municipality: 20,
 } as const;
 
 /**
@@ -96,12 +98,26 @@ const CATEGORY_KEYS = Object.keys(CATEGORIES) as [
   ...SpotCategory[],
 ];
 
-/** 日本のおおよその範囲（DB の submit_spot() と同じ）。地域の範囲の中かは DB が確かめる */
+/**
+ * 日本のおおよその範囲（DB の submit_spot_anywhere() と同じ）。
+ * anaba の地域（areas）の中ならすぐ公開、外なら公開待ちの候補にする。どちらになるかは DB が決める
+ */
 const OUT_OF_JAPAN = "場所が日本の範囲の外です";
 
-/** スポットの投稿（POST /api/spot-submissions） */
+const PREFECTURE_OPTIONS = PREFECTURE_NAMES as [
+  PrefectureName,
+  ...PrefectureName[],
+];
+
+/**
+ * スポットの投稿（POST /api/spot-submissions）。
+ * 市区町村が候補（lib/geo/municipalities.json）にあるかは、候補のデータが大きいので API（route.ts）で確かめる
+ */
 export const spotSubmissionInputSchema = z.strictObject({
-  areaId: z.guid({ error: "地域を選んでください" }),
+  prefecture: z.enum(PREFECTURE_OPTIONS, {
+    error: "都道府県を選んでください",
+  }),
+  municipality: text("市区町村", LIMITS.municipality),
   name: text("スポット名", LIMITS.name),
   category: z.enum(CATEGORY_KEYS, { error: "カテゴリを選んでください" }),
   description: text("ひとこと", LIMITS.description, { multiline: true }),
@@ -118,6 +134,25 @@ export const spotSubmissionInputSchema = z.strictObject({
 });
 
 export type SpotSubmissionInput = z.infer<typeof spotSubmissionInputSchema>;
+
+/** 投稿の結果。published: 地域の中なのですぐ公開した / pending: 地域の外なので公開待ちの候補にした */
+export type SubmissionStatus = "published" | "pending";
+
+export const SUBMISSION_MESSAGES: Record<SubmissionStatus, string> = {
+  published: "公開しました",
+  pending: "公開待ちの候補として受け付けました",
+};
+
+/** 投稿の API の応答（201）か DB の submit_spot_anywhere() の戻り値から、id と結果を取り出す。形が違えば null */
+export function toSubmissionResult(
+  data: unknown,
+): { id: string; status: SubmissionStatus } | null {
+  if (!data || typeof data !== "object") return null;
+  const { id, status } = data as Record<string, unknown>;
+  if (typeof id !== "string") return null;
+  if (status !== "published" && status !== "pending") return null;
+  return { id, status };
+}
 
 /** パスの id（スポットの id）。形の違う値を DB に送らない */
 export const spotIdSchema = z.guid();

@@ -13,6 +13,11 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { CircleCheckBig, Loader2, MapPinPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogOverlay, DialogPortal } from "@/components/ui/dialog";
+import type { SubmissionStatus } from "@/lib/community/schema";
+import {
+  loadMunicipalities as loadMunicipalityIndex,
+  type MunicipalityIndex,
+} from "@/lib/geo/municipalities";
 import { cn } from "@/lib/utils";
 import { loadSubmittableAreas } from "./load-areas";
 import {
@@ -24,26 +29,33 @@ import {
   「穴場を教える」（#54）。入口のボタンは PC のヒーローとスマホの下部ナビの真ん中（#134）にあり、
   下部ナビはどのページにも出るので、ダイアログはルートのレイアウトの SpotSubmissionProvider に1つだけ置き、
   ボタン（SpotSubmissionTrigger・useOpenSpotSubmission）から開く。
-  地域の一覧（境界を含む）は、初めて開いたときにブラウザから読み、以後はその結果を使い回す
+  地域の一覧（境界を含む）と市区町村の候補は、初めて開いたときにブラウザから読み、以後はその結果を使い回す
   （ページの表示を待たせず、開かない人のぶんは読まない）。読めなかったときは null（ダイアログの中で知らせ、次に開いたときに読み直す）
 */
 
-type AreasPromise = Promise<SubmittableArea[] | null>;
+type FormSource = {
+  areas: SubmittableArea[];
+  municipalities: MunicipalityIndex;
+};
+type SourcePromise = Promise<FormSource | null>;
 
 const OpenContext = createContext<(() => void) | null>(null);
 
 export function SpotSubmissionProvider({
   loadAreas = loadSubmittableAreas,
+  loadMunicipalities = loadMunicipalityIndex,
   children,
 }: {
   /** 地域の一覧を読む関数（テストで差し替える） */
-  loadAreas?: () => AreasPromise;
+  loadAreas?: () => Promise<SubmittableArea[] | null>;
+  /** 市区町村の候補を読む関数（テストで差し替える） */
+  loadMunicipalities?: () => Promise<MunicipalityIndex | null>;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const [areas, setAreas] = useState<AreasPromise | null>(null);
+  const [areas, setAreas] = useState<SourcePromise | null>(null);
   // 読み込み中・読めた Promise。読めなかったら null に戻し、次に開いたときに読み直す
-  const areasRef = useRef<AreasPromise | null>(null);
+  const areasRef = useRef<SourcePromise | null>(null);
   // Trigger を使わずに開くので、閉じたら開く前にフォーカスがあった場所（押したボタン）へ自分で戻す
   const returnFocusRef = useRef<HTMLElement | null>(null);
 
@@ -53,10 +65,15 @@ export function SpotSubmissionProvider({
         ? document.activeElement
         : null;
     if (!areasRef.current) {
-      const loading = loadAreas().then((loaded) => {
-        if (!loaded) areasRef.current = null;
-        return loaded;
-      });
+      const loading = Promise.all([loadAreas(), loadMunicipalities()]).then(
+        ([loadedAreas, municipalities]) => {
+          if (!loadedAreas || !municipalities) {
+            areasRef.current = null;
+            return null;
+          }
+          return { areas: loadedAreas, municipalities };
+        },
+      );
       areasRef.current = loading;
       setAreas(loading);
     }
@@ -113,23 +130,24 @@ function SpotSubmissionDialog({
   onOpenChange,
   returnFocusRef,
 }: {
-  areas: AreasPromise;
+  areas: SourcePromise;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   returnFocusRef: React.RefObject<HTMLElement | null>;
 }) {
   const router = useRouter();
-  const [done, setDone] = useState(false);
+  const [done, setDone] = useState<SubmissionStatus | null>(null);
   // 開き直したら、新しい投稿のフォームから始める
   const [prevOpen, setPrevOpen] = useState(open);
   if (prevOpen !== open) {
     setPrevOpen(open);
-    if (open) setDone(false);
+    if (open) setDone(null);
   }
 
-  const submitted = () => {
-    setDone(true);
-    router.refresh();
+  const submitted = (status: SubmissionStatus) => {
+    setDone(status);
+    // すぐ公開したときだけ、次の読み込みで「穴場を探す」の地図に出す
+    if (status === "published") router.refresh();
   };
 
   return (
@@ -163,7 +181,7 @@ function SpotSubmissionDialog({
 
           <div className="p-5 sm:p-6">
             {done ? (
-              <SubmittedMessage />
+              <SubmittedMessage status={done} />
             ) : (
               <Suspense fallback={<FormLoading />}>
                 <FormWithAreas
@@ -184,8 +202,8 @@ function FormWithAreas({
   areas,
   ...props
 }: {
-  areas: AreasPromise;
-  onSubmitted: () => void;
+  areas: SourcePromise;
+  onSubmitted: (status: SubmissionStatus) => void;
   onCancel: () => void;
 }) {
   const loaded = use(areas);
@@ -199,7 +217,13 @@ function FormWithAreas({
       </p>
     );
   }
-  return <SpotSubmissionForm areas={loaded} {...props} />;
+  return (
+    <SpotSubmissionForm
+      areas={loaded.areas}
+      municipalities={loaded.municipalities}
+      {...props}
+    />
+  );
 }
 
 function FormLoading() {
@@ -214,7 +238,7 @@ function FormLoading() {
   );
 }
 
-function SubmittedMessage() {
+function SubmittedMessage({ status }: { status: SubmissionStatus }) {
   return (
     <div
       role="status"
@@ -222,10 +246,14 @@ function SubmittedMessage() {
     >
       <CircleCheckBig aria-hidden className="h-10 w-10 text-ink" />
       <p className="text-base font-bold text-stone-900">
-        ありがとうございます。公開しました
+        {status === "published"
+          ? "ありがとうございます。公開しました"
+          : "ありがとうございます。公開待ちの候補として受け付けました"}
       </p>
       <p className="text-sm text-stone-600">
-        「穴場を探す」の地図と AI旅プランに出ます。
+        {status === "published"
+          ? "「穴場を探す」の地図と AI旅プランに出ます。"
+          : "anaba がこの町を地域に加えたら、「穴場を探す」の地図と AI旅プランに出ます。"}
       </p>
       <DialogPrimitive.Close asChild>
         <Button className="mt-2">閉じる</Button>

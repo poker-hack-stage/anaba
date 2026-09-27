@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AreaSelect } from "@/components/ui/area-select";
+import { PrefectureSelect } from "@/components/ui/prefecture-select";
 import {
   NETWORK_ERROR_MESSAGE,
   loadNickname,
@@ -20,12 +20,20 @@ import {
   LIMITS,
   countChars,
   spotSubmissionInputSchema,
+  toSubmissionResult,
   type SpotSubmissionInput,
+  type SubmissionStatus,
 } from "@/lib/community/schema";
 import type { Area } from "@/lib/data/areas";
+import {
+  MUNICIPALITY_ATTRIBUTION,
+  findMunicipality,
+  prefectureBounds,
+  type MunicipalityIndex,
+} from "@/lib/geo/municipalities";
 import { CATEGORIES, type SpotCategory } from "@/lib/spots/categories";
 import { cn } from "@/lib/utils";
-import { areaRange } from "./area-range";
+import { areaRange, findAreaForPoint } from "./area-range";
 
 const MAP_CLASS_NAME = "h-64 sm:h-72";
 
@@ -50,26 +58,36 @@ export type SubmittableArea = Pick<
 >;
 
 type Field =
-  "areaId" | "name" | "category" | "description" | "location" | "nickname";
+  | "prefecture"
+  | "municipality"
+  | "name"
+  | "category"
+  | "description"
+  | "location"
+  | "nickname";
 type FieldErrors = Partial<Record<Field, string>>;
 
 /**
  * スポットを投稿するフォーム（「穴場を教える」、#54）。送る前に API と同じスキーマ（lib/community/schema.ts）で確かめ、
- * 400 の欄ごとの理由は欄の下に、ほかのエラー（範囲の外・429・503 など）はフォームの上に出す。
- * 場所は地図をタップしてピンを置く。ピンを置くまで送信できない
+ * 400 の欄ごとの理由は欄の下に、ほかのエラー（429・503 など）はフォームの上に出す。
+ * 場所は47都道府県から県を選び、市区町村を入力して（候補から選ぶ）、地図をタップしてピンを置く。ピンを置くまで送信できない。
+ * ピンが anaba の地域の中ならすぐ公開、外なら公開待ちの候補になる（地図の下で先に知らせる。決めるのは DB）
  */
 export function SpotSubmissionForm({
   areas,
+  municipalities,
   onSubmitted,
   onCancel,
 }: {
   areas: SubmittableArea[];
-  onSubmitted: () => void;
+  /** 市区町村の候補（lib/geo/municipalities.ts の loadMunicipalities()） */
+  municipalities: MunicipalityIndex;
+  onSubmitted: (status: SubmissionStatus) => void;
   onCancel: () => void;
 }) {
   const id = useId();
   const [prefecture, setPrefecture] = useState("");
-  const [areaId, setAreaId] = useState("");
+  const [municipalityText, setMunicipalityText] = useState("");
   const [name, setName] = useState("");
   const [category, setCategory] = useState<SpotCategory | null>(null);
   const [description, setDescription] = useState("");
@@ -86,22 +104,56 @@ export function SpotSubmissionForm({
     if (formError) formErrorRef.current?.scrollIntoView?.({ block: "nearest" });
   }, [formError]);
 
-  const area = areas.find((a) => a.id === areaId);
+  const municipality = findMunicipality(
+    municipalities,
+    prefecture,
+    municipalityText,
+  );
+  // 選んだ市区町村が anaba の地域なら、その範囲（境界）を地図に出す
+  const area = municipality
+    ? areas.find(
+        (a) => a.prefecture === prefecture && a.name === municipality.name,
+      )
+    : undefined;
   // 参照が変わると地図が描き直すので、地域ごとに1回だけ作る
   const range = useMemo(() => (area ? areaRange(area) : null), [area]);
+  // 地図に入れる範囲。市区町村が決まればその町、まだなら県全体
+  const fitPoints = useMemo((): [number, number][] => {
+    const box =
+      municipality?.bounds ?? prefectureBounds(municipalities, prefecture);
+    return box ? [box[0], box[1]] : [];
+  }, [municipality, municipalities, prefecture]);
+  // ピンが入る地域（すぐ公開になるか、公開待ちの候補になるかを先に知らせる）
+  const pinArea = pin ? findAreaForPoint(areas, pin) : undefined;
+  const municipalityOptions = municipalities[prefecture] ?? [];
 
   const remaining = LIMITS.description - countChars(description);
 
   const changePrefecture = (next: string) => {
     setPrefecture(next);
-    // 市区町村はその県の中から選び直す
-    changeArea("");
+    // 市区町村はその県の中から選び直す。地図もその県へ移るので、置いたピンは外す
+    setMunicipalityText("");
+    setPin(null);
+    clearFieldError("prefecture", "municipality", "location");
   };
 
-  const changeArea = (next: string) => {
-    setAreaId(next);
-    // ほかの地域の範囲の外になるので、置いたピンは外す
-    setPin(null);
+  const changeMunicipality = (next: string) => {
+    const before = municipality?.name;
+    setMunicipalityText(next);
+    // 別の町に決まったら、地図がその町へ移るので、置いたピンは外す
+    const after = findMunicipality(municipalities, prefecture, next)?.name;
+    if (after && after !== before) setPin(null);
+    clearFieldError("municipality");
+  };
+
+  const clearFieldError = (...fields: Field[]) => {
+    if (fields.some((field) => fieldErrors[field])) {
+      setFieldErrors((errors) => {
+        const next = { ...errors };
+        for (const field of fields) delete next[field];
+        return next;
+      });
+    }
   };
 
   const placePin = (point: MapPoint) => {
@@ -117,7 +169,8 @@ export function SpotSubmissionForm({
     setFormError(null);
 
     const parsed = spotSubmissionInputSchema.safeParse({
-      areaId: areaId || undefined,
+      prefecture: prefecture || undefined,
+      municipality: municipalityText,
       name,
       category: category ?? undefined,
       description,
@@ -126,8 +179,16 @@ export function SpotSubmissionForm({
       nickname,
       website,
     });
-    if (!parsed.success) {
-      setFieldErrors(toFieldErrors(parsed.error.issues));
+    // 市区町村は候補の名前だけ（API も確かめる）
+    const municipalityError =
+      parsed.success && !municipality
+        ? { municipality: "市区町村は候補から選んでください" }
+        : {};
+    if (!parsed.success || !municipality) {
+      setFieldErrors({
+        ...(parsed.success ? {} : toFieldErrors(parsed.error.issues)),
+        ...municipalityError,
+      });
       return;
     }
     setFieldErrors({});
@@ -142,14 +203,15 @@ export function SpotSubmissionForm({
       });
       if (res.ok) {
         saveNickname(parsed.data.nickname);
-        onSubmitted();
+        const result = toSubmissionResult(await res.json().catch(() => null));
+        onSubmitted(result?.status ?? "published");
         return;
       }
       const error = await readApiError(res);
       setFormError(error.message);
       if (error.fields) setFieldErrors(toFieldErrors(error.fields));
       else if (error.error === "out_of_area") {
-        setFieldErrors({ location: "地域の範囲の中にピンを置いてください" });
+        setFieldErrors({ location: "日本の中にピンを置いてください" });
       }
     } catch {
       setFormError(NETWORK_ERROR_MESSAGE);
@@ -188,7 +250,6 @@ export function SpotSubmissionForm({
       <div
         role="group"
         aria-labelledby={`${id}-area-label`}
-        aria-describedby={describedBy("areaId")}
         className="flex flex-col gap-1.5"
       >
         <span
@@ -197,23 +258,65 @@ export function SpotSubmissionForm({
         >
           地域
         </span>
-        {/* 県 → 市区町村の2段（#147）。送る値は市区町村（地域）の id で、県だけでは送れない（地図の範囲が地域ごとのため） */}
-        <AreaSelect
-          areas={areas}
-          prefecture={prefecture}
-          areaId={areaId}
-          onPrefectureChange={changePrefecture}
-          onAreaChange={changeArea}
-          labelClassName="font-normal text-stone-600"
-          areaSelectProps={{
-            id: `${id}-areaId`,
-            // 送る値は市区町村なので、必須であることを読み上げに伝える（ブラウザの検証は使わないので required ではなく aria-required）
-            "aria-required": true,
-            "aria-invalid": fieldErrors.areaId ? true : undefined,
-            "aria-describedby": describedBy("areaId"),
-          }}
+        {/* 47都道府県から県を選び、市区町村は入力する（その県の候補がブラウザの候補に出る） */}
+        <div className="grid grid-cols-2 gap-2">
+          <div className="flex min-w-0 flex-col gap-1">
+            <label
+              htmlFor={`${id}-prefecture`}
+              className="block text-xs font-normal text-stone-600"
+            >
+              都道府県
+            </label>
+            <PrefectureSelect
+              id={`${id}-prefecture`}
+              value={prefecture}
+              onChange={changePrefecture}
+              aria-required
+              aria-invalid={fieldErrors.prefecture ? true : undefined}
+              aria-describedby={describedBy("prefecture")}
+            />
+          </div>
+          <div className="flex min-w-0 flex-col gap-1">
+            <label
+              htmlFor={`${id}-municipality`}
+              className="block text-xs font-normal text-stone-600"
+            >
+              市区町村
+            </label>
+            <Input
+              id={`${id}-municipality`}
+              value={municipalityText}
+              onChange={(e) => changeMunicipality(e.target.value)}
+              list={`${id}-municipality-options`}
+              disabled={prefecture === ""}
+              placeholder={prefecture === "" ? "先に県を選ぶ" : "例: 松本市"}
+              autoComplete="off"
+              aria-required
+              aria-invalid={fieldErrors.municipality ? true : undefined}
+              aria-describedby={describedBy(
+                "municipality",
+                `${id}-municipality-hint`,
+              )}
+            />
+            <datalist id={`${id}-municipality-options`}>
+              {municipalityOptions.map((m) => (
+                <option key={m.name} value={m.name} />
+              ))}
+            </datalist>
+          </div>
+        </div>
+        <p id={`${id}-municipality-hint`} className="text-xs text-stone-500">
+          市区町村は、入力すると出る候補から選んでください。
+          {MUNICIPALITY_ATTRIBUTION}
+        </p>
+        <FieldError
+          id={`${id}-prefecture-error`}
+          message={fieldErrors.prefecture}
         />
-        <FieldError id={`${id}-areaId-error`} message={fieldErrors.areaId} />
+        <FieldError
+          id={`${id}-municipality-error`}
+          message={fieldErrors.municipality}
+        />
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -297,13 +400,16 @@ export function SpotSubmissionForm({
         <p id={`${id}-location-label`} className="text-sm font-medium">
           場所
         </p>
-        {area && range ? (
+        {prefecture !== "" ? (
           <SpotMap
-            key={area.id}
-            areaName={area.name}
+            key={prefecture}
+            areaName={municipality?.name ?? prefecture}
             boundary={range}
+            fitPoints={fitPoints}
             pin={pin}
             onMapClick={placePin}
+            animateMove
+            emptyPlaceholder={false}
             className={cn(
               MAP_CLASS_NAME,
               "[&_.maplibregl-canvas]:cursor-crosshair",
@@ -319,7 +425,7 @@ export function SpotSubmissionForm({
           >
             <MapPinned aria-hidden className="h-6 w-6" />
             <span className="text-xs font-semibold">
-              地域を選ぶと地図が出ます
+              都道府県を選ぶと地図が出ます
             </span>
           </div>
         )}
@@ -328,9 +434,11 @@ export function SpotSubmissionForm({
           aria-live="polite"
           className="text-xs text-stone-500"
         >
-          {pin
-            ? "ピンを置きました。置き直すときは、もう一度地図をタップしてください"
-            : "地図をタップして、枠の内側にピンを置いてください"}
+          {!pin
+            ? "地図をタップして、スポットの場所にピンを置いてください"
+            : pinArea
+              ? `ピンを置きました（${pinArea.name}）。投稿するとすぐ公開されます`
+              : "ピンを置きました。anaba の地域がまだない場所なので、公開待ちの候補として受け付けます（地域ができたら公開します）"}
         </p>
         <FieldError
           id={`${id}-location-error`}
@@ -400,7 +508,8 @@ function FieldError({ id, message }: { id: string; message?: string }) {
 
 /** スキーマの項目名から、画面の欄へ。緯度・経度はまとめて「場所」の欄にする */
 const FIELD_OF: Record<string, Field> = {
-  areaId: "areaId",
+  prefecture: "prefecture",
+  municipality: "municipality",
   name: "name",
   category: "category",
   description: "description",

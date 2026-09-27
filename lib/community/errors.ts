@@ -76,7 +76,7 @@ export type DbError = { code?: string | null };
 
 /**
  * DB のエラーを API のエラーに変える。知らない errcode は 500（呼ぶ側でログに残す）。
- * 22023（引数の形・場所の範囲）は、投稿では場所の範囲の外として 400、それ以外は API の不具合なので 500 にする
+ * 22023（引数の形・場所の範囲）は、投稿では場所が日本の範囲の外として 400、それ以外は API の不具合なので 500 にする
  */
 export function toApiError(error: DbError, kind: WriteKind): ApiError {
   switch (error.code) {
@@ -111,7 +111,7 @@ export function toApiError(error: DbError, kind: WriteKind): ApiError {
         : bad("not_found", "地域が見つかりません");
     case "22023":
       return kind === "submission"
-        ? bad("out_of_area", "場所が地域の範囲の外です")
+        ? bad("out_of_area", "場所が日本の範囲の外です")
         : INTERNAL;
     case "42501":
       return CLOSED;

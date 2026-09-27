@@ -12,6 +12,14 @@ export function createCommunitySupabaseMock() {
     rateLimitError: null as DbResult["error"] | null,
     insertError: null as DbResult["error"] | null,
     submitSpot: { data: "20000000-0000-4000-8000-000000000099" } as DbResult,
+    /** submit_spot_anywhere() の結果。既定は地域の中（すぐ公開） */
+    submitSpotAnywhere: {
+      data: {
+        status: "published",
+        id: "20000000-0000-4000-8000-000000000099",
+        area_id: "10000000-0000-4000-8000-000000000005",
+      },
+    } as DbResult,
     /** published_reviews の一覧と、星ごとの件数（[★1, …, ★5]） */
     reviews: [] as unknown[],
     ratingCounts: [0, 0, 0, 0, 0],
@@ -27,6 +35,12 @@ export function createCommunitySupabaseMock() {
       return {
         data: state.submitSpot.data ?? null,
         error: state.submitSpot.error ?? null,
+      };
+    }
+    if (name === "submit_spot_anywhere") {
+      return {
+        data: state.submitSpotAnywhere.data ?? null,
+        error: state.submitSpotAnywhere.error ?? null,
       };
     }
     throw new Error(`想定していない rpc: ${name}`);

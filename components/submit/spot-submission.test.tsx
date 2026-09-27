@@ -3,6 +3,10 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import type { MapPoint } from "@/components/map/spot-map";
 import { NICKNAME_STORAGE_KEY } from "@/lib/community/review-client";
 import {
+  toMunicipalityIndex,
+  type MunicipalityIndex,
+} from "@/lib/geo/municipalities";
+import {
   SpotSubmissionProvider,
   SpotSubmissionTrigger,
 } from "./spot-submission";
@@ -11,8 +15,9 @@ import type { SubmittableArea } from "./spot-submission-form";
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 
-/** 地図をタップした場所（テストの地図のボタンを押すと、ここを渡す） */
+/** 地図をタップした場所（テストの地図のボタンを押すと、tap.point を渡す） */
 const TAP: MapPoint = { lat: 36.3, lng: 137.9 };
+const tap = vi.hoisted(() => ({ point: null as MapPoint | null }));
 
 // 地図（MapLibre）は jsdom では描けないので、地域名とピンを出し、押すと TAP の場所を渡すボタンにする
 vi.mock("@/components/map/spot-map", () => ({
@@ -28,7 +33,7 @@ vi.mock("@/components/map/spot-map", () => ({
     <div data-testid="map">
       {areaName}
       {pin && <span data-testid="pin">{`${pin.lat},${pin.lng}`}</span>}
-      <button type="button" onClick={() => onMapClick?.(TAP)}>
+      <button type="button" onClick={() => onMapClick?.(tap.point ?? TAP)}>
         地図をタップ
       </button>
     </div>
@@ -63,7 +68,19 @@ const AREAS: SubmittableArea[] = [
 ];
 const AZUMINO = AREAS[2];
 
+/** 市区町村の候補（テスト用に少しだけ） */
+const MUNICIPALITIES: MunicipalityIndex = toMunicipalityIndex({
+  北海道: [["東川町", 142.4, 43.6, 142.7, 43.8]],
+  長野県: [
+    ["白馬村", 137.8, 36.6, 137.9, 36.8],
+    ["安曇野市", 137.8, 36.2, 138, 36.4],
+    ["松本市", 137.8, 36.1, 138.1, 36.4],
+  ],
+  沖縄県: [["那覇市", 127.65, 26.18, 127.72, 26.24]],
+});
+
 afterEach(() => {
+  tap.point = null;
   vi.unstubAllGlobals();
   refresh.mockReset();
   window.localStorage.clear();
@@ -82,7 +99,10 @@ function stubFetch(...responses: (Response | Error)[]) {
 
 function renderEntry(loadAreas: () => Promise<SubmittableArea[] | null>) {
   render(
-    <SpotSubmissionProvider loadAreas={loadAreas}>
+    <SpotSubmissionProvider
+      loadAreas={loadAreas}
+      loadMunicipalities={() => Promise.resolve(MUNICIPALITIES)}
+    >
       <SpotSubmissionTrigger />
     </SpotSubmissionProvider>,
   );
@@ -110,14 +130,26 @@ async function openForm(areas: SubmittableArea[] | null = AREAS) {
   return screen.getByRole("form", { name: "穴場を教える" });
 }
 
-/** 県 → 市区町村の順に地域を選ぶ（#147） */
-function chooseArea(form: HTMLElement, area: SubmittableArea) {
-  fireEvent.change(within(form).getByLabelText("都道府県"), {
-    target: { value: area.prefecture },
-  });
+/** 都道府県の一覧を開いて選ぶ */
+function choosePrefecture(form: HTMLElement, prefecture: string) {
+  fireEvent.click(within(form).getByRole("combobox", { name: "都道府県" }));
+  fireEvent.click(within(form).getByRole("option", { name: prefecture }));
+}
+
+/** 県を選び、市区町村を入力する */
+function choosePlace(
+  form: HTMLElement,
+  prefecture: string,
+  municipality: string,
+) {
+  choosePrefecture(form, prefecture);
   fireEvent.change(within(form).getByLabelText("市区町村"), {
-    target: { value: area.id },
+    target: { value: municipality },
   });
+}
+
+function chooseArea(form: HTMLElement, area: SubmittableArea) {
+  choosePlace(form, area.prefecture, area.name);
 }
 
 /** 地域を選び、地図のボタン（テスト用）を押してピンを置く */
@@ -153,37 +185,48 @@ function submitButton(form: HTMLElement) {
 }
 
 describe("穴場を教えるフォーム", () => {
-  test("地域は県 → 市区町村の2段で選び、送る前の注意を出す（#147）", async () => {
+  test("県は47都道府県から選び、市区町村は入力して候補から選ぶ。送る前の注意を出す", async () => {
     const form = await openForm();
     const area = within(form).getByRole("group", { name: "地域" });
-    const prefecture = within(area).getByRole<HTMLSelectElement>("combobox", {
+    const prefecture = within(area).getByRole("combobox", {
       name: "都道府県",
     });
-    const municipality = within(area).getByRole<HTMLSelectElement>("combobox", {
-      name: "市区町村",
-    });
-    const texts = (select: HTMLSelectElement) =>
-      [...select.options].map((o) => o.textContent);
+    const municipality =
+      within(area).getByLabelText<HTMLInputElement>("市区町村");
 
-    // 登録済みの地域がある県だけを、display_order の順に出す（案 A）
-    expect(texts(prefecture)).toEqual(["選ぶ", "長野県", "北海道"]);
+    // 47都道府県を都道府県コードの順に出す。地域がまだない県も同じように選べる
+    // 押すと、高さを決めてスクロールする一覧を開く
+    expect(prefecture.textContent).toBe("選ぶ");
+    fireEvent.click(prefecture);
+    const prefectureTexts = within(form)
+      .getAllByRole("option")
+      .map((o) => o.textContent);
+    expect(prefectureTexts).toHaveLength(47);
+    expect(prefectureTexts.slice(0, 2)).toEqual(["北海道", "青森県"]);
+    expect(prefectureTexts.at(-1)).toBe("沖縄県");
+    expect(prefectureTexts.join("")).not.toContain("準備中");
     expect(municipality.disabled).toBe(true);
-    // 送る値は市区町村なので、必須であることを読み上げに伝える
     expect(municipality.getAttribute("aria-required")).toBe("true");
 
-    fireEvent.change(prefecture, { target: { value: "長野県" } });
+    fireEvent.click(within(form).getByRole("option", { name: "長野県" }));
+    expect(prefecture.textContent).toBe("長野県");
     expect(municipality.disabled).toBe(false);
-    expect(texts(municipality)).toEqual(["選ぶ", "白馬村", "安曇野市"]);
+    const options = form.querySelector("datalist");
+    expect(options?.id).toBe(municipality.getAttribute("list"));
+    expect(
+      [...(options?.querySelectorAll("option") ?? [])].map((o) => o.value),
+    ).toEqual(["白馬村", "安曇野市", "松本市"]);
+    expect(form.textContent).toContain("Geolonia 住所データ（CC BY 4.0）");
     expect(form.textContent).toContain(
       "ログインは不要です。スポット名・ひとこと・ニックネームはすぐ公開されます。管理者が非表示にすることがあります。",
     );
   });
 
-  test("地域を選ぶまでは地図を出さず、ピンを置くまで送信できない", async () => {
+  test("県を選ぶまでは地図を出さず、ピンを置くまで送信できない", async () => {
     const form = await openForm();
 
     expect(within(form).queryByTestId("map")).toBeNull();
-    expect(form.textContent).toContain("地域を選ぶと地図が出ます");
+    expect(form.textContent).toContain("都道府県を選ぶと地図が出ます");
     fillText(form);
     expect(submitButton(form).disabled).toBe(true);
 
@@ -193,7 +236,78 @@ describe("穴場を教えるフォーム", () => {
     expect(submitButton(form).disabled).toBe(false);
   });
 
-  test("地域を変えたら、置いたピンを外す", async () => {
+  test("地域の中にピンを置くと、すぐ公開されると知らせる", async () => {
+    const form = await openForm();
+    await selectAreaAndPin(form);
+
+    // 境界のない地域は中心から 50 km。TAP は白馬村（先に並ぶ地域）の範囲にも入る
+    expect(form.textContent).toContain(
+      "ピンを置きました（白馬村）。投稿するとすぐ公開されます",
+    );
+  });
+
+  test("地域がない県・町でも地図を出してピンを置け、公開待ちの候補になると知らせる", async () => {
+    const fetchMock = stubFetch(
+      Response.json(
+        {
+          id: "candidate",
+          status: "pending",
+          message: "公開待ちの候補として受け付けました",
+        },
+        { status: 201 },
+      ),
+    );
+    const form = await openForm();
+    choosePrefecture(form, "沖縄県");
+    expect((await within(form).findByTestId("map")).textContent).toContain(
+      "沖縄県",
+    );
+
+    fireEvent.change(within(form).getByLabelText("市区町村"), {
+      target: { value: "那覇市" },
+    });
+    expect(within(form).getByTestId("map").textContent).toContain("那覇市");
+    tap.point = { lat: 26.21, lng: 127.68 };
+    fireEvent.click(within(form).getByText("地図をタップ"));
+    expect(form.textContent).toContain(
+      "anaba の地域がまだない場所なので、公開待ちの候補として受け付けます",
+    );
+
+    fillText(form);
+    fireEvent.click(submitButton(form));
+    expect(
+      await screen.findByText(
+        "ありがとうございます。公開待ちの候補として受け付けました",
+      ),
+    ).toBeTruthy();
+    // まだ地図には出ないので、読み込み直さない
+    expect(refresh).not.toHaveBeenCalled();
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body as string)).toMatchObject(
+      {
+        prefecture: "沖縄県",
+        municipality: "那覇市",
+        lat: 26.21,
+        lng: 127.68,
+      },
+    );
+  });
+
+  test("市区町村が候補にない名前なら送らず、欄の下に理由を出す", async () => {
+    const fetchMock = stubFetch();
+    const form = await openForm();
+    await selectAreaAndPin(form);
+    fireEvent.change(within(form).getByLabelText("市区町村"), {
+      target: { value: "あずみの" },
+    });
+    fillText(form);
+    fireEvent.click(submitButton(form));
+
+    expect(form.textContent).toContain("市区町村は候補から選んでください");
+    expect(within(form).getByLabelText("市区町村").ariaInvalid).toBe("true");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test("市区町村を別の町に変えたら、置いたピンを外す", async () => {
     const form = await openForm();
     await selectAreaAndPin(form);
 
@@ -202,27 +316,26 @@ describe("穴場を教えるフォーム", () => {
     expect(submitButton(form).disabled).toBe(true);
   });
 
-  test("県を変えたら、市区町村の選択と置いたピンを外す", async () => {
+  test("県を変えたら、市区町村の入力と置いたピンを外し、地図はその県に移す", async () => {
     const form = await openForm();
     await selectAreaAndPin(form);
 
-    fireEvent.change(within(form).getByLabelText("都道府県"), {
-      target: { value: "北海道" },
-    });
+    choosePrefecture(form, "北海道");
     const municipality =
-      within(form).getByLabelText<HTMLSelectElement>("市区町村");
+      within(form).getByLabelText<HTMLInputElement>("市区町村");
     expect(municipality.value).toBe("");
-    expect([...municipality.options].map((o) => o.textContent)).toEqual([
-      "選ぶ",
-      "東川町",
-    ]);
     expect(within(form).queryByTestId("pin")).toBeNull();
-    expect(within(form).queryByTestId("map")).toBeNull();
+    expect((await within(form).findByTestId("map")).textContent).toContain(
+      "北海道",
+    );
   });
 
   test("送ると API に JSON で送り、成功したら「公開しました」を出して読み込み直す", async () => {
     const fetchMock = stubFetch(
-      Response.json({ id: "new", message: "公開しました" }, { status: 201 }),
+      Response.json(
+        { id: "new", status: "published", message: "公開しました" },
+        { status: 201 },
+      ),
     );
     const form = await openForm();
     await selectAreaAndPin(form);
@@ -240,7 +353,8 @@ describe("穴場を教えるフォーム", () => {
       "application/json",
     );
     expect(JSON.parse(init.body as string)).toEqual({
-      areaId: AZUMINO.id,
+      prefecture: "長野県",
+      municipality: AZUMINO.name,
       name: "朝の田んぼ道",
       category: "nature",
       description: "朝の光がきれい",
@@ -292,10 +406,10 @@ describe("穴場を教えるフォーム", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  test("場所が地域の範囲の外なら、フォームの上と場所の欄に出し、置き直すと場所の理由は消える", async () => {
+  test("場所が日本の範囲の外なら、フォームの上と場所の欄に出し、置き直すと場所の理由は消える", async () => {
     stubFetch(
       Response.json(
-        { error: "out_of_area", message: "場所が地域の範囲の外です" },
+        { error: "out_of_area", message: "場所が日本の範囲の外です" },
         { status: 400 },
       ),
     );
@@ -305,16 +419,14 @@ describe("穴場を教えるフォーム", () => {
     fireEvent.click(submitButton(form));
 
     expect((await within(form).findByRole("alert")).textContent).toBe(
-      "場所が地域の範囲の外です",
+      "場所が日本の範囲の外です",
     );
-    expect(form.textContent).toContain("地域の範囲の中にピンを置いてください");
+    expect(form.textContent).toContain("日本の中にピンを置いてください");
     expect(screen.queryByText("ありがとうございます。公開しました")).toBeNull();
     expect(refresh).not.toHaveBeenCalled();
 
     fireEvent.click(within(form).getByText("地図をタップ"));
-    expect(form.textContent).not.toContain(
-      "地域の範囲の中にピンを置いてください",
-    );
+    expect(form.textContent).not.toContain("日本の中にピンを置いてください");
   });
 
   test.each([
