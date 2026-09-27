@@ -165,8 +165,16 @@ describe("穴場を教えるフォーム", () => {
     const texts = (select: HTMLSelectElement) =>
       [...select.options].map((o) => o.textContent);
 
-    // 登録済みの地域がある県だけを、display_order の順に出す（案 A）
-    expect(texts(prefecture)).toEqual(["選ぶ", "長野県", "北海道"]);
+    // 47都道府県を都道府県コードの順に出し、地域がまだない県には「（準備中）」を付ける
+    const prefectureTexts = texts(prefecture);
+    expect(prefectureTexts).toHaveLength(48);
+    expect(prefectureTexts.slice(0, 3)).toEqual([
+      "選ぶ",
+      "北海道",
+      "青森県（準備中）",
+    ]);
+    expect(prefectureTexts).toContain("長野県");
+    expect(prefectureTexts.at(-1)).toBe("沖縄県（準備中）");
     expect(municipality.disabled).toBe(true);
     // 送る値は市区町村なので、必須であることを読み上げに伝える
     expect(municipality.getAttribute("aria-required")).toBe("true");
@@ -177,6 +185,31 @@ describe("穴場を教えるフォーム", () => {
     expect(form.textContent).toContain(
       "ログインは不要です。スポット名・ひとこと・ニックネームはすぐ公開されます。管理者が非表示にすることがあります。",
     );
+  });
+
+  test("地域がまだない県を選ぶと、準備中と知らせて送信できない", async () => {
+    const form = await openForm();
+    const municipality = within(form).getByRole<HTMLSelectElement>("combobox", {
+      name: "市区町村",
+    });
+
+    fireEvent.change(within(form).getByLabelText("都道府県"), {
+      target: { value: "沖縄県" },
+    });
+    expect(municipality.disabled).toBe(true);
+    expect(municipality.options[0].textContent).toBe("まだありません");
+    expect(within(form).getByRole("status").textContent).toContain(
+      "沖縄県はまだ準備中で、いまは投稿できません",
+    );
+    expect(within(form).queryByTestId("map")).toBeNull();
+    expect(form.textContent).toContain("この県はまだ準備中です");
+    fillText(form);
+    expect(submitButton(form).disabled).toBe(true);
+
+    // 地域がある県に戻せば、いつもどおり選べる
+    chooseArea(form, AREAS[0]);
+    expect(within(form).queryByRole("status")).toBeNull();
+    expect(await within(form).findByTestId("map")).toBeTruthy();
   });
 
   test("地域を選ぶまでは地図を出さず、ピンを置くまで送信できない", async () => {

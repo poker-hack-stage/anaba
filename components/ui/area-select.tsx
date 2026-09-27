@@ -15,6 +15,11 @@ export interface AreaSelectProps {
   areaId: string;
   onPrefectureChange: (prefecture: string) => void;
   onAreaChange: (areaId: string) => void;
+  /**
+   * 県の select に出す都道府県（並びもこの順）。渡すと、地域がまだない県も選べるようにし、名前に「（準備中）」を付ける
+   * （「穴場を教える」の全国対応）。渡さなければ、地域がある県だけを出す（旅プラン）
+   */
+  prefectures?: readonly string[];
   shape?: SelectProps["shape"];
   /** 市区町村の select に渡す属性（id・aria-required・aria-invalid・aria-describedby など） */
   areaSelectProps?: Pick<
@@ -40,6 +45,7 @@ export function AreaSelect({
   areaId,
   onPrefectureChange,
   onAreaChange,
+  prefectures,
   shape,
   areaSelectProps,
   selectedClassName,
@@ -53,6 +59,12 @@ export function AreaSelect({
   const groups = useMemo(() => groupAreasByPrefecture(areas), [areas]);
   const municipalities =
     groups.find((group) => group.prefecture === prefecture)?.areas ?? [];
+  const prefectureOptions = useMemo(
+    () => toPrefectureOptions(groups, prefectures),
+    [groups, prefectures],
+  );
+  // 地域がまだない県を選んでいる（prefectures を渡したときだけ起きる）
+  const noMunicipality = prefecture !== "" && municipalities.length === 0;
   const stateClass = (selected: boolean) =>
     selected ? selectedClassName : unselectedClassName;
   const labelClass = cn(
@@ -75,9 +87,11 @@ export function AreaSelect({
         >
           {/* 375px では select の幅が 150px ほどなので、切れない短い文にする（何を選ぶかは label に書いてある） */}
           <option value="">選ぶ</option>
-          {groups.map((group) => (
-            <option key={group.prefecture} value={group.prefecture}>
-              {group.prefecture}
+          {prefectureOptions.map((option) => (
+            <option key={option.prefecture} value={option.prefecture}>
+              {option.hasAreas
+                ? option.prefecture
+                : `${option.prefecture}（準備中）`}
             </option>
           ))}
         </Select>
@@ -92,11 +106,15 @@ export function AreaSelect({
           shape={shape}
           value={areaId}
           onChange={(e) => onAreaChange(e.target.value)}
-          disabled={prefecture === ""}
+          disabled={prefecture === "" || noMunicipality}
           className={stateClass(areaId !== "")}
         >
           <option value="">
-            {prefecture === "" ? "先に県を選ぶ" : "選ぶ"}
+            {prefecture === ""
+              ? "先に県を選ぶ"
+              : noMunicipality
+                ? "まだありません"
+                : "選ぶ"}
           </option>
           {municipalities.map((area) => (
             <option key={area.id} value={area.id}>
@@ -107,4 +125,31 @@ export function AreaSelect({
       </div>
     </div>
   );
+}
+
+/**
+ * 県の select の選択肢。prefectures を渡さなければ地域がある県だけ（display_order の順）。
+ * 渡したらその順で全部を出し、一覧にない県の地域があれば（名前の書き方の違いなど）選べなくならないよう後ろに足す
+ */
+function toPrefectureOptions(
+  groups: readonly { prefecture: string }[],
+  prefectures: readonly string[] | undefined,
+): { prefecture: string; hasAreas: boolean }[] {
+  if (!prefectures) {
+    return groups.map((group) => ({
+      prefecture: group.prefecture,
+      hasAreas: true,
+    }));
+  }
+  const withAreas = new Set(groups.map((group) => group.prefecture));
+  const listed = new Set(prefectures);
+  return [
+    ...prefectures.map((prefecture) => ({
+      prefecture,
+      hasAreas: withAreas.has(prefecture),
+    })),
+    ...groups
+      .filter((group) => !listed.has(group.prefecture))
+      .map((group) => ({ prefecture: group.prefecture, hasAreas: true })),
+  ];
 }

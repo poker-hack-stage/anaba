@@ -23,6 +23,7 @@ import {
   type SpotSubmissionInput,
 } from "@/lib/community/schema";
 import type { Area } from "@/lib/data/areas";
+import { PREFECTURE_NAMES } from "@/lib/geo/prefectures";
 import { CATEGORIES, type SpotCategory } from "@/lib/spots/categories";
 import { cn } from "@/lib/utils";
 import { areaRange } from "./area-range";
@@ -87,6 +88,9 @@ export function SpotSubmissionForm({
   }, [formError]);
 
   const area = areas.find((a) => a.id === areaId);
+  // 地域がまだない県を選んでいる。いまは投稿できないので知らせる（地域がない場所の投稿は、あとで「公開待ちの候補」として受け付ける予定）
+  const preparing =
+    prefecture !== "" && !areas.some((a) => a.prefecture === prefecture);
   // 参照が変わると地図が描き直すので、地域ごとに1回だけ作る
   const range = useMemo(() => (area ? areaRange(area) : null), [area]);
 
@@ -197,13 +201,14 @@ export function SpotSubmissionForm({
         >
           地域
         </span>
-        {/* 県 → 市区町村の2段（#147）。送る値は市区町村（地域）の id で、県だけでは送れない（地図の範囲が地域ごとのため） */}
+        {/* 県 → 市区町村の2段（#147）。県は47都道府県から選べる。送る値は市区町村（地域）の id で、県だけでは送れない（地図の範囲が地域ごとのため） */}
         <AreaSelect
           areas={areas}
           prefecture={prefecture}
           areaId={areaId}
           onPrefectureChange={changePrefecture}
           onAreaChange={changeArea}
+          prefectures={PREFECTURE_NAMES}
           labelClassName="font-normal text-stone-600"
           areaSelectProps={{
             id: `${id}-areaId`,
@@ -213,6 +218,15 @@ export function SpotSubmissionForm({
             "aria-describedby": describedBy("areaId"),
           }}
         />
+        {preparing && (
+          <p
+            role="status"
+            className="rounded-lg bg-stone-50 p-3 text-xs leading-relaxed text-stone-600"
+          >
+            {prefecture}
+            はまだ準備中で、いまは投稿できません。地域は順に増やしていきます。
+          </p>
+        )}
         <FieldError id={`${id}-areaId-error`} message={fieldErrors.areaId} />
       </div>
 
@@ -319,7 +333,9 @@ export function SpotSubmissionForm({
           >
             <MapPinned aria-hidden className="h-6 w-6" />
             <span className="text-xs font-semibold">
-              地域を選ぶと地図が出ます
+              {preparing
+                ? "この県はまだ準備中です"
+                : "地域を選ぶと地図が出ます"}
             </span>
           </div>
         )}
