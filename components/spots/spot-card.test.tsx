@@ -39,7 +39,7 @@ describe("SpotCard", () => {
     expect(onSelect).toHaveBeenCalledWith(s);
   });
 
-  test("情報パネルのカードは、スマホでキャッチコピーを1行まで（長い文は「…」、PC は2行まで、#155・#171）", () => {
+  test("情報パネルのカードでも、キャッチコピーは2行まで（長い文は「…」、#155）", () => {
     render(
       <SpotCard
         spot={{
@@ -51,6 +51,6 @@ describe("SpotCard", () => {
     );
     const catchphrase = screen.getByText(/とても長いキャッチコピー/);
     expect(catchphrase.className).toMatch(/\bline-clamp-2\b/);
-    expect(catchphrase.className).toMatch(/\bmax-lg:line-clamp-1\b/);
+    expect(catchphrase.className).not.toMatch(/line-clamp-1/);
   });
 });
