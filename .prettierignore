@@ -4,3 +4,5 @@ package-lock.json
 supabase/.temp
 lib/supabase/database.types.ts
 public/maplibre
+# scripts/municipalities/build.mjs が1行で書く（整形すると大きくなる）
+lib/geo/municipalities.json

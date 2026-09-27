@@ -323,6 +323,20 @@ export type Database = {
         }
         Returns: string
       }
+      submit_spot_anywhere: {
+        Args: {
+          p_category: string
+          p_client_hash?: string
+          p_description: string
+          p_lat: number
+          p_lng: number
+          p_municipality: string
+          p_name: string
+          p_nickname: string
+          p_prefecture: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never

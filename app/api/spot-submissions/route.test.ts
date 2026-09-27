@@ -11,7 +11,8 @@ const { POST } = await import("./route");
 
 const IP = "203.0.113.5";
 const valid = {
-  areaId: "10000000-0000-4000-8000-000000000001",
+  prefecture: "長野県",
+  municipality: "松本市",
   name: "川沿いの小さな茶屋",
   category: "gourmet",
   description: "朝はほとんど人がいない",
@@ -48,15 +49,17 @@ function post(body: unknown, headers: Record<string, string> = {}) {
 }
 
 describe("POST /api/spot-submissions", () => {
-  test("submit_spot() を呼び、201 と新しいスポットの id・「公開しました」を返す", async () => {
+  test("submit_spot_anywhere() を呼び、地域の中なら 201 と新しいスポットの id・「公開しました」を返す", async () => {
     const response = await post(valid);
     expect(response.status).toBe(201);
     expect(await response.json()).toEqual({
       id: "20000000-0000-4000-8000-000000000099",
+      status: "published",
       message: "公開しました",
     });
-    expect(mock.rpc).toHaveBeenCalledWith("submit_spot", {
-      p_area_id: valid.areaId,
+    expect(mock.rpc).toHaveBeenCalledWith("submit_spot_anywhere", {
+      p_prefecture: valid.prefecture,
+      p_municipality: valid.municipality,
       p_name: valid.name,
       p_category: valid.category,
       p_description: valid.description,
@@ -68,6 +71,45 @@ describe("POST /api/spot-submissions", () => {
     expect(JSON.stringify(mock.rpc.mock.calls)).not.toContain(IP);
   });
 
+  test("地域の外なら 201 と候補の id・「公開待ちの候補として受け付けました」を返す", async () => {
+    mock.state.submitSpotAnywhere = {
+      data: { status: "pending", id: "30000000-0000-4000-8000-000000000001" },
+    };
+    const response = await post({
+      ...valid,
+      prefecture: "沖縄県",
+      municipality: "那覇市",
+      lat: 26.21,
+      lng: 127.68,
+    });
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({
+      id: "30000000-0000-4000-8000-000000000001",
+      status: "pending",
+      message: "公開待ちの候補として受け付けました",
+    });
+  });
+
+  test("市区町村が候補にない（ほかの県の町・でたらめな名前）なら 400 で、数えず保存もしない", async () => {
+    for (const municipality of ["那覇市", "まつもと"]) {
+      const response = await post({ ...valid, municipality });
+      expect(response.status).toBe(400);
+      expect((await response.json()).fields).toEqual({
+        municipality: "市区町村は候補から選んでください",
+      });
+    }
+    expect(mock.rpc).not.toHaveBeenCalled();
+  });
+
+  test("DB の戻り値の形が違えば 500", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mock.state.submitSpotAnywhere = {
+      data: "20000000-0000-4000-8000-000000000099",
+    };
+    const response = await post(valid);
+    expect(response.status).toBe(500);
+  });
+
   test("レート制限のキーは submission:<16進64文字>、1時間に2件", async () => {
     await post(valid);
     expect(mock.rpc).toHaveBeenCalledWith("check_rate_limit", {
@@ -77,22 +119,29 @@ describe("POST /api/spot-submissions", () => {
     });
   });
 
-  test("レート制限を超えたら 429 で、submit_spot() を呼ばない", async () => {
+  test("レート制限を超えたら 429 で、submit_spot_anywhere() を呼ばない", async () => {
     mock.state.rateLimitAllowed = false;
     const response = await post(valid);
     expect(response.status).toBe(429);
-    expect(mock.rpc).not.toHaveBeenCalledWith("submit_spot", expect.anything());
+    expect(mock.rpc).not.toHaveBeenCalledWith(
+      "submit_spot_anywhere",
+      expect.anything(),
+    );
   });
 
-  test("おとりの欄に値があれば、submit_spot() を呼ばずに同じ形の応答を返す", async () => {
+  test("おとりの欄に値があれば、submit_spot_anywhere() を呼ばずに同じ形の応答を返す", async () => {
     const response = await post({ ...valid, website: "spam" });
     expect(response.status).toBe(201);
     const json = await response.json();
     expect(json).toEqual({
       id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+      status: "published",
       message: "公開しました",
     });
-    expect(mock.rpc).not.toHaveBeenCalledWith("submit_spot", expect.anything());
+    expect(mock.rpc).not.toHaveBeenCalledWith(
+      "submit_spot_anywhere",
+      expect.anything(),
+    );
   });
 
   test("別のオリジンからの POST は 403 で、数えず保存もしない（CSRF）", async () => {
@@ -118,7 +167,7 @@ describe("POST /api/spot-submissions", () => {
     ["42501", 503, "closed"],
     ["57014", 503, "busy"],
   ])("DB の %s は %i・%s に変える", async (code, status, error) => {
-    mock.state.submitSpot = { error: { code } };
+    mock.state.submitSpotAnywhere = { error: { code } };
     const response = await post(valid);
     expect(response.status).toBe(status);
     expect((await response.json()).error).toBe(error);
@@ -128,7 +177,10 @@ describe("POST /api/spot-submissions", () => {
     mock.state.rateLimitError = { code: "42501" };
     const response = await post(valid);
     expect(response.status).toBe(503);
-    expect(mock.rpc).not.toHaveBeenCalledWith("submit_spot", expect.anything());
+    expect(mock.rpc).not.toHaveBeenCalledWith(
+      "submit_spot_anywhere",
+      expect.anything(),
+    );
   });
 
   test.each([
@@ -136,6 +188,11 @@ describe("POST /api/spot-submissions", () => {
     ["カテゴリがない", { ...valid, category: "shopping" }],
     ["日本の外", { ...valid, lat: 0 }],
     ["source の指定", { ...valid, source: "seed" }],
+    ["都道府県がない", { ...valid, prefecture: undefined }],
+    [
+      "地域の id（古い形）",
+      { ...valid, areaId: "10000000-0000-4000-8000-000000000001" },
+    ],
   ])("%s は 400 で、数えず保存もしない", async (_label, body) => {
     const response = await post(body);
     expect(response.status).toBe(400);

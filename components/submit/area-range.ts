@@ -1,9 +1,12 @@
-import type { GeoJsonObject, Polygon } from "geojson";
+import type { GeoJsonObject, Polygon, Position } from "geojson";
+import type { MapPoint } from "@/components/map/spot-map";
 import type { Area } from "@/lib/data/areas";
+import { toAreaBoundary } from "@/lib/map/boundary";
 
 // スポットの投稿（#54）で、地図に出す地域の範囲。
 // DB の submit_spot() は、境界（areas.boundary）があればその内側、なければ地域の中心から 50 km 以内だけを受け付ける。
-// 同じ範囲を地図に出して、どこに置けるかを見せる
+// 同じ範囲を地図に出して、どこに置けるかを見せる。
+// 全国対応（47都道府県）のあとは、範囲の外にもピンを置ける。外なら「公開待ちの候補」になる（submit_spot_anywhere()）
 
 /** 境界がない地域で受け付ける、中心からの距離（km。submit_spot() と同じ） */
 export const FALLBACK_RADIUS_KM = 50;
@@ -51,6 +54,63 @@ export function circlePolygon(
   }
   ring.push(ring[0]);
   return { type: "Polygon", coordinates: [ring] };
+}
+
+/**
+ * 点が地域の範囲の中か（DB の find_area_for_point() と同じ判定）。
+ * 境界があればその内側（偶奇則なので穴も扱う）、読めなければ中心から 50 km 以内
+ */
+export function isInAreaRange(area: AreaRangeSource, point: MapPoint): boolean {
+  const boundary = toAreaBoundary(area.boundary);
+  if (!boundary) {
+    return (
+      distanceKm(area.center_lat, area.center_lng, point.lat, point.lng) <=
+      FALLBACK_RADIUS_KM
+    );
+  }
+  const polygons =
+    boundary.type === "Polygon" ? [boundary.coordinates] : boundary.coordinates;
+  let inside = false;
+  for (const polygon of polygons) {
+    for (const ring of polygon) {
+      if (crossesOddTimes(ring, point)) inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/**
+ * 点が入る地域。渡した順（display_order）で最初に当たったもの。どこにも入らなければ undefined。
+ * 画面で「すぐ公開 / 公開待ち」を先に知らせるためのもので、最後に決めるのは DB
+ */
+export function findAreaForPoint<T extends AreaRangeSource>(
+  areas: readonly T[],
+  point: MapPoint,
+): T | undefined {
+  return areas.find((area) => isInAreaRange(area, point));
+}
+
+/** 点から東へ伸ばした線が、輪郭と奇数回交わるか */
+function crossesOddTimes(ring: Position[], { lat, lng }: MapPoint): boolean {
+  let odd = false;
+  for (let i = 0; i < ring.length; i++) {
+    const [x1, y1] = ring[i];
+    const [x2, y2] = ring[(i + 1) % ring.length];
+    if (y1 > lat !== y2 > lat) {
+      if (lng < ((x2 - x1) * (lat - y1)) / (y2 - y1) + x1) odd = !odd;
+    }
+  }
+  return odd;
+}
+
+/** 大円の距離（km） */
+function distanceKm(lat1: number, lng1: number, lat2: number, lng2: number) {
+  const a =
+    Math.sin(toRadians(lat2 - lat1) / 2) ** 2 +
+    Math.cos(toRadians(lat1)) *
+      Math.cos(toRadians(lat2)) *
+      Math.sin(toRadians(lng2 - lng1) / 2) ** 2;
+  return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(a));
 }
 
 function toRadians(deg: number) {
