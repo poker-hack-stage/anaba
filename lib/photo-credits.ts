@@ -1044,6 +1044,60 @@ export const AI_IMAGE_CREDITS: AiImageCredit[] = [
     prompt: "石で囲った池に澄んだ水が湧き、石の水路へ流れ出る湧き水（初夏）",
     createdOn: "2026-09-26",
   },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/tsuwano-03.jpg",
+    subject: "堀庭園",
+    model: AI_MODEL,
+    prompt:
+      "山あいの古い日本庭園の苔むした庭石と池、池の上に枝を伸ばす色づいたもみじ、奥に杉の山の斜面（秋）",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/tsuwano-05.jpg",
+    subject: "山田竹風軒 本町店",
+    model: AI_MODEL,
+    prompt:
+      "木のテーブルの白い和皿にのった源氏巻（輪切りと1本）と、陶器の湯のみの緑茶",
+    createdOn: "2026-09-26",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/tono-04.jpg",
+    subject: "たかむろ水光園",
+    model: AI_MODEL,
+    prompt:
+      "木の縁の四角い浴槽に澄んだお湯、底に網の袋に入れた備長炭、窓の外に雪の残る杉林と低い山（冬の終わり）",
+    createdOn: "2026-09-27",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/tono-05.jpg",
+    subject: "じんぎすかんあんべ",
+    model: AI_MODEL,
+    prompt:
+      "卓上コンロの中央が盛り上がったジンギスカン鍋で焼ける羊肉ともやし・玉ねぎ・ピーマン、白いご飯とたれの小皿",
+    createdOn: "2026-09-27",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/miyoshi-05.jpg",
+    subject: "ハレとケ珈琲本店",
+    model: AI_MODEL,
+    prompt:
+      "木造校舎の窓ぎわの木の机に、ハンドドリップのコーヒーとカヌレ2つ、ガラスのビーカーとフラスコ、窓の外に緑の山（初夏）",
+    createdOn: "2026-09-27",
+  },
+  {
+    kind: "ai",
+    path: "/images/spots/ai/miyoshi-06.jpg",
+    subject: "つづき商店・古式そば打ち体験塾",
+    model: AI_MODEL,
+    prompt:
+      "古民家の囲炉裏の座敷で、黒い漆のお盆に祖谷そばのかけそば、山菜の小鉢、川魚の塩焼き",
+    createdOn: "2026-09-27",
+  },
 ];
 
 /** 写真と AI の画像のすべて（パスで引くとき・シードとの突き合わせ） */
