@@ -118,6 +118,7 @@ export type Database = {
           client_hash: string | null
           created_at: string
           id: string
+          is_sample: boolean
           nickname: string
           rating: number
           spot_id: string
@@ -128,6 +129,7 @@ export type Database = {
           client_hash?: string | null
           created_at?: string
           id?: string
+          is_sample?: boolean
           nickname: string
           rating: number
           spot_id: string
@@ -138,6 +140,7 @@ export type Database = {
           client_hash?: string | null
           created_at?: string
           id?: string
+          is_sample?: boolean
           nickname?: string
           rating?: number
           spot_id?: string
@@ -263,6 +266,7 @@ export type Database = {
           body: string | null
           created_at: string | null
           id: string | null
+          is_sample: boolean | null
           nickname: string | null
           rating: number | null
           spot_id: string | null
@@ -271,6 +275,7 @@ export type Database = {
           body?: string | null
           created_at?: string | null
           id?: string | null
+          is_sample?: boolean | null
           nickname?: string | null
           rating?: number | null
           spot_id?: string | null
@@ -279,6 +284,7 @@ export type Database = {
           body?: string | null
           created_at?: string | null
           id?: string | null
+          is_sample?: boolean | null
           nickname?: string | null
           rating?: number | null
           spot_id?: string | null

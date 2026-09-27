@@ -70,11 +70,12 @@ export function SpotReviewsSection({ spotId }: { spotId: string }) {
       const data =
         prev.status === "done"
           ? prev.data
-          : { reviews: [], count: 0, average: null };
+          : { reviews: [], count: 0, average: null, sampleCount: 0 };
       const local: PublicReview = {
         ...review,
         id: `local-${Date.now()}`,
         created_at: new Date().toISOString(),
+        is_sample: false,
       };
       return {
         status: "done",
@@ -82,6 +83,7 @@ export function SpotReviewsSection({ spotId }: { spotId: string }) {
           reviews: [local, ...data.reviews],
           count: data.count + 1,
           average: data.average,
+          sampleCount: data.sampleCount,
         },
       };
     });
@@ -97,10 +99,11 @@ export function SpotReviewsSection({ spotId }: { spotId: string }) {
       aria-labelledby={`reviews-${spotId}`}
       className="flex flex-col gap-3 border-t border-stone-100 pt-4"
     >
-      <div className="flex items-center justify-between gap-3">
+      {/* スマホの幅で件数（「うちサンプルN件」）が長くなったら、見出しとボタンを折り返す */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h3
           id={`reviews-${spotId}`}
-          className="flex items-center gap-2 font-extrabold text-stone-900"
+          className="flex flex-wrap items-center gap-x-2 gap-y-1 whitespace-nowrap font-extrabold text-stone-900"
         >
           口コミ
           {state.status === "done" && <Summary data={state.data} />}
@@ -156,23 +159,35 @@ export function SpotReviewsSection({ spotId }: { spotId: string }) {
             まだ口コミはありません。最初の口コミを書いてみませんか。
           </p>
         ) : (
-          <ul className="flex flex-col gap-2">
-            {state.data.reviews.map((review) => (
-              <ReviewItem key={review.id} review={review} />
-            ))}
-          </ul>
+          <>
+            <ul className="flex flex-col gap-2">
+              {state.data.reviews.map((review) => (
+                <ReviewItem key={review.id} review={review} />
+              ))}
+            </ul>
+            {state.data.sampleCount > 0 && (
+              <p className="text-pretty text-xs text-stone-500">
+                「サンプル」の口コミは、表示の例として運営が書いたものです。実際に訪れた人の声ではありません。
+              </p>
+            )}
+          </>
         ))}
     </section>
   );
 }
 
-/** 「★4.2（3件）」。平均がない（口コミがない・書いた直後で読み直す前）ときは件数だけ */
+/**
+ * 「★4.2（3件）」。平均がない（口コミがない・書いた直後で読み直す前）ときは件数だけ。
+ * サンプルの口コミ（#152）が入っていれば「（3件・うちサンプル2件）」にする
+ */
 function Summary({ data }: { data: SpotReviews }) {
+  const countText =
+    data.sampleCount > 0
+      ? `（${data.count}件・うちサンプル${data.sampleCount}件）`
+      : `（${data.count}件）`;
   if (data.average === null) {
     return (
-      <span className="text-sm font-normal text-stone-500">
-        （{data.count}件）
-      </span>
+      <span className="text-sm font-normal text-stone-500">{countText}</span>
     );
   }
   return (
@@ -181,7 +196,7 @@ function Summary({ data }: { data: SpotReviews }) {
       <span className="font-bold text-amber-700">
         {formatRating(data.average)}
       </span>
-      （{data.count}件）
+      {countText}
     </span>
   );
 }
@@ -191,6 +206,11 @@ function ReviewItem({ review }: { review: PublicReview }) {
     <li className="rounded-xl bg-stone-50 p-3">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-stone-500">
         <span className="font-bold text-stone-800">{review.nickname}</span>
+        {review.is_sample && (
+          <span className="rounded border border-stone-300 bg-white px-1.5 font-bold text-stone-600">
+            サンプル
+          </span>
+        )}
         <Rating value={review.rating} size="sm" />
         <time dateTime={review.created_at} className="ml-auto">
           {formatReviewDate(review.created_at)}

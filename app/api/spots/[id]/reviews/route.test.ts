@@ -260,7 +260,7 @@ describe("POST /api/spots/[id]/reviews", () => {
 });
 
 describe("GET /api/spots/[id]/reviews", () => {
-  test("口コミの一覧・件数・平均（小数1桁）を返す", async () => {
+  test("口コミの一覧・件数・平均（小数1桁）・サンプルの件数を返す", async () => {
     const reviews = [
       {
         id: "30000000-0000-4000-8000-000000000001",
@@ -269,10 +269,12 @@ describe("GET /api/spots/[id]/reviews", () => {
         rating: 5,
         body: "よかった",
         created_at: "2026-09-25T00:00:00Z",
+        is_sample: true,
       },
     ];
     mock.state.reviews = reviews;
     mock.state.ratingCounts = [0, 0, 1, 0, 2];
+    mock.state.sampleCount = 1;
 
     const response = await get();
     expect(response.status).toBe(200);
@@ -280,6 +282,7 @@ describe("GET /api/spots/[id]/reviews", () => {
       reviews,
       count: 3,
       average: 4.3,
+      sampleCount: 1,
     });
     expect(mock.from).toHaveBeenCalledWith("published_reviews");
     expect(mock.from).not.toHaveBeenCalledWith("reviews");
@@ -290,6 +293,7 @@ describe("GET /api/spots/[id]/reviews", () => {
       reviews: [],
       count: 0,
       average: null,
+      sampleCount: 0,
     });
   });
 
