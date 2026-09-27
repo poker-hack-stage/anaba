@@ -1,21 +1,15 @@
-<section id="demo" style="background:#1d3a32; padding:128px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:48px; font-family:'Noto Sans JP', Arial, sans-serif; color:#ffffff">
-  <svg width="120" height="120" viewBox="0 0 160 160" aria-label="anaba のロゴ（丸の中に山の稜線と洞窟の入口、朱色の日）"><g fill="none" stroke="#ffffff" stroke-width="5.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="80" cy="80" r="70"/><path d="M12.8 99.2 L44 68 L68 90 L100 52 L148 96.4"/><path d="M24 122 H136"/><path d="M64 122 V110 A16 16 0 0 1 96 110 V122"/></g><circle cx="118" cy="42" r="10.4" fill="#c0432b"/></svg>
-  <p style="font-family:'Zen Maru Gothic', Arial, sans-serif; font-size:280px; font-weight:700; letter-spacing:40px; line-height:1; color:#ffffff">デモ</p>
-  <div style="width:120px; height:8px; background:#c0432b; border-radius:4px"></div>
-  <p style="font-size:40px; font-weight:500; color:#e7efeb">anaba-rho.vercel.app</p>
-  <aside>（1:50〜5:00。話すのは約500字＝約100秒で、残りは操作と AI の待ち。このスライドを出したらすぐブラウザに切り替える。1:50〜2:00 が切り替え、2:00〜4:55 がデモ、4:55〜5:00 でスライドに戻る。デモの間はスライドを見せない。操作の細かい手順は docs/demo.md の「デモの台本」）
-【2:00〜2:25 巡回する地図で町に出会う】（トップを開いたまま、画面を触らない）
-開くと、全国15の市町村が、6秒ごとに巡回します。黒い枠が町の境界です。有名どころを知らなくても、ここで知らない町に出会えます。
-（検索欄に「温泉」と入れて Enter）温泉と入れると、温泉がある町だけが巡回します。
-【2:25〜3:15 スポットの詳細: 地元の人のおすすめ・口コミ】（右のパネルの点の「大町市」→「ぽかぽかランド美麻」）
-長野県の大町市の穴場、ぽかぽかランド美麻です。星の評価とは別に、穴場度が出ます。地元の人のおすすめは「湯上がりに、道の駅の手打ちそばを食べて帰れる」。おすすめの時間や、滞在時間の目安も分かります。
-（下にスクロール）口コミは、ログインなしで書けます。行った人の声が、次の人の手がかりになります。
-【3:15〜4:35 AI 旅プランで経路を作る】（ヘッダーの「AI旅プラン」）
-では、この町を回る旅を、AI に組んでもらいます。東京から週末にひとりで、車で来る人の1泊2日です。興味は絶景と温泉。希望欄には「雨でも楽しめる所がいい、ゆっくり回りたい」と書きます。
-（「旅プランをつくる」を押す。待つ間に）AI には、この町に実在するスポットだけを渡しています。
-（候補が出たら）候補は最大3件です。選んだ大町市に加えて、近くの町の案も出ます。タブで比べられます。
-（理由と経路のカードまで下げる）それぞれに「なぜこのプランか」が書いてあります。雨の日でも楽しめる所を入れた、と書いてありますね。経路のスポットにも、写真と穴場度が出ます。
-【4:35〜4:55 経路外のスポットを加えて作り直す】（地図の番号のない小さなピン → 「このスポットを経路に加えて作り直す」）
-経路にない、気になったスポットを足してみます。押すだけで、回る順番と日割りを組み直します。
-（AI の結果は毎回変わる。理由の欄は画面の文言を読む。押していたら作り直しは押さず、ボタンを見せて「押すと、そのスポットを入れた経路に組み直します」とだけ言う。口コミの欄を飛ばしてもよい。旅プランをつくるところは削らない）</aside>
+<section id="demo" style="background:#1d3a32; padding:128px; display:flex; flex-direction:row; align-items:center; justify-content:space-between; gap:96px; font-family:'Noto Sans JP', Arial, sans-serif; color:#ffffff">
+  <div style="flex:1; display:flex; flex-direction:column; align-items:flex-start; gap:48px">
+    <svg width="120" height="120" viewBox="0 0 160 160" aria-label="anaba のロゴ（丸の中に山の稜線と洞窟の入口、朱色の日）"><g fill="none" stroke="#ffffff" stroke-width="5.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="80" cy="80" r="70"/><path d="M12.8 99.2 L44 68 L68 90 L100 52 L148 96.4"/><path d="M24 122 H136"/><path d="M64 122 V110 A16 16 0 0 1 96 110 V122"/></g><circle cx="118" cy="42" r="10.4" fill="#c0432b"/></svg>
+    <p style="font-family:'Zen Maru Gothic', Arial, sans-serif; font-size:240px; font-weight:700; letter-spacing:32px; line-height:1; color:#ffffff">デモ</p>
+    <div style="width:120px; height:8px; background:#c0432b; border-radius:4px"></div>
+    <p style="font-size:44px; font-weight:700; line-height:1.4; color:#ffffff">お手元のスマホでも、<br>いっしょに開いてみてください</p>
+  </div>
+  <div style="width:520px; display:flex; flex-direction:column; align-items:center; gap:24px; background:#ffffff; border-radius:32px; padding:48px">
+    <img src="/_blob/b4d3f4a715f7ebf48c09f870b486a633" alt="anaba の本番 https://anaba-rho.vercel.app を開く QR コード" style="width:424px; height:424px; object-fit:contain">
+    <p style="font-size:34px; font-weight:700; color:#24463d">anaba-rho.vercel.app</p>
+  </div>
+  <aside>（1:50〜2:00。約40字＝約8秒。QR を出したまま話し、次の「地図と巡回」へ進む）
+ここからデモです。お手元のスマホでも、QR から一緒に開いてみてください。
+（デモの流れ: 地図と巡回 → スポットと口コミ はスライドの画面で説明し、AI旅プランでブラウザに切り替えて実際に動かす。操作の細かい手順は docs/demo.md の「デモの台本」）</aside>
 </section>
