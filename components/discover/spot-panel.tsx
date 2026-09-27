@@ -50,24 +50,25 @@ export function SpotPanel({
   }, [nextArea]);
 
   return (
-    <div className="flex flex-col gap-4 rounded-2xl border border-stone-200 bg-white p-5 max-lg:gap-2 max-lg:bg-white/95 max-lg:p-3 max-lg:backdrop-blur-sm">
+    <div className="flex flex-col gap-4 rounded-2xl border border-stone-200 bg-white p-5 max-lg:gap-1 max-lg:bg-white/95 max-lg:px-3 max-lg:pb-3 max-lg:pt-2 max-lg:backdrop-blur-sm">
       {/* いちばん上に、地域を切り替えるボタン（nav）だけを置く。
           カードのすぐ上に置くと、スポットを切り替えるボタンと間違えやすいため */}
       {nav}
 
       <div
         key={`heading-${area?.id}`}
-        className="animate-in fade-in slide-in-from-right-4"
+        // スマホでは地域名とキャッチコピーを1行に並べ、右上の閉じるボタン（area-rotator.tsx）の分を空ける（#171）
+        className="animate-in fade-in slide-in-from-right-4 max-lg:flex max-lg:items-baseline max-lg:gap-2 max-lg:pr-9"
       >
         {/* スマホでは地図を広く見せるため、見出しの前の「ピックアップ中の地域」は読み上げだけにする */}
         <p className="text-xs font-bold text-shu max-lg:sr-only">
           ピックアップ中の地域
         </p>
-        <h2 className="font-brand text-xl font-bold text-ink max-lg:text-lg max-lg:leading-snug">
+        <h2 className="font-brand text-xl font-bold text-ink max-lg:shrink-0 max-lg:text-base max-lg:leading-snug">
           {area?.name ?? "地域はまだありません"}
         </h2>
         {area?.catchphrase && (
-          <p className="mt-1 text-sm text-stone-600 max-lg:mt-0 max-lg:line-clamp-1 max-lg:text-xs">
+          <p className="mt-1 text-sm text-stone-600 max-lg:mt-0 max-lg:min-w-0 max-lg:truncate max-lg:text-xs">
             {area.catchphrase}
           </p>
         )}
@@ -180,12 +181,12 @@ function SpotCarousel({
 
   const multiple = spots.length > 1;
   const arrowButton = cn(
-    "flex h-7 w-7 items-center justify-center rounded-full border border-stone-200 bg-white text-stone-600 hover:bg-stone-100 aria-disabled:cursor-default aria-disabled:opacity-40 aria-disabled:hover:bg-white",
+    "flex h-7 w-7 items-center justify-center rounded-full border max-lg:h-6 max-lg:w-6 border-stone-200 bg-white text-stone-600 hover:bg-stone-100 aria-disabled:cursor-default aria-disabled:opacity-40 aria-disabled:hover:bg-white",
     focusRing,
   );
 
   return (
-    <div className="flex flex-col gap-2 border-t border-stone-200 pt-4 max-lg:border-t-0 max-lg:pt-0">
+    <div className="flex flex-col gap-2 border-t border-stone-200 pt-4 max-lg:gap-1.5 max-lg:border-t-0 max-lg:pt-0">
       <div className="flex items-center justify-between gap-2">
         <p id={headingId} className="text-xs font-bold text-stone-600">
           おすすめの{spots.length}か所

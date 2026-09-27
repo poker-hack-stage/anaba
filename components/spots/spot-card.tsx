@@ -35,7 +35,8 @@ export function preloadSpotCardImages(
  * 口コミの件数・平均はカードには出さない（詳細の口コミ欄だけ、#53）。
  * `variant="panel"` は PC（lg 以上）で写真を上に大きく出し、その下に文字を並べる。
  * スマホ・タブレット（lg 未満）では地図の下に浮かべた横スクロールのカードになるので（#142）、地図を隠しすぎないよう
- * 写真を少し小さくし、評価と穴場度を1行に、キャッチコピーを2行まで（長い文は「…」）にして、タグとおすすめの時間帯は出さない。
+ * 写真を小さくし、余白と名前の文字を詰め、評価と穴場度を1行に、キャッチコピーを1行まで（長い文は「…」）にして、
+ * タグとおすすめの時間帯は出さない（#171）。
  * 横に並べたカードの高さは、並びの側（spot-panel.tsx）でいちばん高いカードにそろえる（#155）
  */
 export function SpotCard({
@@ -57,7 +58,7 @@ export function SpotCard({
       onClick={() => onSelect?.(spot)}
       className={cn(
         "flex w-full gap-3 overflow-hidden rounded-2xl border border-stone-200 bg-white p-3 text-left transition-colors hover:border-stone-300 hover:bg-stone-50",
-        panel && "lg:flex-col",
+        panel && "max-lg:gap-2 max-lg:p-2 lg:flex-col",
       )}
     >
       <SpotImage
@@ -67,15 +68,20 @@ export function SpotCard({
         className={cn(
           "h-24 w-24 shrink-0 rounded-xl",
           panel &&
-            "max-lg:h-20 max-lg:w-20 lg:aspect-[16/10] lg:h-auto lg:w-full",
+            "max-lg:h-14 max-lg:w-14 lg:aspect-[16/10] lg:h-auto lg:w-full",
         )}
       />
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
+      <div
+        className={cn(
+          "flex min-w-0 flex-1 flex-col gap-1",
+          panel && "max-lg:gap-0.5",
+        )}
+      >
         <CategoryBadge category={spot.category} />
         <h3
           className={cn(
             "truncate font-extrabold text-stone-900",
-            panel && "lg:text-lg",
+            panel && "max-lg:text-sm lg:text-lg",
           )}
         >
           {spot.name}
@@ -86,7 +92,7 @@ export function SpotCard({
             className={cn(
               "flex flex-col items-start gap-y-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3",
               panel &&
-                "max-lg:flex-row max-lg:flex-wrap max-lg:items-center max-lg:gap-x-3",
+                "max-lg:flex-row max-lg:flex-wrap max-lg:items-center max-lg:gap-x-1.5 max-lg:gap-y-0 max-lg:whitespace-nowrap",
             )}
           >
             <Rating value={rating} />
@@ -94,7 +100,12 @@ export function SpotCard({
           </div>
         )}
         {spot.catchphrase && (
-          <p className="line-clamp-2 text-xs leading-relaxed text-stone-600">
+          <p
+            className={cn(
+              "line-clamp-2 text-xs leading-relaxed text-stone-600",
+              panel && "max-lg:line-clamp-1",
+            )}
+          >
             {spot.catchphrase}
           </p>
         )}
