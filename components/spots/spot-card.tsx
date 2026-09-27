@@ -36,6 +36,7 @@ export function preloadSpotCardImages(
  * `variant="panel"` は PC（lg 以上）で写真を上に大きく出し、その下に文字を並べる。
  * スマホ・タブレット（lg 未満）では地図の下に浮かべた横スクロールのカードになるので（#142）、地図を隠しすぎないよう
  * 写真を少し小さくし、評価と穴場度を1行に、キャッチコピーを2行まで（長い文は「…」）にして、タグとおすすめの時間帯は出さない。
+ * 中身の大きさは変えずに、カードの余白だけを少し詰める（#171）。
  * 横に並べたカードの高さは、並びの側（spot-panel.tsx）でいちばん高いカードにそろえる（#155）
  */
 export function SpotCard({
@@ -57,7 +58,7 @@ export function SpotCard({
       onClick={() => onSelect?.(spot)}
       className={cn(
         "flex w-full gap-3 overflow-hidden rounded-2xl border border-stone-200 bg-white p-3 text-left transition-colors hover:border-stone-300 hover:bg-stone-50",
-        panel && "lg:flex-col",
+        panel && "max-lg:gap-2.5 max-lg:p-2.5 lg:flex-col",
       )}
     >
       <SpotImage

@@ -1,8 +1,14 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { PanelRightClose, PanelRightOpen, SearchX } from "lucide-react";
+import {
+  ChevronUp,
+  PanelRightClose,
+  PanelRightOpen,
+  SearchX,
+  X,
+} from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { SpotDetailDialog } from "@/components/spots/spot-detail-dialog";
 import { Button } from "@/components/ui/button";
@@ -29,6 +35,8 @@ import { useOverlayInsets } from "./use-overlay-insets";
  * 右の情報パネルは、左上に付いたタブで開け閉めできる。閉じるとタブごと右へ滑り、地図の右の端にタブ（「開く」）だけが残る。
  * スマホ・タブレット（lg 未満）は、地図をヘッダーと下部ナビのあいだいっぱいに出し、上端に検索欄、
  * 下端に情報パネル（地域の切り替え・地域名・横スクロールのおすすめのカード）を浮かべる（#142）。
+ * スマホ・タブレットの情報パネルは、右上の × で閉じられる。閉じると地図を広く見せ、下に「〇〇のおすすめを見る」のチップだけを残す（#171）。
+ * PC と同じく、閉じている間も地域の巡回は続ける（チップの地域名も切り替わる）。
  * 表示中のカードのスポットのピンを地図で目立たせる。
  * 地図のおすすめのピンにマウスを乗せると、情報パネルの同じカードを枠で強調する（#14）。
  * 検索欄・カテゴリで絞り込むと、条件に合うスポットがある地域だけを巡回する（docs/spec.md 画面-3）。
@@ -93,10 +101,26 @@ export function AreaRotator({ areas }: { areas: AreaWithSpots[] }) {
 
   const closeDetail = useCallback(() => setSelectedSpot(null), []);
 
-  // PC で右の情報パネルを開いているか。スマホ・タブレットでは閉じない（パネルは地図の下に並ぶため）
+  // 情報パネルを開いているか。PC は右のパネルを左上のタブで、スマホ・タブレットは下のパネルを右上の × と
+  // 閉じたあとのチップで開け閉めする（#171）
   const [panelOpen, setPanelOpen] = useState(true);
+  const panelClosed = !panelOpen;
   const lg = useMediaQuery("(min-width: 1024px)");
-  const panelClosed = lg && !panelOpen;
+
+  // スマホ・タブレットで × やチップを押したら、押したボタンが消えるので、代わりに出たボタンへフォーカスを移す
+  // （キーボード・読み上げで開け閉めを続けられるように）。最初の表示では動かさない
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const chipRef = useRef<HTMLButtonElement>(null);
+  const movePanelFocus = useRef(false);
+  const toggleMobilePanel = (open: boolean) => {
+    movePanelFocus.current = true;
+    setPanelOpen(open);
+  };
+  useEffect(() => {
+    if (!movePanelFocus.current) return;
+    movePanelFocus.current = false;
+    (panelOpen ? closeRef : chipRef).current?.focus();
+  }, [panelOpen]);
 
   // スマホ・タブレットで、上に浮かべた検索欄と下に浮かべた情報パネルの高さ。地図の表示範囲の余白に使う
   const frameRef = useRef<HTMLDivElement>(null);
@@ -148,10 +172,11 @@ export function AreaRotator({ areas }: { areas: AreaWithSpots[] }) {
         {/* 右のパネル（PC）。下は地図の帰属表示が見えるよう空ける。幅は area-map.tsx の OVERLAY_PANEL_WIDTH と合わせる。
             外側の枠は開閉で横に滑らせるだけで、地図の操作を邪魔しないよう pointer-events を切る。
             スマホ・タブレットでは地図の下端に浮かべる。スマホ（sm 未満）は、下に写真の出典のリンクを出すので下を 36px 空ける（#155）。
-            低い画面（横向き）では検索欄の下までに収め、中をスクロールさせる */}
+            低い画面（横向き）では検索欄の下までに収め、中をスクロールさせる。
+            スマホ・タブレットで閉じているときはチップだけを出し、チップの横で地図を触れるよう、枠は触れないようにする（#171） */}
         <div
           ref={panelRef}
-          className={`max-lg:absolute max-lg:inset-x-3 max-lg:bottom-9 max-lg:z-10 max-lg:flex max-lg:max-h-[calc(100%-6.5rem)] max-lg:flex-col sm:max-lg:bottom-3 sm:max-lg:right-auto sm:max-lg:w-[420px] lg:pointer-events-none lg:absolute lg:bottom-20 lg:right-4 lg:top-4 lg:z-10 lg:w-[360px] lg:transition-transform lg:duration-500 lg:ease-in-out lg:motion-reduce:transition-none xl:w-[420px] ${panelClosed ? "lg:translate-x-[calc(100%+1rem)]" : ""}`}
+          className={`max-lg:absolute max-lg:inset-x-3 max-lg:bottom-9 max-lg:z-10 max-lg:flex max-lg:max-h-[calc(100%-6.5rem)] max-lg:flex-col sm:max-lg:bottom-3 sm:max-lg:right-auto sm:max-lg:w-[420px] lg:pointer-events-none lg:absolute lg:bottom-20 lg:right-4 lg:top-4 lg:z-10 lg:w-[360px] lg:transition-transform lg:duration-500 lg:ease-in-out lg:motion-reduce:transition-none xl:w-[420px] ${panelClosed ? "max-lg:pointer-events-none lg:translate-x-[calc(100%+1rem)]" : ""}`}
         >
           {/* パネルの左上に付いたタブ（PC）。パネルと一緒に滑るので、閉じると地図の右の端に残る。
               開いているときは「閉じる」、閉じているときは「開く」を縦書きで出す */}
@@ -176,11 +201,40 @@ export function AreaRotator({ areas }: { areas: AreaWithSpots[] }) {
               </>
             )}
           </button>
+          {/* スマホ・タブレットの閉じるボタン。パネルの右上に重ね、押せる範囲は 44×44px にする（#171） */}
+          {!panelClosed && (
+            <button
+              ref={closeRef}
+              type="button"
+              onClick={() => toggleMobilePanel(false)}
+              aria-controls="discover-panel"
+              aria-label="閉じる"
+              className="absolute right-0 top-0 z-10 flex h-11 w-11 items-center justify-center rounded-full text-stone-600 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring lg:hidden"
+            >
+              <X aria-hidden className="h-5 w-5" />
+            </button>
+          )}
+          {/* 閉じたときに下に残すチップ（スマホ・タブレット）。押すとパネルを開き直す */}
+          {panelClosed && (
+            <button
+              ref={chipRef}
+              type="button"
+              onClick={() => toggleMobilePanel(true)}
+              aria-controls="discover-panel"
+              aria-expanded={false}
+              className="pointer-events-auto flex min-h-11 max-w-full items-center gap-1.5 self-start rounded-full border border-stone-200 bg-white/95 px-4 text-sm font-bold text-ink shadow-lg backdrop-blur-sm hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
+            >
+              <ChevronUp aria-hidden className="h-4 w-4 shrink-0" />
+              <span className="truncate">
+                {area ? `${area.name}のおすすめを見る` : "地域の情報を見る"}
+              </span>
+            </button>
+          )}
           <div
             id="discover-panel"
             // 閉じている間は、中のカードやボタンに Tab で行かないようにする
             inert={panelClosed}
-            className="max-lg:min-h-0 max-lg:overflow-y-auto max-lg:rounded-2xl max-lg:shadow-lg lg:pointer-events-auto lg:max-h-full lg:overflow-y-auto lg:rounded-2xl lg:shadow-lg"
+            className={`max-lg:min-h-0 max-lg:overflow-y-auto max-lg:rounded-2xl max-lg:shadow-lg lg:pointer-events-auto lg:max-h-full lg:overflow-y-auto lg:rounded-2xl lg:shadow-lg ${panelClosed ? "max-lg:hidden" : ""}`}
           >
             {filtering && !area ? (
               <NoMatchPanel onClear={search.clear} />

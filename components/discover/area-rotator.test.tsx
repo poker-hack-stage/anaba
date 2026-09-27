@@ -628,3 +628,49 @@ describe("スマホのおすすめのカードの大きさ（#155）", () => {
     }
   });
 });
+
+describe("スマホの情報パネルを閉じる（#171）", () => {
+  test("右上の × で閉じるとチップだけを残し、チップで開き直す（フォーカスも移す）", () => {
+    render(<AreaRotator areas={areas} />);
+    const panel = document.getElementById("discover-panel")!;
+    const close = screen.getByRole("button", { name: "閉じる" });
+    expect(close.className).toMatch(/\bh-11\b/);
+    expect(close.className).toMatch(/\bw-11\b/);
+    expect(close.className).toMatch(/\blg:hidden\b/);
+
+    fireEvent.click(close);
+    expect(panel.className).toMatch(/\bmax-lg:hidden\b/);
+    expect(panel.hasAttribute("inert")).toBe(true);
+    expect(screen.queryByRole("button", { name: "閉じる" })).toBeNull();
+    const chip = screen.getByRole("button", { name: "白馬村のおすすめを見る" });
+    expect(chip.getAttribute("aria-expanded")).toBe("false");
+    expect(chip.getAttribute("aria-controls")).toBe("discover-panel");
+    expect(document.activeElement).toBe(chip);
+
+    fireEvent.click(chip);
+    expect(panel.className).not.toMatch(/\bmax-lg:hidden\b/);
+    expect(panel.hasAttribute("inert")).toBe(false);
+    expect(
+      screen.queryByRole("button", { name: /のおすすめを見る$/ }),
+    ).toBeNull();
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "閉じる" }),
+    );
+  });
+
+  test("閉じている間に地域が切り替わると、チップの地域名も変わる（巡回は PC の右のパネルと同じく止めない）", () => {
+    render(<AreaRotator areas={areas} />);
+    fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
+    // 自動の切り替えの代わり（このテストでは「視差効果を減らす」で自動の切り替えを止めている）
+    fireEvent.click(screen.getByRole("button", { name: "次の地域" }));
+    expect(currentArea()).toBe("松本市");
+    expect(
+      screen.getByRole("button", { name: "松本市のおすすめを見る" }),
+    ).toBeTruthy();
+  });
+
+  test("最初の表示ではフォーカスを動かさない", () => {
+    render(<AreaRotator areas={areas} />);
+    expect(document.activeElement).toBe(document.body);
+  });
+});
