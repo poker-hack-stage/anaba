@@ -1,0 +1,41 @@
+<section id="scale" style="background:#faf8f4; padding:112px 128px 128px; display:flex; flex-direction:column; gap:48px; font-family:'Noto Sans JP', Arial, sans-serif; color:#1f2a26">
+  <div style="display:flex; flex-direction:column; gap:12px">
+    <p style="font-size:26px; font-weight:700; letter-spacing:4px; color:#c0432b">拡張性</p>
+    <h2 style="font-family:'Zen Maru Gothic', Arial, sans-serif; font-size:72px; font-weight:700; line-height:1.2; color:#24463d">町を増やすのは、データを足すだけ</h2>
+  </div>
+  <div style="display:flex; flex-direction:row; align-items:center; gap:16px">
+    <div style="width:480px; display:flex; flex-direction:column; gap:8px; background:#ffffff; border:2px solid #24463d; border-radius:24px; padding:24px 36px">
+      <p style="font-size:34px; font-weight:700; color:#24463d">地域とスポットのデータ</p>
+    </div>
+    <p style="width:48px; font-family:'Zen Maru Gothic', Arial, sans-serif; font-size:56px; font-weight:700; text-align:center; color:#24463d">+</p>
+    <div style="width:300px; display:flex; flex-direction:column; gap:8px; background:#ffffff; border:2px solid #24463d; border-radius:24px; padding:24px 36px">
+      <p style="font-size:34px; font-weight:700; color:#24463d">町の境界</p>
+    </div>
+    <x-connector head="end" style="width:96px; color:#24463d; border-width:4px"></x-connector>
+    <div style="flex:1; display:flex; flex-direction:column; gap:8px; background:#24463d; border-radius:24px; padding:24px 36px">
+      <p style="font-size:34px; font-weight:700; color:#ffffff">地図と AI旅プランに出る</p>
+    </div>
+  </div>
+  <div style="flex:1; display:flex; flex-direction:row; gap:40px">
+    <div style="width:560px; display:flex; flex-direction:column; justify-content:center; gap:20px; background:#ffffff; border:1px solid #dfe6e2; border-radius:24px; padding:40px">
+      <p style="font-size:28px; font-weight:700; color:#5b6b65">最初の5つ（長野県）</p>
+      <div style="display:flex; flex-direction:row; flex-wrap:wrap; gap:12px">
+        <p style="font-size:28px; font-weight:500; color:#24463d; background:#e7efeb; border-radius:999px; padding:8px 24px">白馬村</p><p style="font-size:28px; font-weight:500; color:#24463d; background:#e7efeb; border-radius:999px; padding:8px 24px">大町市</p><p style="font-size:28px; font-weight:500; color:#24463d; background:#e7efeb; border-radius:999px; padding:8px 24px">池田町</p><p style="font-size:28px; font-weight:500; color:#24463d; background:#e7efeb; border-radius:999px; padding:8px 24px">安曇野市</p><p style="font-size:28px; font-weight:500; color:#24463d; background:#e7efeb; border-radius:999px; padding:8px 24px">松本市</p>
+      </div>
+    </div>
+    <div style="flex:1; display:flex; flex-direction:column; justify-content:center; gap:20px; background:#ffffff; border:2px solid #24463d; border-radius:24px; padding:40px">
+      <p style="font-size:28px; font-weight:700; color:#24463d">データを足した7つ（北海道〜大分県）</p>
+      <div style="display:flex; flex-direction:row; flex-wrap:wrap; gap:12px">
+        <p style="font-size:28px; font-weight:500; color:#24463d; background:#e7efeb; border-radius:999px; padding:8px 24px">東川町</p><p style="font-size:28px; font-weight:500; color:#24463d; background:#e7efeb; border-radius:999px; padding:8px 24px">丸森町</p><p style="font-size:28px; font-weight:500; color:#24463d; background:#e7efeb; border-radius:999px; padding:8px 24px">中之条町</p><p style="font-size:28px; font-weight:500; color:#24463d; background:#e7efeb; border-radius:999px; padding:8px 24px">大野市</p><p style="font-size:28px; font-weight:500; color:#24463d; background:#e7efeb; border-radius:999px; padding:8px 24px">高島市</p><p style="font-size:28px; font-weight:500; color:#24463d; background:#e7efeb; border-radius:999px; padding:8px 24px">高梁市</p><p style="font-size:28px; font-weight:500; color:#24463d; background:#e7efeb; border-radius:999px; padding:8px 24px">竹田市</p>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex; flex-direction:row; align-items:center; gap:32px; background:#fcf0ec; border-radius:24px; padding:32px 48px">
+    <p style="font-size:26px; font-weight:700; color:#c0432b; background:#ffffff; border-radius:999px; padding:8px 24px">これから（計画中）</p>
+    <p style="flex:1; font-size:32px; font-weight:700; color:#1f2a26">観光施設のオープンデータから、スポットの候補をつくる</p>
+  </div>
+  <aside>（5:25〜5:55。約120字＝約24秒。審査の④「拡張性」）
+町を増やすのに、画面のコードは書き換えません。地域とスポットのデータと境界を足せば、地図にも旅プランにも出ます。実際に長野の5つに全国の7つを足しました。これからは、観光施設一覧のオープンデータがある自治体から候補をつくり、町を増やします。
+（「データを足すだけ?」と聞かれたら: スポットの中身は人が公式サイトで確かめて入れます。それを楽にするのが、次のオープンデータです。）
+（「これから」は #145 の、まだ作っていない計画。「できます」「対応しています」とは言わない。文書の中だけの対応: データは supabase/seed.sql、境界は scripts/boundaries/build.mjs。7つは北海道の東川町・宮城県の丸森町・群馬県の中之条町・福井県の大野市・滋賀県の高島市・岡山県の高梁市・大分県の竹田市。スポットは合わせて82件）</aside>
+</section>
